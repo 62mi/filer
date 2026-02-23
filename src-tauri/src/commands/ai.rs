@@ -346,6 +346,7 @@ fn record_usage_to_db(db: &Database, usage: &ApiUsage, operation: &str) {
 }
 
 /// Claude APIのContentBlockの型安全な表現
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
 enum ContentBlock {
@@ -359,12 +360,14 @@ enum ContentBlock {
 }
 
 /// Claude APIレスポンスの型安全な表現
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct ClaudeResponse {
     content: Vec<ContentBlock>,
     usage: Option<ClaudeUsage>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct ClaudeUsage {
     input_tokens: Option<i64>,
