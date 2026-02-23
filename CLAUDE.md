@@ -67,8 +67,11 @@ pnpm dev
 pnpm test                    # フロントエンド
 cd src-tauri && cargo test   # バックエンド
 
-# リント
-pnpm lint
+# リント・フォーマット (Biome)
+pnpm lint                    # チェックのみ
+pnpm lint:fix                # 自動修正
+pnpm format                  # フォーマットのみ
+pnpm check                   # lint + format + tsc
 ```
 
 ## コーディング規約
@@ -78,6 +81,26 @@ pnpm lint
 - エラーハンドリング: Rustは`Result`型、TSは適切なtry-catch
 - Tauri IPC コマンドは `commands/` 配下にモジュール分割
 - 1ファイル1責務を意識、大きくなったら分割
+
+## 開発ワークフロー
+
+### ブランチ運用
+- `feature/*` / `fix/*` / `chore/*` / `release/*`
+- PRは squash merge（1 PR = 1 コミット）
+
+### CI/CD
+- **PR / master push**: Biome lint + TypeScript型チェック + Vitest（GitHub Actions）
+- **タグ `v*` push**: Tauri ビルド + GitHub Release ドラフト作成
+
+### pre-commit フック
+- Husky + lint-staged でステージファイルに Biome check --write を自動適用
+
+### リリース手順
+1. バージョンを `package.json` / `tauri.conf.json` で更新
+2. master にマージ
+3. `git tag v0.x.x && git push --tags`
+4. GitHub Actions が自動ビルド → Release ドラフト作成
+5. Release ページでドラフトを確認・公開
 
 ## 重要な設計方針
 - **パフォーマンス最優先**: 大量ファイル（10万件以上）でも快適に動作
