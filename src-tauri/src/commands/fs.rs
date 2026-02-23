@@ -5,6 +5,20 @@ use std::path::Path;
 use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 
+/// ファイル名にパス区切り文字やトラバーサル文字列が含まれていないか検証
+fn validate_name(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("ファイル名が空です".to_string());
+    }
+    if name.contains('/') || name.contains('\\') || name.contains('\0') {
+        return Err("ファイル名にパス区切り文字が含まれています".to_string());
+    }
+    if name == "." || name == ".." || name.contains("..") {
+        return Err("ファイル名に不正な文字列が含まれています".to_string());
+    }
+    Ok(())
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct FileEntry {
     pub name: String,
@@ -49,12 +63,18 @@ pub fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
     for entry in read_dir {
         let entry = match entry {
             Ok(e) => e,
-            Err(_) => continue,
+            Err(e) => {
+                eprintln!("[fs] Error reading directory entry: {}", e);
+                continue;
+            }
         };
 
         let metadata = match entry.metadata() {
             Ok(m) => m,
-            Err(_) => continue,
+            Err(e) => {
+                eprintln!("[fs] Error reading metadata for {:?}: {}", entry.file_name(), e);
+                continue;
+            }
         };
 
         let file_path = entry.path();
@@ -164,6 +184,7 @@ pub fn delete_files(paths: Vec<String>, to_trash: bool) -> Result<(), String> {
 
 #[tauri::command]
 pub fn rename_file(path: String, new_name: String) -> Result<String, String> {
+    validate_name(&new_name)?;
     let src = Path::new(&path);
     let parent = src.parent().ok_or("Cannot get parent directory")?;
     let dest = parent.join(&new_name);
@@ -173,6 +194,7 @@ pub fn rename_file(path: String, new_name: String) -> Result<String, String> {
 
 #[tauri::command]
 pub fn create_directory(path: String, name: String) -> Result<String, String> {
+    validate_name(&name)?;
     let dir = Path::new(&path).join(&name);
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create directory: {}", e))?;
     Ok(dir.to_string_lossy().to_string())
@@ -180,9 +202,106 @@ pub fn create_directory(path: String, name: String) -> Result<String, String> {
 
 #[tauri::command]
 pub fn create_file(path: String, name: String) -> Result<String, String> {
+    validate_name(&name)?;
     let file_path = Path::new(&path).join(&name);
     fs::File::create(&file_path).map_err(|e| format!("Failed to create file: {}", e))?;
     Ok(file_path.to_string_lossy().to_string())
+}
+
+/// ファイル同士をグループ化して新しいフォルダに入れる
+/// drag_paths: ドラッグ中のファイルパス
+/// target_path: ドロップ先のファイルパス
+/// folder_name: 作成するフォルダ名（Noneの場合は自動生成）
+/// 戻り値: 作成されたフォルダのパス
+#[tauri::command]
+pub fn group_files_into_folder(
+    drag_paths: Vec<String>,
+    target_path: String,
+    folder_name: Option<String>,
+) -> Result<String, String> {
+    let target = Path::new(&target_path);
+    let parent = target.parent().ok_or("Cannot get parent directory")?;
+
+    // フォルダ名を決定
+    let name = folder_name.unwrap_or_else(|| {
+        // ターゲットファイル名のステム（拡張子なし）をベースに
+        let stem = target
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("New Folder");
+        // 共通プレフィックスがあれば使う
+        let all_names: Vec<String> = std::iter::once(target_path.clone())
+            .chain(drag_paths.iter().cloned())
+            .filter_map(|p| {
+                Path::new(&p)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.to_string())
+            })
+            .collect();
+
+        if let Some(prefix) = find_common_prefix(&all_names) {
+            if prefix.len() >= 3 {
+                return prefix;
+            }
+        }
+        stem.to_string()
+    });
+
+    // 重複しないフォルダ名を生成
+    let mut folder_path = parent.join(&name);
+    let mut counter = 1;
+    while folder_path.exists() {
+        folder_path = parent.join(format!("{} ({})", name, counter));
+        counter += 1;
+    }
+
+    // フォルダ作成
+    fs::create_dir_all(&folder_path)
+        .map_err(|e| format!("Failed to create folder: {}", e))?;
+
+    // ファイルを移動
+    let all_paths: Vec<&str> = std::iter::once(target_path.as_str())
+        .chain(drag_paths.iter().map(|s| s.as_str()))
+        .collect();
+
+    for path_str in all_paths {
+        let src = Path::new(path_str);
+        let file_name = src.file_name().ok_or("Invalid file name")?;
+        let dest = folder_path.join(file_name);
+        fs::rename(src, &dest)
+            .map_err(|e| format!("Failed to move {}: {}", path_str, e))?;
+    }
+
+    Ok(folder_path.to_string_lossy().to_string())
+}
+
+fn find_common_prefix(names: &[String]) -> Option<String> {
+    if names.is_empty() {
+        return None;
+    }
+    let first = &names[0];
+    let mut prefix_len = first.len();
+    for name in &names[1..] {
+        prefix_len = prefix_len.min(name.len());
+        for (i, (a, b)) in first.chars().zip(name.chars()).enumerate() {
+            if a != b {
+                prefix_len = prefix_len.min(i);
+                break;
+            }
+        }
+    }
+    if prefix_len == 0 {
+        return None;
+    }
+    // 末尾の区切り文字を除去
+    let prefix: String = first.chars().take(prefix_len).collect();
+    let trimmed = prefix.trim_end_matches(|c: char| c == '_' || c == '-' || c == ' ' || c == '.');
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
 }
 
 #[tauri::command]

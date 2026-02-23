@@ -12,6 +12,8 @@ export interface FileEntry {
 export interface DriveInfo {
   name: string;
   path: string;
+  display_name: string;
+  icon: string | null;
 }
 
 export type SortKey = "name" | "size" | "modified" | "extension";

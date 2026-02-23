@@ -1,15 +1,16 @@
 import {
-  Folder,
   File,
-  FileText,
-  FileImage,
-  FileVideo,
+  FileArchive,
   FileAudio,
   FileCode,
-  FileArchive,
+  FileImage,
   FileSpreadsheet,
+  FileText,
+  FileVideo,
+  Folder,
   type LucideProps,
 } from "lucide-react";
+import { useIconStore } from "../../stores/iconStore";
 
 const iconMap: Record<string, React.ComponentType<LucideProps>> = {
   // テキスト
@@ -66,6 +67,12 @@ interface FileIconProps {
 }
 
 export function FileIcon({ isDir, extension, className }: FileIconProps) {
+  const iconUrl = useIconStore((s) => s.icons[isDir ? "__directory__" : extension]);
+
+  if (iconUrl) {
+    return <img src={iconUrl} alt="" className="w-4 h-4 mr-2 shrink-0" draggable={false} />;
+  }
+
   if (isDir) {
     return <Folder className={className} />;
   }

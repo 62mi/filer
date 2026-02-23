@@ -1,5 +1,7 @@
-import { Plus, X } from "lucide-react";
+import { Plus, Sparkles, X } from "lucide-react";
+import { useAiStore } from "../../stores/aiStore";
 import { useExplorerStore } from "../../stores/panelStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { cn } from "../../utils/cn";
 
 export function TabBar() {
@@ -8,21 +10,31 @@ export function TabBar() {
   const setActiveTab = useExplorerStore((s) => s.setActiveTab);
   const addTab = useExplorerStore((s) => s.addTab);
   const closeTab = useExplorerStore((s) => s.closeTab);
+  const aiDialogTabId = useAiStore((s) => s.dialogTabId);
+  const aiLoading = useAiStore((s) => s.loading);
+  const aiDialogOpen = useAiStore((s) => s.dialogOpen);
+  const tabBarHeight = useSettingsStore((s) => s.tabBarHeight);
+  const uiFontSize = useSettingsStore((s) => s.uiFontSize);
 
   return (
-    <div className="flex items-center h-9 bg-[#f0f0f0] border-b border-[#e5e5e5] select-none shrink-0">
+    <div
+      className="flex items-center bg-[#f0f0f0] border-b border-[#e5e5e5] select-none shrink-0"
+      style={{ height: tabBarHeight, fontSize: uiFontSize }}
+    >
       <div className="flex items-end h-full overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           const label = tab.path.split("\\").filter(Boolean).pop() || tab.path;
+          const hasAi = aiDialogOpen && aiDialogTabId === tab.id;
           return (
             <div
               key={tab.id}
               className={cn(
-                "group flex items-center gap-1 h-full px-3 text-sm cursor-pointer border-r border-[#e0e0e0] max-w-48 min-w-0",
+                "group flex items-center gap-1 h-full px-3 cursor-pointer border-r border-[#e0e0e0] max-w-48 min-w-0",
+                "transition-[background-color,border-color,color] duration-150 ease-out",
                 isActive
                   ? "bg-white text-[#1a1a1a] border-t-2 border-t-[#0078d4]"
-                  : "bg-[#f0f0f0] text-[#666] hover:bg-[#e8e8e8] border-t-2 border-t-transparent"
+                  : "bg-[#f0f0f0] text-[#666] hover:bg-[#e8e8e8] border-t-2 border-t-transparent",
               )}
               onClick={() => setActiveTab(tab.id)}
               onMouseDown={(e) => {
@@ -34,6 +46,11 @@ export function TabBar() {
               }}
               title={tab.path}
             >
+              {hasAi && (
+                <Sparkles
+                  className={cn("w-3 h-3 text-purple-500 shrink-0", aiLoading && "animate-pulse")}
+                />
+              )}
               <span className="truncate flex-1">{label}</span>
               {tabs.length > 1 && (
                 <button

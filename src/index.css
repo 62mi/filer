@@ -32,3 +32,228 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #a0a0a0;
 }
+
+/* === Animations (yui540 inspired) === */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 100ms ease-out forwards;
+}
+
+.animate-fade-scale-in {
+  animation: fadeScaleIn 150ms ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 150ms ease-out forwards;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 60vh;
+  }
+}
+
+.animate-slide-down {
+  animation: slideDown 200ms ease-out forwards;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 150ms ease-out forwards;
+}
+
+@keyframes suggestionSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-suggestion-in {
+  animation: suggestionSlideUp 150ms cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+/* QuickLookの横スクロールバーを非表示 */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* === Folderize Animation (おしゃれ・控えめ) === */
+
+@keyframes folderizeShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.folderize-target {
+  background: linear-gradient(
+    90deg,
+    #e8f0fe 0%,
+    #d4e4fc 25%,
+    #e8f0fe 50%,
+    #d4e4fc 75%,
+    #e8f0fe 100%
+  );
+  background-size: 200% 100%;
+  animation: folderizeShimmer 2s ease-in-out infinite;
+  outline: 1.5px solid rgba(0, 120, 212, 0.4);
+  outline-offset: -1px;
+  border-radius: 5px;
+  position: relative;
+  z-index: 2;
+  transition: all 150ms ease;
+}
+
+.folderize-target .folderize-icon {
+  color: #0078d4;
+  filter: drop-shadow(0 0 3px rgba(0, 120, 212, 0.3));
+}
+
+/* === Mac-style QuickLook Animations === */
+
+@keyframes quickLookIn {
+  from {
+    transform: scale(0.96) translateZ(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateZ(0);
+    opacity: 1;
+  }
+}
+
+@keyframes quickLookBackdropIn {
+  from {
+    background-color: rgba(0, 0, 0, 0);
+  }
+  to {
+    background-color: rgba(0, 0, 0, 0.35);
+  }
+}
+
+.animate-quicklook-spring {
+  animation: quickLookIn 180ms cubic-bezier(0.2, 0, 0, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-quicklook-backdrop {
+  animation: quickLookBackdropIn 180ms ease-out forwards;
+  backdrop-filter: blur(8px);
+  will-change: background-color;
+}
+
+@keyframes quickLookContentFade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-quicklook-content {
+  animation: quickLookContentFade 200ms ease-out forwards;
+}
+
+/* QuickLook 閉じるアニメーション */
+@keyframes quickLookOut {
+  from {
+    transform: scale(1) translateZ(0);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.96) translateZ(0);
+    opacity: 0;
+  }
+}
+
+@keyframes quickLookBackdropOut {
+  from {
+    background-color: rgba(0, 0, 0, 0.35);
+  }
+  to {
+    background-color: rgba(0, 0, 0, 0);
+  }
+}
+
+.animate-quicklook-spring-out {
+  animation: quickLookOut 150ms ease-in forwards;
+  will-change: transform, opacity;
+}
+
+.animate-quicklook-backdrop-out {
+  animation: quickLookBackdropOut 150ms ease-in forwards;
+  backdrop-filter: blur(0px);
+  will-change: background-color;
+}

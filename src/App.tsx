@@ -1,11 +1,20 @@
-import { useState } from "react";
-import { Sidebar } from "./components/Sidebar";
+import { listen } from "@tauri-apps/api/event";
+import { useEffect, useState } from "react";
+import { AiSettings } from "./components/AiSettings";
+import { BookmarkBar } from "./components/BookmarkBar";
 import { NavigationBar } from "./components/NavigationBar";
-import { TabBar } from "./components/TabBar";
 import { Panel } from "./components/Panel";
 import { PreviewPanel } from "./components/PreviewPanel";
+import { RuleManager } from "./components/RuleManager";
+import { RuleWizard } from "./components/RuleWizard";
+import { SettingsDialog } from "./components/SettingsDialog/SettingsDialog";
+import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
+import { TabBar } from "./components/TabBar";
+import { useAiStore } from "./stores/aiStore";
 import { useExplorerStore } from "./stores/panelStore";
+import { useRuleSuggestionStore } from "./stores/ruleSuggestionStore";
+import { toast, useToastStore } from "./stores/toastStore";
 
 function App() {
   const [sidebarWidth, setSidebarWidth] = useState(220);
@@ -14,8 +23,66 @@ function App() {
   const [previewWidth, setPreviewWidth] = useState(280);
   const [previewDragging, setPreviewDragging] = useState(false);
 
+  const toasts = useToastStore((s) => s.toasts);
   const tab = useExplorerStore((s) => s.tabs.find((t) => t.id === s.activeTabId) || s.tabs[0]);
   const cursorEntry = (tab.searchResults ?? tab.entries)[tab.cursorIndex] ?? null;
+
+  // 起動時にAPIキーの存在チェック + 使用量ロード
+  useEffect(() => {
+    useAiStore.getState().checkApiKey();
+    useAiStore.getState().loadUsage();
+  }, []);
+
+  // ルール自動実行の通知をリッスン
+  useEffect(() => {
+    const unlistenExec = listen<{
+      rule_name: string;
+      file_name: string;
+      action_type: string;
+    }>("rule-executed", (event) => {
+      const { rule_name, file_name, action_type } = event.payload;
+      const actionLabel =
+        action_type === "move" ? "移動" : action_type === "copy" ? "コピー" : "削除";
+      toast.success(`${rule_name}: ${file_name} を${actionLabel}しました`);
+      useExplorerStore.getState().refreshDirectory();
+    });
+
+    const unlistenErr = listen<{
+      rule_name: string;
+      file_name: string;
+      error: string;
+    }>("rule-error", (event) => {
+      const { rule_name, file_name, error } = event.payload;
+      toast.error(`${rule_name}: ${file_name} — ${error}`);
+    });
+
+    // ルールサジェストイベント（auto_execute = false のルールがマッチ）
+    const unlistenSuggest = listen<{
+      rule_id: string;
+      rule_name: string;
+      file_name: string;
+      file_path: string;
+      action_type: string;
+      action_dest: string | null;
+    }>("rule-suggestion", (event) => {
+      const { rule_id, rule_name, file_name, file_path, action_type, action_dest } = event.payload;
+      useRuleSuggestionStore.getState().addSuggestion({
+        ruleId: rule_id,
+        ruleName: rule_name,
+        fileName: file_name,
+        filePath: file_path,
+        actionType: action_type,
+        actionDest: action_dest,
+        timestamp: Date.now(),
+      });
+    });
+
+    return () => {
+      unlistenExec.then((f) => f()).catch(() => {});
+      unlistenErr.then((f) => f()).catch(() => {});
+      unlistenSuggest.then((f) => f()).catch(() => {});
+    };
+  }, []);
 
   const handleMouseDown = () => setDragging(true);
   const handlePreviewMouseDown = () => setPreviewDragging(true);
@@ -39,15 +106,18 @@ function App() {
   return (
     <div
       className="flex flex-col h-screen bg-white text-[#1a1a1a]"
-      onMouseMove={(dragging || previewDragging) ? handleMouseMove : undefined}
-      onMouseUp={(dragging || previewDragging) ? handleMouseUp : undefined}
-      onMouseLeave={(dragging || previewDragging) ? handleMouseUp : undefined}
+      onMouseMove={dragging || previewDragging ? handleMouseMove : undefined}
+      onMouseUp={dragging || previewDragging ? handleMouseUp : undefined}
+      onMouseLeave={dragging || previewDragging ? handleMouseUp : undefined}
     >
       {/* Tab bar */}
       <TabBar />
 
       {/* Navigation bar */}
       <NavigationBar />
+
+      {/* Bookmark bar */}
+      <BookmarkBar />
 
       {/* Main content: sidebar + file list + preview */}
       <div className="flex flex-1 min-h-0">
@@ -82,20 +152,46 @@ function App() {
               onMouseDown={handlePreviewMouseDown}
             />
             <div className="shrink-0 overflow-hidden" style={{ width: previewWidth }}>
-              <PreviewPanel
-                entry={cursorEntry}
-                onClose={() => setPreviewOpen(false)}
-              />
+              <PreviewPanel entry={cursorEntry} onClose={() => setPreviewOpen(false)} />
             </div>
           </>
         )}
       </div>
 
       {/* Status bar */}
-      <StatusBar
-        onTogglePreview={() => setPreviewOpen(!previewOpen)}
-        previewOpen={previewOpen}
-      />
+      <StatusBar onTogglePreview={() => setPreviewOpen(!previewOpen)} previewOpen={previewOpen} />
+
+      {/* Rule Manager Dialog */}
+      <RuleManager />
+
+      {/* AI Rule Wizard Dialog */}
+      <RuleWizard />
+
+      {/* AI Settings Dialog (global) */}
+      <AiSettings />
+
+      {/* UI Settings Dialog */}
+      <SettingsDialog />
+
+      {/* Toast notifications */}
+      {toasts.length > 0 && (
+        <div className="fixed bottom-10 right-4 z-50 flex flex-col gap-2">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className={`px-4 py-2 rounded-lg shadow-lg text-sm max-w-xs animate-fade-scale-in ${
+                t.type === "error"
+                  ? "bg-red-500 text-white"
+                  : t.type === "info"
+                    ? "bg-gray-700 text-white"
+                    : "bg-[#0078d4] text-white"
+              }`}
+            >
+              {t.message}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

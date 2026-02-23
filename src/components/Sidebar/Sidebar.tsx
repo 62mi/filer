@@ -1,29 +1,38 @@
-import { useEffect, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  Monitor,
-  Download,
-  Image,
-  Music,
-  Video,
-  FileText,
-  HardDrive,
-  ChevronDown,
   ChevronRight,
-  Layers,
-  Folder,
+  Download,
   File,
-  X,
+  FileText,
+  Folder,
+  HardDrive,
+  Image,
+  Layers,
+  Monitor,
+  Music,
   Trash2,
+  Video,
+  X,
 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useIconStore } from "../../stores/iconStore";
 import { useExplorerStore } from "../../stores/panelStore";
-import { cn } from "../../utils/cn";
 import type { DriveInfo } from "../../types";
+import { cn } from "../../utils/cn";
+import { createDragGhost, removeDragGhost } from "../Panel/DragGhost";
 
 interface QuickAccessItem {
   label: string;
   path: string;
   icon: React.ReactNode;
+}
+
+function SidebarIcon({ ext, fallback }: { ext: string; fallback: React.ReactNode }) {
+  const iconUrl = useIconStore((s) => s.icons[ext]);
+  if (iconUrl) {
+    return <img src={iconUrl} alt="" className="w-4 h-4 shrink-0" draggable={false} />;
+  }
+  return <>{fallback}</>;
 }
 
 export function Sidebar() {
@@ -36,7 +45,7 @@ export function Sidebar() {
   const addToStack = useExplorerStore((s) => s.addToStack);
   const removeFromStack = useExplorerStore((s) => s.removeFromStack);
   const clearStack = useExplorerStore((s) => s.clearStack);
-
+  const fetchIcons = useIconStore((s) => s.fetchIcons);
 
   const [drives, setDrives] = useState<DriveInfo[]>([]);
   const [homeDir, setHomeDir] = useState("");
@@ -55,11 +64,24 @@ export function Sidebar() {
     invoke<string>("get_home_dir").then(setHomeDir);
   }, []);
 
+  // サイドバー用のアイコンを取得
+  useEffect(() => {
+    fetchIcons(["__directory__"]);
+  }, [fetchIcons]);
+
   const quickAccess: QuickAccessItem[] = homeDir
     ? [
         { label: "Desktop", path: `${homeDir}\\Desktop`, icon: <Monitor className="w-4 h-4" /> },
-        { label: "Documents", path: `${homeDir}\\Documents`, icon: <FileText className="w-4 h-4" /> },
-        { label: "Downloads", path: `${homeDir}\\Downloads`, icon: <Download className="w-4 h-4" /> },
+        {
+          label: "Documents",
+          path: `${homeDir}\\Documents`,
+          icon: <FileText className="w-4 h-4" />,
+        },
+        {
+          label: "Downloads",
+          path: `${homeDir}\\Downloads`,
+          icon: <Download className="w-4 h-4" />,
+        },
         { label: "Pictures", path: `${homeDir}\\Pictures`, icon: <Image className="w-4 h-4" /> },
         { label: "Music", path: `${homeDir}\\Music`, icon: <Music className="w-4 h-4" /> },
         { label: "Videos", path: `${homeDir}\\Videos`, icon: <Video className="w-4 h-4" /> },
@@ -68,7 +90,7 @@ export function Sidebar() {
 
   const isActive = (path: string) =>
     currentPath.toLowerCase() === path.toLowerCase() ||
-    currentPath.toLowerCase().startsWith(path.toLowerCase() + "\\");
+    currentPath.toLowerCase().startsWith(`${path.toLowerCase()}\\`);
 
   // Stack D&D handlers
   const handleStackDragOver = useCallback((e: React.DragEvent) => {
@@ -94,18 +116,15 @@ export function Sidebar() {
         // ignore
       }
     },
-    [addToStack]
+    [addToStack],
   );
 
   // Stack item context menu
-  const handleStackItemContextMenu = useCallback(
-    (e: React.MouseEvent, path: string | null) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setStackContextMenu({ x: e.clientX, y: e.clientY, path });
-    },
-    []
-  );
+  const handleStackItemContextMenu = useCallback((e: React.MouseEvent, path: string | null) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setStackContextMenu({ x: e.clientX, y: e.clientY, path });
+  }, []);
 
   // Close context menu
   useEffect(() => {
@@ -128,6 +147,13 @@ export function Sidebar() {
     return parts[parts.length - 1] || path;
   };
 
+  // Get extension from path
+  const getExtension = (path: string) => {
+    const name = getFileName(path);
+    const dot = name.lastIndexOf(".");
+    return dot > 0 ? name.substring(dot + 1).toLowerCase() : "";
+  };
+
   // Check if path is a directory (simple heuristic: no extension)
   const isLikelyDir = (path: string) => {
     const name = getFileName(path);
@@ -138,10 +164,15 @@ export function Sidebar() {
     <div className="flex flex-col h-full w-full overflow-y-auto overflow-x-hidden py-1 text-[13px]">
       {/* クイックアクセス */}
       <button
-        className="flex items-center gap-1 px-2 py-1 hover:bg-[#e8e8e8] text-left w-full font-semibold text-[#1a1a1a]"
+        className="flex items-center gap-1 px-2 py-1 hover:bg-[#e8e8e8] text-left w-full font-semibold text-[#1a1a1a] transition-colors duration-100"
         onClick={() => setQuickAccessOpen(!quickAccessOpen)}
       >
-        {quickAccessOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        <ChevronRight
+          className={cn(
+            "w-3 h-3 transition-transform duration-200",
+            quickAccessOpen && "rotate-90",
+          )}
+        />
         Quick access
       </button>
       {quickAccessOpen &&
@@ -149,23 +180,27 @@ export function Sidebar() {
           <button
             key={item.path}
             className={cn(
-              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[#e8e8e8] text-left w-full truncate",
-              isActive(item.path) && "bg-[#e8e8e8]"
+              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[#e8e8e8] text-left w-full truncate transition-colors duration-100",
+              isActive(item.path) && "bg-[#e8e8e8]",
             )}
             onClick={() => loadDirectory(item.path)}
             title={item.path}
           >
-            <span className="text-[#666] shrink-0">{item.icon}</span>
+            <span className="text-[#666] shrink-0">
+              <SidebarIcon ext="__directory__" fallback={item.icon} />
+            </span>
             <span className="truncate">{item.label}</span>
           </button>
         ))}
 
       {/* PC */}
       <button
-        className="flex items-center gap-1 px-2 py-1 mt-2 hover:bg-[#e8e8e8] text-left w-full font-semibold text-[#1a1a1a]"
+        className="flex items-center gap-1 px-2 py-1 mt-2 hover:bg-[#e8e8e8] text-left w-full font-semibold text-[#1a1a1a] transition-colors duration-100"
         onClick={() => setPcOpen(!pcOpen)}
       >
-        {pcOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        <ChevronRight
+          className={cn("w-3 h-3 transition-transform duration-200", pcOpen && "rotate-90")}
+        />
         This PC
       </button>
       {pcOpen &&
@@ -173,23 +208,29 @@ export function Sidebar() {
           <button
             key={drive.path}
             className={cn(
-              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[#e8e8e8] text-left w-full",
-              isActive(drive.path) && "bg-[#e8e8e8]"
+              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[#e8e8e8] text-left w-full transition-colors duration-100",
+              isActive(drive.path) && "bg-[#e8e8e8]",
             )}
             onClick={() => loadDirectory(drive.path)}
             title={drive.path}
           >
-            <HardDrive className="w-4 h-4 text-[#666] shrink-0" />
-            <span>Local Disk ({drive.name})</span>
+            {drive.icon ? (
+              <img src={drive.icon} alt="" className="w-4 h-4 shrink-0" draggable={false} />
+            ) : (
+              <HardDrive className="w-4 h-4 text-[#666] shrink-0" />
+            )}
+            <span className="truncate">{drive.display_name}</span>
           </button>
         ))}
 
       {/* Stack */}
       <button
-        className="flex items-center gap-1 px-2 py-1 mt-2 hover:bg-[#e8e8e8] text-left w-full font-semibold text-[#1a1a1a]"
+        className="flex items-center gap-1 px-2 py-1 mt-2 hover:bg-[#e8e8e8] text-left w-full font-semibold text-[#1a1a1a] transition-colors duration-100"
         onClick={() => setStackOpen(!stackOpen)}
       >
-        {stackOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        <ChevronRight
+          className={cn("w-3 h-3 transition-transform duration-200", stackOpen && "rotate-90")}
+        />
         <Layers className="w-3.5 h-3.5 mr-0.5" />
         Stack
         {stackItems.length > 0 && (
@@ -209,7 +250,8 @@ export function Sidebar() {
         <div
           className={cn(
             "min-h-[40px] transition-colors",
-            stackDragOver && "bg-[#cce8ff] outline outline-1 outline-[#0078d4] outline-offset-[-1px]"
+            stackDragOver &&
+              "bg-[#cce8ff] outline outline-1 outline-[#0078d4] outline-offset-[-1px]",
           )}
           onDragOver={handleStackDragOver}
           onDragLeave={handleStackDragLeave}
@@ -221,42 +263,59 @@ export function Sidebar() {
               Drag files here
             </div>
           ) : (
-            stackItems.map((path) => (
-              <div
-                key={path}
-                className="flex items-center gap-2 pl-6 pr-1 py-[3px] hover:bg-[#e8e8e8] text-left w-full group cursor-grab active:cursor-grabbing"
-                title={path}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.effectAllowed = "copyMove";
-                  e.dataTransfer.setData("application/x-filer-paths", JSON.stringify(stackItems));
-                  e.dataTransfer.setData("application/x-filer-from-stack", "true");
-                }}
-                onDoubleClick={() => {
-                  // ファイルの親ディレクトリに移動
-                  const parent = path.substring(0, path.lastIndexOf("\\"));
-                  if (parent) loadDirectory(parent);
-                }}
-                onContextMenu={(e) => handleStackItemContextMenu(e, path)}
-              >
-                {isLikelyDir(path) ? (
-                  <Folder className="w-4 h-4 text-amber-500 shrink-0" />
-                ) : (
-                  <File className="w-4 h-4 text-[#666] shrink-0" />
-                )}
-                <span className="truncate flex-1">{getFileName(path)}</span>
-                <button
-                  className="p-0.5 rounded hover:bg-[#d0d0d0] opacity-0 group-hover:opacity-100 shrink-0 transition-opacity"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFromStack(path);
+            stackItems.map((path) => {
+              const isDir = isLikelyDir(path);
+              const ext = isDir ? "__directory__" : getExtension(path);
+              return (
+                <div
+                  key={path}
+                  className="flex items-center gap-2 pl-6 pr-1 py-[3px] hover:bg-[#e8e8e8] text-left w-full group cursor-grab active:cursor-grabbing transition-colors duration-100"
+                  title={path}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "copyMove";
+                    e.dataTransfer.setData("application/x-filer-paths", JSON.stringify([path]));
+                    e.dataTransfer.setData("application/x-filer-from-stack", "true");
+                    const ghostItems = [
+                      {
+                        name: getFileName(path),
+                        is_dir: isDir,
+                      },
+                    ];
+                    const ghostCard = createDragGhost(ghostItems);
+                    e.dataTransfer.setDragImage(ghostCard, 20, 16);
                   }}
-                  title="Remove"
+                  onDragEnd={() => removeDragGhost()}
+                  onDoubleClick={() => {
+                    const parent = path.substring(0, path.lastIndexOf("\\"));
+                    if (parent) loadDirectory(parent);
+                  }}
+                  onContextMenu={(e) => handleStackItemContextMenu(e, path)}
                 >
-                  <X className="w-3 h-3 text-[#999]" />
-                </button>
-              </div>
-            ))
+                  <SidebarIcon
+                    ext={ext}
+                    fallback={
+                      isDir ? (
+                        <Folder className="w-4 h-4 text-amber-500 shrink-0" />
+                      ) : (
+                        <File className="w-4 h-4 text-[#666] shrink-0" />
+                      )
+                    }
+                  />
+                  <span className="truncate flex-1">{getFileName(path)}</span>
+                  <button
+                    className="p-0.5 rounded hover:bg-[#d0d0d0] opacity-0 group-hover:opacity-100 shrink-0 transition-opacity"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFromStack(path);
+                    }}
+                    title="Remove"
+                  >
+                    <X className="w-3 h-3 text-[#999]" />
+                  </button>
+                </div>
+              );
+            })
           )}
         </div>
       )}
@@ -264,7 +323,7 @@ export function Sidebar() {
       {/* Stack context menu */}
       {stackContextMenu && (
         <div
-          className="fixed z-50 min-w-40 bg-white border border-[#e0e0e0] rounded-lg shadow-lg py-1"
+          className="fixed z-50 min-w-40 bg-white border border-[#e0e0e0] rounded-lg shadow-lg py-1 animate-fade-scale-in origin-top-left"
           style={{ left: stackContextMenu.x, top: stackContextMenu.y }}
           onMouseDown={(e) => e.stopPropagation()}
         >

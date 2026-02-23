@@ -1,18 +1,24 @@
-import { useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import {
-  Copy,
-  Scissors,
   ClipboardPaste,
-  Trash2,
-  PencilLine,
-  FolderPlus,
-  FilePlus,
+  Copy,
   ExternalLink,
+  FilePlus,
+  FolderPlus,
   Info,
   Layers,
+  PencilLine,
+  Scissors,
+  Sparkles,
+  Trash2,
+  Wand2,
+  Zap,
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useRef } from "react";
+import { useAiStore } from "../../stores/aiStore";
 import { useExplorerStore } from "../../stores/panelStore";
+import { useRuleStore } from "../../stores/ruleStore";
+import { useRuleWizardStore } from "../../stores/ruleWizardStore";
 import type { FileEntry } from "../../types";
 
 interface ContextMenuProps {
@@ -85,7 +91,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     if (rect.bottom > window.innerHeight) {
       menuRef.current.style.top = `${window.innerHeight - rect.height - 4}px`;
     }
-  }, [x, y]);
+  }, []);
 
   const items: MenuEntry[] = [
     ...(hasTarget
@@ -109,26 +115,38 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     {
       label: "Copy",
       icon: <Copy className="w-4 h-4" />,
-      onClick: () => { clipboardCopy(); onClose(); },
+      onClick: () => {
+        clipboardCopy();
+        onClose();
+      },
       disabled: !hasSelection,
     },
     {
       label: "Cut",
       icon: <Scissors className="w-4 h-4" />,
-      onClick: () => { clipboardCut(); onClose(); },
+      onClick: () => {
+        clipboardCut();
+        onClose();
+      },
       disabled: !hasSelection,
     },
     {
       label: "Paste",
       icon: <ClipboardPaste className="w-4 h-4" />,
-      onClick: () => { clipboardPaste(); onClose(); },
+      onClick: () => {
+        clipboardPaste();
+        onClose();
+      },
       disabled: !clipboard,
     },
     { separator: true },
     {
       label: "Delete",
       icon: <Trash2 className="w-4 h-4" />,
-      onClick: () => { deleteSelected(); onClose(); },
+      onClick: () => {
+        deleteSelected();
+        onClose();
+      },
       disabled: !hasSelection,
     },
     ...(hasTarget
@@ -136,7 +154,10 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
           {
             label: "Rename",
             icon: <PencilLine className="w-4 h-4" />,
-            onClick: () => { startRename(targetIndex!); onClose(); },
+            onClick: () => {
+              startRename(targetIndex!);
+              onClose();
+            },
           } as MenuItem,
         ]
       : []),
@@ -146,9 +167,12 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
             label: "Add to Stack",
             icon: <Layers className="w-4 h-4" />,
             onClick: () => {
-              const indices = selectedIndices.size > 0
-                ? Array.from(selectedIndices)
-                : targetIndex !== null ? [targetIndex] : [];
+              const indices =
+                selectedIndices.size > 0
+                  ? Array.from(selectedIndices)
+                  : targetIndex !== null
+                    ? [targetIndex]
+                    : [];
               const paths = indices.map((i) => entries[i]?.path).filter(Boolean);
               if (paths.length > 0) addToStack(paths);
               onClose();
@@ -161,25 +185,61 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
           {
             label: `Paste from Stack (Move ${stackItems.length})`,
             icon: <Scissors className="w-4 h-4" />,
-            onClick: () => { pasteFromStack("move"); onClose(); },
+            onClick: () => {
+              pasteFromStack("move");
+              onClose();
+            },
           } as MenuItem,
           {
             label: `Paste from Stack (Copy ${stackItems.length})`,
             icon: <Copy className="w-4 h-4" />,
-            onClick: () => { pasteFromStack("copy"); onClose(); },
+            onClick: () => {
+              pasteFromStack("copy");
+              onClose();
+            },
           } as MenuItem,
         ]
       : []),
     { separator: true },
     {
+      label: "Folder Rules",
+      icon: <Zap className="w-4 h-4" />,
+      onClick: () => {
+        useRuleStore.getState().openDialog(tab.path);
+        onClose();
+      },
+    },
+    {
+      label: "AI Rule Wizard",
+      icon: <Wand2 className="w-4 h-4" />,
+      onClick: () => {
+        useRuleWizardStore.getState().openWizard(tab.path);
+        onClose();
+      },
+    },
+    {
+      label: "AI Auto-Organize",
+      icon: <Sparkles className="w-4 h-4" />,
+      onClick: () => {
+        useAiStore.getState().openDialog(tab.path, tab.id);
+        onClose();
+      },
+    },
+    {
       label: "New Folder",
       icon: <FolderPlus className="w-4 h-4" />,
-      onClick: () => { createNewFolder(); onClose(); },
+      onClick: () => {
+        createNewFolder();
+        onClose();
+      },
     },
     {
       label: "New File",
       icon: <FilePlus className="w-4 h-4" />,
-      onClick: () => { createNewFile(); onClose(); },
+      onClick: () => {
+        createNewFile();
+        onClose();
+      },
     },
     ...(hasTarget
       ? [
@@ -187,7 +247,9 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
           {
             label: "Properties",
             icon: <Info className="w-4 h-4" />,
-            onClick: () => { onProperties(entries[targetIndex!]); },
+            onClick: () => {
+              onProperties(entries[targetIndex!]);
+            },
           } as MenuItem,
         ]
       : []),
@@ -196,7 +258,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-48 bg-white border border-[#e0e0e0] rounded-lg shadow-lg py-1"
+      className="fixed z-50 min-w-48 bg-white border border-[#e0e0e0] rounded-lg shadow-lg py-1 animate-fade-scale-in origin-top-left"
       style={{ left: x, top: y }}
     >
       {items.map((item, i) => {
