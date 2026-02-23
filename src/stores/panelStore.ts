@@ -1,6 +1,7 @@
-import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { create } from "zustand";
 import type { FileEntry, SortKey, SortOrder } from "../types";
+import { useUndoStore } from "./undoStore";
 
 function sortEntries(entries: FileEntry[], key: SortKey, order: SortOrder): FileEntry[] {
   return [...entries].sort((a, b) => {
@@ -44,9 +45,11 @@ interface TabState {
   history: string[];
   historyIndex: number;
   renamingIndex: number | null;
+  pendingRenamePath: string | null;
   searchQuery: string;
   searchResults: FileEntry[] | null;
   searching: boolean;
+  viewMode: "details" | "icons";
 }
 
 function createTabState(path: string): TabState {
@@ -63,9 +66,11 @@ function createTabState(path: string): TabState {
     history: [path],
     historyIndex: 0,
     renamingIndex: null,
+    pendingRenamePath: null,
     searchQuery: "",
     searchResults: null,
     searching: false,
+    viewMode: "details",
   };
 }
 
@@ -89,7 +94,8 @@ interface ExplorerStore {
   getActiveTab: () => TabState;
 
   // Directory navigation
-  loadDirectory: (path: string, addToHistory?: boolean) => Promise<void>;
+  loadDirectory: (path: string, addToHistory?: boolean, smooth?: boolean) => Promise<void>;
+  refreshDirectory: () => Promise<void>;
   navigateUp: () => Promise<void>;
   navigateBack: () => Promise<void>;
   navigateForward: () => Promise<void>;
@@ -97,6 +103,7 @@ interface ExplorerStore {
   // Selection
   setCursor: (index: number) => void;
   toggleSelection: (index: number) => void;
+  selectRange: (fromIndex: number, toIndex: number) => void;
   selectAll: () => void;
   clearSelection: () => void;
   setSort: (key: SortKey) => void;
@@ -111,7 +118,11 @@ interface ExplorerStore {
   createNewFile: () => Promise<void>;
   startRename: (index: number) => void;
   commitRename: (newName: string) => Promise<void>;
+  commitRenameAndNext: (newName: string, direction: 1 | -1) => Promise<void>;
   cancelRename: () => void;
+
+  // View mode
+  setViewMode: (mode: "details" | "icons") => void;
 
   // Search
   search: (query: string) => Promise<void>;
@@ -129,11 +140,9 @@ interface ExplorerStore {
 function updateActiveTab(
   tabs: TabState[],
   activeTabId: string,
-  updater: (tab: TabState) => Partial<TabState>
+  updater: (tab: TabState) => Partial<TabState>,
 ): TabState[] {
-  return tabs.map((t) =>
-    t.id === activeTabId ? { ...t, ...updater(t) } : t
-  );
+  return tabs.map((t) => (t.id === activeTabId ? { ...t, ...updater(t) } : t));
 }
 
 const initialTab = createTabState("C:\\");
@@ -191,17 +200,20 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   },
 
   // Directory
-  loadDirectory: async (path, addToHistory = true) => {
+  // smooth=true: 既存entriesを保持したままバックグラウンド更新（Undo/Redo時のチカチカ防止）
+  loadDirectory: async (path, addToHistory = true, smooth = false) => {
     const { activeTabId, showHidden } = get();
-    set((s) => ({
-      tabs: updateActiveTab(s.tabs, activeTabId, () => ({
-        loading: true,
-        error: null,
-        searchResults: null,
-        searchQuery: "",
-        searching: false,
-      })),
-    }));
+    if (!smooth) {
+      set((s) => ({
+        tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+          loading: true,
+          error: null,
+          searchResults: null,
+          searchQuery: "",
+          searching: false,
+        })),
+      }));
+    }
     try {
       const entries: FileEntry[] = await invoke("list_directory", { path });
       const tab = get().getActiveTab();
@@ -220,14 +232,28 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           path,
           entries: sorted,
           selectedIndices: new Set<number>(),
-          cursorIndex: 0,
+          cursorIndex: smooth ? Math.min(tab.cursorIndex, sorted.length - 1) : 0,
           loading: false,
           error: null,
           history,
           historyIndex,
           renamingIndex: null,
+          ...(smooth ? {} : { searchResults: null, searchQuery: "", searching: false }),
         })),
       }));
+
+      // 新規作成後の自動リネーム
+      const updatedTab = get().tabs.find((t) => t.id === activeTabId);
+      if (updatedTab?.pendingRenamePath) {
+        const pendingPath = updatedTab.pendingRenamePath;
+        const renameIdx = sorted.findIndex((e) => e.path === pendingPath);
+        set((s) => ({
+          tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+            pendingRenamePath: null,
+            ...(renameIdx >= 0 ? { renamingIndex: renameIdx, cursorIndex: renameIdx } : {}),
+          })),
+        }));
+      }
     } catch (e) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({
@@ -238,12 +264,19 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }
   },
 
+  refreshDirectory: async () => {
+    const tab = get().getActiveTab();
+    await get().loadDirectory(tab.path, false);
+  },
+
   navigateUp: async () => {
     const tab = get().getActiveTab();
     try {
       const parent: string = await invoke("get_parent_dir", { path: tab.path });
       if (parent !== tab.path) await get().loadDirectory(parent);
-    } catch { /* root */ }
+    } catch {
+      /* root */
+    }
   },
 
   navigateBack: async () => {
@@ -295,6 +328,22 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }));
   },
 
+  selectRange: (fromIndex, toIndex) => {
+    const tab = get().getActiveTab();
+    const newSet = new Set(tab.selectedIndices);
+    const start = Math.min(fromIndex, toIndex);
+    const end = Math.max(fromIndex, toIndex);
+    for (let i = start; i <= end; i++) {
+      newSet.add(i);
+    }
+    set((s) => ({
+      tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
+        selectedIndices: newSet,
+        cursorIndex: toIndex,
+      })),
+    }));
+  },
+
   selectAll: () => {
     const tab = get().getActiveTab();
     const displayEntries = tab.searchResults ?? tab.entries;
@@ -338,7 +387,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   clipboardCopy: () => {
     const tab = get().getActiveTab();
     const displayEntries = tab.searchResults ?? tab.entries;
-    const indices = tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
+    const indices =
+      tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
     if (paths.length > 0) {
       set({ clipboard: { paths, operation: "copy" } });
@@ -348,7 +398,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   clipboardCut: () => {
     const tab = get().getActiveTab();
     const displayEntries = tab.searchResults ?? tab.entries;
-    const indices = tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
+    const indices =
+      tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
     if (paths.length > 0) {
       set({ clipboard: { paths, operation: "cut" } });
@@ -360,12 +411,35 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const tab = get().getActiveTab();
     if (!clipboard) return;
     try {
+      // Undo用に移動先パスを記録
+      const entries = clipboard.paths.map((sourcePath) => {
+        const fileName = sourcePath.substring(sourcePath.lastIndexOf("\\") + 1);
+        return { sourcePath, destPath: `${tab.path}\\${fileName}` };
+      });
+
       if (clipboard.operation === "copy") {
         await invoke("copy_files", { sources: clipboard.paths, dest: tab.path });
+        useUndoStore.getState().pushAction({ type: "copy", entries });
       } else {
         await invoke("move_files", { sources: clipboard.paths, dest: tab.path });
+        useUndoStore.getState().pushAction({ type: "move", entries });
         set({ clipboard: null });
       }
+      // 移動履歴記録
+      const exts = clipboard.paths
+        .map((p) => {
+          const dot = p.lastIndexOf(".");
+          const sep = p.lastIndexOf("\\");
+          return dot > sep ? p.substring(dot + 1).toLowerCase() : "";
+        })
+        .filter((v, i, a) => a.indexOf(v) === i);
+      invoke("record_move_operation", {
+        sourceDir: clipboard.paths[0]?.substring(0, clipboard.paths[0].lastIndexOf("\\")) || "",
+        destDir: tab.path,
+        extensions: exts,
+        operation: clipboard.operation === "copy" ? "copy" : "move",
+        fileCount: clipboard.paths.length,
+      }).catch((_err) => {});
       await get().loadDirectory(tab.path, false);
     } catch (e) {
       set((s) => ({
@@ -379,11 +453,17 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   deleteSelected: async () => {
     const tab = get().getActiveTab();
     const displayEntries = tab.searchResults ?? tab.entries;
-    const indices = tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
+    const indices =
+      tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
     if (paths.length === 0) return;
     try {
       await invoke("delete_files", { paths, toTrash: true });
+      // Undo用に削除パスを記録（ゴミ箱送り）
+      useUndoStore.getState().pushAction({
+        type: "delete",
+        entries: paths.map((p) => ({ sourcePath: p, destPath: "" })),
+      });
       await get().loadDirectory(tab.path, false);
     } catch (e) {
       set((s) => ({
@@ -397,7 +477,19 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   createNewFolder: async () => {
     const tab = get().getActiveTab();
     try {
-      await invoke("create_directory", { path: tab.path, name: "New Folder" });
+      const createdPath: string = await invoke("create_directory", {
+        path: tab.path,
+        name: "New Folder",
+      });
+      useUndoStore.getState().pushAction({
+        type: "create_dir",
+        entries: [{ sourcePath: "", destPath: createdPath }],
+      });
+      set((s) => ({
+        tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
+          pendingRenamePath: createdPath,
+        })),
+      }));
       await get().loadDirectory(tab.path, false);
     } catch (e) {
       set((s) => ({
@@ -411,7 +503,19 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   createNewFile: async () => {
     const tab = get().getActiveTab();
     try {
-      await invoke("create_file", { path: tab.path, name: "New File.txt" });
+      const createdPath: string = await invoke("create_file", {
+        path: tab.path,
+        name: "New File.txt",
+      });
+      useUndoStore.getState().pushAction({
+        type: "create_file",
+        entries: [{ sourcePath: "", destPath: createdPath }],
+      });
+      set((s) => ({
+        tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
+          pendingRenamePath: createdPath,
+        })),
+      }));
       await get().loadDirectory(tab.path, false);
     } catch (e) {
       set((s) => ({
@@ -444,7 +548,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       return;
     }
     try {
-      await invoke("rename_file", { path: entry.path, newName });
+      const newPath: string = await invoke("rename_file", { path: entry.path, newName });
+      useUndoStore.getState().pushAction({
+        type: "rename",
+        entries: [{ sourcePath: entry.path, destPath: newPath }],
+      });
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
           renamingIndex: null,
@@ -459,6 +567,61 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         })),
       }));
     }
+  },
+
+  commitRenameAndNext: async (newName, direction) => {
+    const tab = get().getActiveTab();
+    if (tab.renamingIndex === null) return;
+    const entry = tab.entries[tab.renamingIndex];
+    if (!entry) return;
+
+    // リネーム実行（名前が変わった場合のみ）
+    if (newName !== entry.name) {
+      try {
+        const newPath: string = await invoke("rename_file", { path: entry.path, newName });
+        useUndoStore.getState().pushAction({
+          type: "rename",
+          entries: [{ sourcePath: entry.path, destPath: newPath }],
+        });
+      } catch (e) {
+        set((s) => ({
+          tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
+            error: String(e),
+            renamingIndex: null,
+          })),
+        }));
+        return;
+      }
+    }
+
+    // 次/前のファイルへ移動してリネーム開始
+    const displayEntries = tab.searchResults ?? tab.entries;
+    const nextIndex = tab.renamingIndex + direction;
+    if (nextIndex >= 0 && nextIndex < displayEntries.length) {
+      // ディレクトリを再読み込みしてからリネーム開始
+      await get().loadDirectory(tab.path, false);
+      set((s) => ({
+        tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
+          renamingIndex: nextIndex,
+          cursorIndex: nextIndex,
+        })),
+      }));
+    } else {
+      set((s) => ({
+        tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
+          renamingIndex: null,
+        })),
+      }));
+      await get().loadDirectory(tab.path, false);
+    }
+  },
+
+  setViewMode: (mode) => {
+    set((s) => ({
+      tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
+        viewMode: mode,
+      })),
+    }));
   },
 
   cancelRename: () => {
@@ -547,6 +710,21 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         await invoke("move_files", { sources: stackItems, dest: tab.path });
         set({ stackItems: [] });
       }
+      // 移動履歴記録
+      const exts = stackItems
+        .map((p) => {
+          const dot = p.lastIndexOf(".");
+          const sep = p.lastIndexOf("\\");
+          return dot > sep ? p.substring(dot + 1).toLowerCase() : "";
+        })
+        .filter((v, i, a) => a.indexOf(v) === i);
+      invoke("record_move_operation", {
+        sourceDir: stackItems[0]?.substring(0, stackItems[0].lastIndexOf("\\")) || "",
+        destDir: tab.path,
+        extensions: exts,
+        operation,
+        fileCount: stackItems.length,
+      }).catch((_err) => {});
       await get().loadDirectory(tab.path, false);
     } catch (e) {
       set((s) => ({

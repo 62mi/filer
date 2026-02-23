@@ -1,0 +1,415 @@
+use std::collections::HashMap;
+use std::sync::Mutex;
+use tauri::State;
+
+pub struct IconCache {
+    pub cache: Mutex<HashMap<String, String>>,
+}
+
+pub struct IconCacheLarge {
+    pub cache: Mutex<HashMap<String, String>>,
+}
+
+pub struct ThumbnailCache {
+    pub cache: Mutex<HashMap<(String, u32), String>>,
+}
+
+#[tauri::command]
+pub fn get_file_icons(
+    extensions: Vec<String>,
+    icon_cache: State<'_, IconCache>,
+) -> Result<HashMap<String, String>, String> {
+    let mut cache = icon_cache.cache.lock().map_err(|e| e.to_string())?;
+    let mut result = HashMap::new();
+    let mut missing = Vec::new();
+
+    for ext in &extensions {
+        if let Some(cached) = cache.get(ext) {
+            result.insert(ext.clone(), cached.clone());
+        } else {
+            missing.push(ext.clone());
+        }
+    }
+
+    for ext in missing {
+        match get_shell_icon(&ext) {
+            Ok(data_url) => {
+                cache.insert(ext.clone(), data_url.clone());
+                result.insert(ext, data_url);
+            }
+            Err(_) => {}
+        }
+    }
+
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn get_file_icons_large(
+    extensions: Vec<String>,
+    icon_cache_large: State<'_, IconCacheLarge>,
+) -> Result<HashMap<String, String>, String> {
+    let mut cache = icon_cache_large.cache.lock().map_err(|e| e.to_string())?;
+    let mut result = HashMap::new();
+    let mut missing = Vec::new();
+
+    for ext in &extensions {
+        if let Some(cached) = cache.get(ext) {
+            result.insert(ext.clone(), cached.clone());
+        } else {
+            missing.push(ext.clone());
+        }
+    }
+
+    for ext in missing {
+        match get_shell_icon_large(&ext) {
+            Ok(data_url) => {
+                cache.insert(ext.clone(), data_url.clone());
+                result.insert(ext, data_url);
+            }
+            Err(_) => {}
+        }
+    }
+
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn get_thumbnails(
+    paths: Vec<String>,
+    size: u32,
+    thumbnail_cache: State<'_, ThumbnailCache>,
+) -> Result<HashMap<String, String>, String> {
+    let mut cache = thumbnail_cache.cache.lock().map_err(|e| e.to_string())?;
+    let mut result = HashMap::new();
+    let mut missing = Vec::new();
+
+    for path in &paths {
+        let key = (path.clone(), size);
+        if let Some(cached) = cache.get(&key) {
+            result.insert(path.clone(), cached.clone());
+        } else {
+            missing.push(path.clone());
+        }
+    }
+
+    for path in missing {
+        match generate_thumbnail(&path, size) {
+            Ok(data_url) => {
+                cache.insert((path.clone(), size), data_url.clone());
+                result.insert(path, data_url);
+            }
+            Err(_) => {}
+        }
+    }
+
+    Ok(result)
+}
+
+fn generate_thumbnail(path: &str, size: u32) -> Result<String, String> {
+    let img = image::open(path).map_err(|e| e.to_string())?;
+    let thumb = img.thumbnail(size, size);
+    let rgba = thumb.to_rgba8();
+
+    let mut png_buf = std::io::Cursor::new(Vec::new());
+    rgba.write_to(&mut png_buf, image::ImageFormat::Png)
+        .map_err(|e| e.to_string())?;
+
+    let b64 = base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        png_buf.into_inner(),
+    );
+
+    Ok(format!("data:image/png;base64,{}", b64))
+}
+
+#[cfg(windows)]
+fn get_shell_icon_large(ext: &str) -> Result<String, String> {
+    use std::mem;
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL,
+    };
+    use windows_sys::Win32::UI::Shell::{
+        SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGFI_USEFILEATTRIBUTES,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::DestroyIcon;
+
+    let is_dir = ext == "__directory__";
+
+    let dummy: Vec<u16> = if is_dir {
+        "directory\0".encode_utf16().collect()
+    } else {
+        format!("dummy.{}\0", ext).encode_utf16().collect()
+    };
+
+    let file_attrs = if is_dir {
+        FILE_ATTRIBUTE_DIRECTORY
+    } else {
+        FILE_ATTRIBUTE_NORMAL
+    };
+
+    let mut shfi: SHFILEINFOW = unsafe { mem::zeroed() };
+    let result = unsafe {
+        SHGetFileInfoW(
+            dummy.as_ptr(),
+            file_attrs,
+            &mut shfi as *mut SHFILEINFOW,
+            mem::size_of::<SHFILEINFOW>() as u32,
+            SHGFI_ICON | SHGFI_LARGEICON | SHGFI_USEFILEATTRIBUTES,
+        )
+    };
+
+    if result == 0 || shfi.hIcon.is_null() {
+        return Err("SHGetFileInfoW failed".into());
+    }
+
+    let data_url = hicon_to_data_url_sized(shfi.hIcon, 32);
+    unsafe { DestroyIcon(shfi.hIcon) };
+    data_url
+}
+
+#[cfg(not(windows))]
+fn get_shell_icon_large(_ext: &str) -> Result<String, String> {
+    Err("Shell icons are only available on Windows".into())
+}
+
+#[cfg(windows)]
+fn get_shell_icon(ext: &str) -> Result<String, String> {
+    use std::mem;
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL,
+    };
+    use windows_sys::Win32::UI::Shell::{
+        SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_SMALLICON, SHGFI_USEFILEATTRIBUTES,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::DestroyIcon;
+
+    let is_dir = ext == "__directory__";
+
+    let dummy: Vec<u16> = if is_dir {
+        "directory\0".encode_utf16().collect()
+    } else {
+        format!("dummy.{}\0", ext).encode_utf16().collect()
+    };
+
+    let file_attrs = if is_dir {
+        FILE_ATTRIBUTE_DIRECTORY
+    } else {
+        FILE_ATTRIBUTE_NORMAL
+    };
+
+    let mut shfi: SHFILEINFOW = unsafe { mem::zeroed() };
+    let result = unsafe {
+        SHGetFileInfoW(
+            dummy.as_ptr(),
+            file_attrs,
+            &mut shfi as *mut SHFILEINFOW,
+            mem::size_of::<SHFILEINFOW>() as u32,
+            SHGFI_ICON | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES,
+        )
+    };
+
+    if result == 0 || shfi.hIcon.is_null() {
+        return Err("SHGetFileInfoW failed".into());
+    }
+
+    let data_url = hicon_to_data_url(shfi.hIcon);
+    unsafe { DestroyIcon(shfi.hIcon) };
+    data_url
+}
+
+/// HICON を PNG base64 data URL に変換する（公開ヘルパー）
+#[cfg(windows)]
+pub fn hicon_to_data_url(
+    hicon: windows_sys::Win32::UI::WindowsAndMessaging::HICON,
+) -> Result<String, String> {
+    use image::ImageBuffer;
+    use std::mem;
+    use windows_sys::Win32::Graphics::Gdi::DeleteObject;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetIconInfo, ICONINFO};
+
+    let mut icon_info: ICONINFO = unsafe { mem::zeroed() };
+    let ok = unsafe { GetIconInfo(hicon, &mut icon_info) };
+    if ok == 0 {
+        return Err("GetIconInfo failed".into());
+    }
+
+    let hbm_color = icon_info.hbmColor;
+    let hbm_mask = icon_info.hbmMask;
+
+    let icon_size: i32 = 16;
+    let pixel_count = (icon_size * icon_size) as usize;
+
+    let color_pixels = extract_bitmap_bits(hbm_color, icon_size)?;
+    let mask_pixels = extract_bitmap_bits(hbm_mask, icon_size);
+
+    let mut rgba = vec![0u8; pixel_count * 4];
+    let has_alpha = color_pixels.iter().skip(3).step_by(4).any(|&a| a != 0);
+
+    for i in 0..pixel_count {
+        let base = i * 4;
+        rgba[base] = color_pixels[base + 2];
+        rgba[base + 1] = color_pixels[base + 1];
+        rgba[base + 2] = color_pixels[base];
+
+        if has_alpha {
+            rgba[base + 3] = color_pixels[base + 3];
+        } else if let Ok(ref mask) = mask_pixels {
+            let mask_val = mask[base];
+            rgba[base + 3] = if mask_val == 0 { 255 } else { 0 };
+        } else {
+            rgba[base + 3] = 255;
+        }
+    }
+
+    unsafe {
+        if !hbm_color.is_null() {
+            DeleteObject(hbm_color as _);
+        }
+        if !hbm_mask.is_null() {
+            DeleteObject(hbm_mask as _);
+        }
+    }
+
+    let img: ImageBuffer<image::Rgba<u8>, Vec<u8>> =
+        ImageBuffer::from_raw(icon_size as u32, icon_size as u32, rgba)
+            .ok_or("Failed to create image buffer")?;
+
+    let mut png_buf = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut png_buf, image::ImageFormat::Png)
+        .map_err(|e| e.to_string())?;
+
+    let b64 = base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        png_buf.into_inner(),
+    );
+
+    Ok(format!("data:image/png;base64,{}", b64))
+}
+
+/// HICON を任意サイズの PNG base64 data URL に変換する
+#[cfg(windows)]
+pub fn hicon_to_data_url_sized(
+    hicon: windows_sys::Win32::UI::WindowsAndMessaging::HICON,
+    icon_size: i32,
+) -> Result<String, String> {
+    use image::ImageBuffer;
+    use std::mem;
+    use windows_sys::Win32::Graphics::Gdi::DeleteObject;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetIconInfo, ICONINFO};
+
+    let mut icon_info: ICONINFO = unsafe { mem::zeroed() };
+    let ok = unsafe { GetIconInfo(hicon, &mut icon_info) };
+    if ok == 0 {
+        return Err("GetIconInfo failed".into());
+    }
+
+    let hbm_color = icon_info.hbmColor;
+    let hbm_mask = icon_info.hbmMask;
+
+    let pixel_count = (icon_size * icon_size) as usize;
+
+    let color_pixels = extract_bitmap_bits(hbm_color, icon_size)?;
+    let mask_pixels = extract_bitmap_bits(hbm_mask, icon_size);
+
+    let mut rgba = vec![0u8; pixel_count * 4];
+    let has_alpha = color_pixels.iter().skip(3).step_by(4).any(|&a| a != 0);
+
+    for i in 0..pixel_count {
+        let base = i * 4;
+        rgba[base] = color_pixels[base + 2];
+        rgba[base + 1] = color_pixels[base + 1];
+        rgba[base + 2] = color_pixels[base];
+
+        if has_alpha {
+            rgba[base + 3] = color_pixels[base + 3];
+        } else if let Ok(ref mask) = mask_pixels {
+            let mask_val = mask[base];
+            rgba[base + 3] = if mask_val == 0 { 255 } else { 0 };
+        } else {
+            rgba[base + 3] = 255;
+        }
+    }
+
+    unsafe {
+        if !hbm_color.is_null() {
+            DeleteObject(hbm_color as _);
+        }
+        if !hbm_mask.is_null() {
+            DeleteObject(hbm_mask as _);
+        }
+    }
+
+    let img: ImageBuffer<image::Rgba<u8>, Vec<u8>> =
+        ImageBuffer::from_raw(icon_size as u32, icon_size as u32, rgba)
+            .ok_or("Failed to create image buffer")?;
+
+    let mut png_buf = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut png_buf, image::ImageFormat::Png)
+        .map_err(|e| e.to_string())?;
+
+    let b64 = base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        png_buf.into_inner(),
+    );
+
+    Ok(format!("data:image/png;base64,{}", b64))
+}
+
+#[cfg(windows)]
+fn extract_bitmap_bits(
+    hbm: windows_sys::Win32::Graphics::Gdi::HBITMAP,
+    size: i32,
+) -> Result<Vec<u8>, String> {
+    use std::mem;
+    use std::ptr;
+    use windows_sys::Win32::Graphics::Gdi::{
+        CreateCompatibleDC, DeleteDC, GetDIBits, SelectObject, BITMAPINFO, BITMAPINFOHEADER,
+        BI_RGB, DIB_RGB_COLORS,
+    };
+
+    if hbm.is_null() {
+        return Err("null bitmap".into());
+    }
+
+    let pixel_count = (size * size) as usize;
+    let mut pixels = vec![0u8; pixel_count * 4];
+
+    let mut bmi: BITMAPINFO = unsafe { mem::zeroed() };
+    bmi.bmiHeader.biSize = mem::size_of::<BITMAPINFOHEADER>() as u32;
+    bmi.bmiHeader.biWidth = size;
+    bmi.bmiHeader.biHeight = -size; // top-down
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+
+    unsafe {
+        let hdc = CreateCompatibleDC(ptr::null_mut());
+        if hdc.is_null() {
+            return Err("CreateCompatibleDC failed".into());
+        }
+        let old = SelectObject(hdc, hbm as _);
+        let rows = GetDIBits(
+            hdc,
+            hbm,
+            0,
+            size as u32,
+            pixels.as_mut_ptr() as *mut _,
+            &mut bmi as *mut BITMAPINFO,
+            DIB_RGB_COLORS,
+        );
+        SelectObject(hdc, old);
+        DeleteDC(hdc);
+
+        if rows == 0 {
+            return Err("GetDIBits failed".into());
+        }
+    }
+
+    Ok(pixels)
+}
+
+#[cfg(not(windows))]
+fn get_shell_icon(_ext: &str) -> Result<String, String> {
+    Err("Shell icons are only available on Windows".into())
+}

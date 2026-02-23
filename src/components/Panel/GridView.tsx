@@ -1,0 +1,130 @@
+import { useCallback, useEffect, useMemo } from "react";
+import { useIconStore } from "../../stores/iconStore";
+import { getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
+import { extractImagePaths, useThumbnailStore } from "../../stores/thumbnailStore";
+import type { FileEntry } from "../../types";
+import { GridCell } from "./GridCell";
+
+interface GridViewProps {
+  entries: FileEntry[];
+  cursorIndex: number;
+  selectedIndices: Set<number>;
+  renamingIndex: number | null;
+  cutPaths: Set<string>;
+  dropTarget: number | null;
+  onNavigate: (entry: FileEntry) => void;
+  onSelect: (index: number) => void;
+  onSelectRange: (fromIndex: number, toIndex: number) => void;
+  onCursor: (index: number) => void;
+  onContextMenu: (e: React.MouseEvent, index: number) => void;
+  onCommitRename: (newName: string) => void;
+  onCommitRenameAndNext: (newName: string, direction: 1 | -1) => void;
+  onCancelRename: () => void;
+  onDragStart: (e: React.DragEvent, index: number) => void;
+  onDragOver: (e: React.DragEvent, index: number) => void;
+  onDragLeave: () => void;
+  onDrop: (e: React.DragEvent, index: number) => void;
+  onDragEnd: () => void;
+  onClearSelection: () => void;
+  onStartRename: (index: number) => void;
+}
+
+export function GridView({
+  entries,
+  cursorIndex,
+  selectedIndices,
+  renamingIndex,
+  cutPaths,
+  dropTarget,
+  onNavigate,
+  onSelect,
+  onSelectRange,
+  onCursor,
+  onContextMenu,
+  onCommitRename,
+  onCommitRenameAndNext,
+  onCancelRename,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
+  onClearSelection,
+  onStartRename,
+}: GridViewProps) {
+  const fetchLargeIcons = useIconStore((s) => s.fetchLargeIcons);
+  const gridIconSize = useSettingsStore((s) => s.gridIconSize);
+  const gridGap = useSettingsStore((s) => s.gridGap);
+  const cellWidth = getGridCellWidth({ gridIconSize });
+
+  const prefetchInBackground = useThumbnailStore((s) => s.prefetchInBackground);
+  const cancelPrefetch = useThumbnailStore((s) => s.cancelPrefetch);
+  const THUMB_SIZE = 128;
+
+  // Fetch large icons (lightweight, ext-based cache)
+  useEffect(() => {
+    if (entries.length === 0) return;
+    const exts = new Set<string>();
+    exts.add("__directory__");
+    for (const e of entries) {
+      if (!e.is_dir && e.extension) exts.add(e.extension);
+    }
+    fetchLargeIcons(Array.from(exts));
+  }, [entries, fetchLargeIcons]);
+
+  // Background prefetch thumbnails for all images in folder
+  const imagePaths = useMemo(() => extractImagePaths(entries), [entries]);
+
+  useEffect(() => {
+    if (imagePaths.length === 0) return;
+    prefetchInBackground(imagePaths, THUMB_SIZE);
+    return () => cancelPrefetch();
+  }, [imagePaths, prefetchInBackground, cancelPrefetch]);
+
+  const handleSelectRange = useCallback(
+    (toIndex: number) => onSelectRange(cursorIndex, toIndex),
+    [cursorIndex, onSelectRange],
+  );
+
+  return (
+    <div
+      className="p-1"
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(auto-fill, ${cellWidth}px)`,
+        gap: `${gridGap}px`,
+        alignContent: "start",
+      }}
+    >
+      {entries.map((entry, index) => (
+        <GridCell
+          key={entry.path}
+          entry={entry}
+          index={index}
+          isCursor={index === cursorIndex}
+          isSelected={selectedIndices.has(index)}
+          isRenaming={index === renamingIndex}
+          isCut={cutPaths.has(entry.path)}
+          isDropTarget={index === dropTarget}
+          isFolderizeTarget={index === dropTarget && !entry.is_dir}
+          onNavigate={onNavigate}
+          onSelect={onSelect}
+          onSelectRange={handleSelectRange}
+          onCursor={onCursor}
+          onContextMenu={onContextMenu}
+          onCommitRename={onCommitRename}
+          onCommitRenameAndNext={onCommitRenameAndNext}
+          onCancelRename={onCancelRename}
+          onDragStart={onDragStart}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+          onDragEnd={onDragEnd}
+          onClearSelection={onClearSelection}
+          selectedCount={selectedIndices.size}
+          onStartRename={onStartRename}
+        />
+      ))}
+    </div>
+  );
+}

@@ -1,5 +1,7 @@
-import { PanelRightOpen, PanelRightClose } from "lucide-react";
+import { PanelRightClose, PanelRightOpen, Sparkles } from "lucide-react";
+import { useAiStore } from "../../stores/aiStore";
 import { useExplorerStore } from "../../stores/panelStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { formatFileSize } from "../../utils/format";
 
 interface StatusBarProps {
@@ -9,6 +11,11 @@ interface StatusBarProps {
 
 export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
   const tab = useExplorerStore((s) => s.tabs.find((t) => t.id === s.activeTabId) || s.tabs[0]);
+  const statusBarHeight = useSettingsStore((s) => s.statusBarHeight);
+  const uiFontSize = useSettingsStore((s) => s.uiFontSize);
+  const usageInfo = useAiStore((s) => s.usageInfo);
+  const hasApiKey = useAiStore((s) => s.hasApiKey);
+  const openSettings = useAiStore((s) => s.openSettings);
 
   const entries = tab.entries;
   const selectedIndices = tab.selectedIndices;
@@ -19,27 +26,60 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
 
   const selectedSize = Array.from(selectedIndices).reduce(
     (acc, idx) => acc + (entries[idx]?.size ?? 0),
-    0
+    0,
   );
 
   const totalItems = entries.length;
 
+  // バジェットインジケータの色
+  const getBudgetColor = () => {
+    if (!usageInfo || !usageInfo.budget_usd) return "text-[#999]";
+    const ratio = usageInfo.cost_usd / usageInfo.budget_usd;
+    if (ratio >= 0.9) return "text-red-500";
+    if (ratio >= 0.7) return "text-amber-500";
+    return "text-green-600";
+  };
+
   return (
-    <div className="flex items-center h-6 px-3 text-xs text-[#666] bg-[#f9f9f9] border-t border-[#e5e5e5] select-none shrink-0">
+    <div
+      className="flex items-center px-3 text-[#666] bg-[#f9f9f9] border-t border-[#e5e5e5] select-none shrink-0"
+      style={{ height: statusBarHeight, fontSize: uiFontSize }}
+    >
       <span>
         {totalItems} items ({totalDirs} folders, {totalFiles} files)
       </span>
 
       {selectedCount > 0 && (
-        <>
+        <span key={selectedCount} className="animate-fade-in flex items-center">
           <span className="mx-2 text-[#ccc]">|</span>
           <span className="text-[#0078d4]">
             {selectedCount} selected ({formatFileSize(selectedSize)})
           </span>
-        </>
+        </span>
       )}
 
       <div className="flex-1" />
+
+      {/* AI使用量バジェットインジケータ */}
+      {hasApiKey && (
+        <button
+          className={`flex items-center gap-1 px-1.5 py-0.5 mr-2 rounded hover:bg-[#e0e0e0] transition-colors ${getBudgetColor()}`}
+          onClick={openSettings}
+          title="AI使用量 (クリックで設定)"
+        >
+          <Sparkles className="w-3 h-3" />
+          {usageInfo ? (
+            <span className="tabular-nums">
+              ${usageInfo.cost_usd.toFixed(2)}
+              {usageInfo.budget_usd !== null && (
+                <span className="text-[#bbb]"> / ${usageInfo.budget_usd.toFixed(0)}</span>
+              )}
+            </span>
+          ) : (
+            <span className="text-[#bbb]">--</span>
+          )}
+        </button>
+      )}
 
       <button
         className="p-0.5 mr-2 rounded hover:bg-[#e0e0e0] text-[#999] transition-colors"

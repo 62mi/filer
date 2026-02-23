@@ -1,9 +1,11 @@
-import { useState, useRef, useEffect } from "react";
-import { cn } from "../../utils/cn";
-import { formatFileSize, formatDate } from "../../utils/format";
-import { FileIcon } from "./FileIcon";
-import { getFileType } from "../../utils/fileType";
+import { Folder } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useSettingsStore } from "../../stores/settingsStore";
 import type { FileEntry } from "../../types";
+import { cn } from "../../utils/cn";
+import { getFileType } from "../../utils/fileType";
+import { formatDate, formatFileSize } from "../../utils/format";
+import { FileIcon } from "./FileIcon";
 
 interface FileRowProps {
   entry: FileEntry;
@@ -13,17 +15,24 @@ interface FileRowProps {
   isRenaming: boolean;
   isCut: boolean;
   isDropTarget: boolean;
+  /** ファイル on ファイルのドロップターゲット（iOS風フォルダ化） */
+  isFolderizeTarget: boolean;
   onNavigate: (entry: FileEntry) => void;
   onSelect: (index: number) => void;
+  onSelectRange: (toIndex: number) => void;
   onCursor: (index: number) => void;
   onContextMenu: (e: React.MouseEvent, index: number) => void;
   onCommitRename: (newName: string) => void;
+  onCommitRenameAndNext: (newName: string, direction: 1 | -1) => void;
   onCancelRename: () => void;
   onDragStart: (e: React.DragEvent, index: number) => void;
   onDragOver: (e: React.DragEvent, index: number) => void;
   onDragLeave: () => void;
   onDrop: (e: React.DragEvent, index: number) => void;
   onDragEnd: () => void;
+  onClearSelection: () => void;
+  selectedCount: number;
+  onStartRename: (index: number) => void;
 }
 
 export function FileRow({
@@ -34,20 +43,40 @@ export function FileRow({
   isRenaming,
   isCut,
   isDropTarget,
+  isFolderizeTarget,
   onNavigate,
   onSelect,
+  onSelectRange,
   onCursor,
   onContextMenu,
   onCommitRename,
+  onCommitRenameAndNext,
   onCancelRename,
   onDragStart,
   onDragOver,
   onDragLeave,
   onDrop,
   onDragEnd,
+  onClearSelection,
+  selectedCount,
+  onStartRename,
 }: FileRowProps) {
   const [renameValue, setRenameValue] = useState(entry.name);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Slow-click rename refs
+  const slowClickTimerRef = useRef<number | null>(null);
+  const wasSelectedOnMouseDownRef = useRef(false);
+  const didDragRef = useRef(false);
+
+  // Cleanup slow-click timer on unmount or when renaming starts
+  useEffect(() => {
+    return () => {
+      if (slowClickTimerRef.current) {
+        clearTimeout(slowClickTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (isRenaming && inputRef.current) {
@@ -72,47 +101,101 @@ export function FileRow({
     }
   };
 
+  const rowHeight = useSettingsStore((s) => s.detailRowHeight);
+  const fontSize = useSettingsStore((s) => s.fontSize);
+
   return (
     <div
       className={cn(
-        "flex items-center h-7 px-2 text-sm cursor-default select-none",
-        "border-l-2 border-transparent",
-        isCursor && "bg-[#e8e8e8] border-l-[#0078d4]",
-        isSelected && "bg-[#cce8ff]",
-        isCursor && isSelected && "bg-[#a8d4f0] border-l-[#0078d4]",
-        !isCursor && !isSelected && "hover:bg-[#f0f0f0]",
+        "flex items-center px-2 cursor-default select-none",
+        "transition-[background-color,opacity,transform,box-shadow] duration-100 ease-out",
+        isCursor && !isSelected && "bg-[#e8e8e8]",
+        isSelected && !isCursor && "bg-[#cce8ff]",
+        isCursor && isSelected && "bg-[#b4d8f0]",
+        !isCursor && !isSelected && "hover:bg-[#f5f5f5]",
         isCut && "opacity-50",
-        isDropTarget && "bg-[#cce8ff] outline outline-1 outline-[#0078d4]"
+        // 通常のフォルダへのドロップ
+        isDropTarget && !isFolderizeTarget && "bg-[#cce8ff] outline outline-1 outline-[#0078d4]",
+        // iOS風フォルダ化ターゲット（ファイル on ファイル）
+        isFolderizeTarget && "folderize-target",
       )}
+      style={{ height: rowHeight, fontSize }}
       draggable={!isRenaming}
+      onMouseDown={(e) => {
+        didDragRef.current = false;
+        // 修飾キーなし・左クリック・単一選択済み・カーソル一致 の場合に記録
+        wasSelectedOnMouseDownRef.current =
+          e.button === 0 &&
+          !e.shiftKey &&
+          !e.ctrlKey &&
+          !e.metaKey &&
+          isSelected &&
+          isCursor &&
+          selectedCount <= 1;
+      }}
       onClick={(e) => {
         if (isRenaming) return;
-        onCursor(index);
-        if (e.ctrlKey) {
+        if (e.shiftKey) {
+          onSelectRange(index);
+        } else if (e.ctrlKey) {
+          onCursor(index);
           onSelect(index);
+        } else {
+          // Slow-click rename: 既に選択済み単一アイテムを再度クリック
+          if (wasSelectedOnMouseDownRef.current && !didDragRef.current && selectedCount <= 1) {
+            // 既存のタイマーがあればクリア
+            if (slowClickTimerRef.current) {
+              clearTimeout(slowClickTimerRef.current);
+            }
+            slowClickTimerRef.current = window.setTimeout(() => {
+              slowClickTimerRef.current = null;
+              onStartRename(index);
+            }, 500);
+          } else {
+            onClearSelection();
+            onCursor(index);
+          }
         }
+        wasSelectedOnMouseDownRef.current = false;
       }}
       onDoubleClick={() => {
+        // ダブルクリック時はslow-clickタイマーをキャンセル
+        if (slowClickTimerRef.current) {
+          clearTimeout(slowClickTimerRef.current);
+          slowClickTimerRef.current = null;
+        }
         if (!isRenaming) onNavigate(entry);
       }}
       onContextMenu={(e) => {
         e.preventDefault();
+        if (slowClickTimerRef.current) {
+          clearTimeout(slowClickTimerRef.current);
+          slowClickTimerRef.current = null;
+        }
         onContextMenu(e, index);
       }}
-      onDragStart={(e) => onDragStart(e, index)}
+      onDragStart={(e) => {
+        didDragRef.current = true;
+        if (slowClickTimerRef.current) {
+          clearTimeout(slowClickTimerRef.current);
+          slowClickTimerRef.current = null;
+        }
+        onDragStart(e, index);
+      }}
       onDragOver={(e) => onDragOver(e, index)}
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, index)}
       onDragEnd={onDragEnd}
     >
-      <FileIcon
-        isDir={entry.is_dir}
-        extension={entry.extension}
-        className={cn(
-          "w-4 h-4 mr-2 shrink-0",
-          entry.is_dir ? "text-amber-500" : "text-[#666]"
-        )}
-      />
+      {isFolderizeTarget ? (
+        <Folder className="w-4 h-4 mr-2 shrink-0 folderize-icon text-[#0078d4]" />
+      ) : (
+        <FileIcon
+          isDir={entry.is_dir}
+          extension={entry.extension}
+          className={cn("w-4 h-4 mr-2 shrink-0", entry.is_dir ? "text-amber-500" : "text-[#666]")}
+        />
+      )}
       {isRenaming ? (
         <input
           ref={inputRef}
@@ -124,17 +207,21 @@ export function FileRow({
             e.stopPropagation();
             if (e.key === "Enter") handleRenameSubmit();
             if (e.key === "Escape") onCancelRename();
+            if (e.key === "Tab") {
+              e.preventDefault();
+              const trimmed = renameValue.trim();
+              const name = trimmed && trimmed !== entry.name ? trimmed : entry.name;
+              onCommitRenameAndNext(name, e.shiftKey ? -1 : 1);
+            }
           }}
         />
       ) : (
         <span className="flex-1 truncate">{entry.name}</span>
       )}
-      <span className="w-28 text-right text-[#888] shrink-0 ml-4 truncate">
+      <span className="w-36 text-right text-[#888] shrink-0 ml-4 truncate">
         {formatDate(entry.modified)}
       </span>
-      <span className="w-32 text-[#666] shrink-0 ml-4 truncate">
-        {getFileType(entry)}
-      </span>
+      <span className="w-36 text-[#666] shrink-0 ml-4 truncate">{getFileType(entry)}</span>
       <span className="w-20 text-right text-[#666] shrink-0 ml-2">
         {entry.is_dir ? "" : formatFileSize(entry.size)}
       </span>

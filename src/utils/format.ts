@@ -1,9 +1,11 @@
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return "";
-  const units = ["B", "KB", "MB", "GB", "TB"];
+  const units = ["バイト", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  const size = bytes / Math.pow(1024, i);
-  return `${size.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+  const size = bytes / 1024 ** i;
+  if (i === 0) return `${bytes} ${units[0]}`;
+  // Explorer風: KB以上は切り上げで整数表示
+  return `${Math.ceil(size).toLocaleString()} ${units[i]}`;
 }
 
 export function formatDate(timestamp: number): string {
