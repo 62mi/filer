@@ -340,8 +340,9 @@ fn calculate_cost(usage: &ApiUsage) -> f64 {
 /// 使用量をDBに記録するヘルパー
 fn record_usage_to_db(db: &Database, usage: &ApiUsage, operation: &str) {
     let cost = calculate_cost(usage);
-    db.record_usage(usage.input_tokens, usage.output_tokens, cost, operation)
-        .ok();
+    if let Err(e) = db.record_usage(usage.input_tokens, usage.output_tokens, cost, operation) {
+        eprintln!("[usage] DB記録失敗 ({}): {}", operation, e);
+    }
 }
 
 /// Claude APIのContentBlockの型安全な表現
