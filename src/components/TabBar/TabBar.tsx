@@ -22,7 +22,7 @@ export function TabBar() {
                 "group flex items-center gap-1 h-full px-3 text-sm cursor-pointer border-r border-[#e0e0e0] max-w-48 min-w-0",
                 isActive
                   ? "bg-white text-[#1a1a1a] border-t-2 border-t-[#0078d4]"
-                  : "bg-[#f0f0f0] text-[#666] hover:bg-[#e8e8e8] border-t-2 border-t-transparent"
+                  : "bg-[#f0f0f0] text-[#666] hover:bg-[#e8e8e8] border-t-2 border-t-transparent",
               )}
               onClick={() => setActiveTab(tab.id)}
               onMouseDown={(e) => {

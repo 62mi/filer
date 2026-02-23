@@ -1,5 +1,5 @@
-import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { create } from "zustand";
 import type { FileEntry, SortKey, SortOrder } from "../types";
 
 function sortEntries(entries: FileEntry[], key: SortKey, order: SortOrder): FileEntry[] {
@@ -129,11 +129,9 @@ interface ExplorerStore {
 function updateActiveTab(
   tabs: TabState[],
   activeTabId: string,
-  updater: (tab: TabState) => Partial<TabState>
+  updater: (tab: TabState) => Partial<TabState>,
 ): TabState[] {
-  return tabs.map((t) =>
-    t.id === activeTabId ? { ...t, ...updater(t) } : t
-  );
+  return tabs.map((t) => (t.id === activeTabId ? { ...t, ...updater(t) } : t));
 }
 
 const initialTab = createTabState("C:\\");
@@ -243,7 +241,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     try {
       const parent: string = await invoke("get_parent_dir", { path: tab.path });
       if (parent !== tab.path) await get().loadDirectory(parent);
-    } catch { /* root */ }
+    } catch {
+      /* root */
+    }
   },
 
   navigateBack: async () => {
@@ -338,7 +338,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   clipboardCopy: () => {
     const tab = get().getActiveTab();
     const displayEntries = tab.searchResults ?? tab.entries;
-    const indices = tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
+    const indices =
+      tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
     if (paths.length > 0) {
       set({ clipboard: { paths, operation: "copy" } });
@@ -348,7 +349,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   clipboardCut: () => {
     const tab = get().getActiveTab();
     const displayEntries = tab.searchResults ?? tab.entries;
-    const indices = tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
+    const indices =
+      tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
     if (paths.length > 0) {
       set({ clipboard: { paths, operation: "cut" } });
@@ -379,7 +381,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   deleteSelected: async () => {
     const tab = get().getActiveTab();
     const displayEntries = tab.searchResults ?? tab.entries;
-    const indices = tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
+    const indices =
+      tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
     if (paths.length === 0) return;
     try {

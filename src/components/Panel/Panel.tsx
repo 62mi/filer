@@ -1,11 +1,11 @@
-import { useEffect, useRef, useCallback, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useExplorerStore } from "../../stores/panelStore";
-import { ColumnHeader } from "./ColumnHeader";
-import { FileRow } from "./FileRow";
+import type { FileEntry } from "../../types";
 import { ContextMenu } from "../ContextMenu";
 import { PropertiesDialog } from "../PropertiesDialog";
-import type { FileEntry } from "../../types";
+import { ColumnHeader } from "./ColumnHeader";
+import { FileRow } from "./FileRow";
 
 export function Panel() {
   const tab = useExplorerStore((s) => s.tabs.find((t) => t.id === s.activeTabId) || s.tabs[0]);
@@ -36,7 +36,11 @@ export function Panel() {
 
   const listRef = useRef<HTMLDivElement>(null);
 
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; targetIndex: number | null } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    targetIndex: number | null;
+  } | null>(null);
   const [propertiesEntry, setPropertiesEntry] = useState<FileEntry | null>(null);
 
   // The entries to display: search results or normal directory entries
@@ -75,7 +79,7 @@ export function Panel() {
         invoke("open_in_default_app", { path: entry.path });
       }
     },
-    [loadDirectory]
+    [loadDirectory],
   );
 
   const handleContextMenu = useCallback(
@@ -85,16 +89,13 @@ export function Panel() {
       setCursor(index);
       setContextMenu({ x: e.clientX, y: e.clientY, targetIndex: index });
     },
-    [setCursor]
+    [setCursor],
   );
 
-  const handleBgContextMenu = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      setContextMenu({ x: e.clientX, y: e.clientY, targetIndex: null });
-    },
-    []
-  );
+  const handleBgContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, targetIndex: null });
+  }, []);
 
   // Drag & drop state
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -109,14 +110,15 @@ export function Panel() {
         e.dataTransfer.effectAllowed = "copyMove";
         e.dataTransfer.setData("text/plain", entry.path);
         // Collect all dragged paths (selected or just the one)
-        const indices = tab.selectedIndices.size > 0 && tab.selectedIndices.has(index)
-          ? Array.from(tab.selectedIndices)
-          : [index];
+        const indices =
+          tab.selectedIndices.size > 0 && tab.selectedIndices.has(index)
+            ? Array.from(tab.selectedIndices)
+            : [index];
         const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
         e.dataTransfer.setData("application/x-filer-paths", JSON.stringify(paths));
       }
     },
-    [displayEntries, tab.selectedIndices, setCursor]
+    [displayEntries, tab.selectedIndices, setCursor],
   );
 
   const handleDragOver = useCallback(
@@ -128,7 +130,7 @@ export function Panel() {
         setDropTarget(index);
       }
     },
-    [displayEntries, dragIndex]
+    [displayEntries, dragIndex],
   );
 
   const handleDragLeave = useCallback(() => {
@@ -171,7 +173,7 @@ export function Panel() {
         console.error("Drop failed:", err);
       }
     },
-    [displayEntries, tab.path, loadDirectory, clearStack]
+    [displayEntries, tab.path, loadDirectory, clearStack],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -225,16 +227,13 @@ export function Panel() {
         console.error("Drop failed:", err);
       }
     },
-    [tab.path, loadDirectory, clearStack]
+    [tab.path, loadDirectory, clearStack],
   );
 
   // Keyboard handling
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      ) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
 
@@ -304,9 +303,10 @@ export function Panel() {
         case "s":
           if (e.ctrlKey && e.shiftKey) {
             e.preventDefault();
-            const indices = activeTab.selectedIndices.size > 0
-              ? Array.from(activeTab.selectedIndices)
-              : [activeTab.cursorIndex];
+            const indices =
+              activeTab.selectedIndices.size > 0
+                ? Array.from(activeTab.selectedIndices)
+                : [activeTab.cursorIndex];
             const paths = indices.map((i) => entries[i]?.path).filter(Boolean);
             if (paths.length > 0) addToStack(paths);
           }
@@ -372,7 +372,28 @@ export function Panel() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNavigate, setCursor, toggleSelection, selectAll, navigateUp, navigateBack, navigateForward, loadDirectory, toggleHidden, clipboardCopy, clipboardCut, clipboardPaste, deleteSelected, startRename, addTab, closeTab, nextTab, prevTab, addToStack, pasteFromStack]);
+  }, [
+    handleNavigate,
+    setCursor,
+    toggleSelection,
+    selectAll,
+    navigateUp,
+    navigateBack,
+    navigateForward,
+    loadDirectory,
+    toggleHidden,
+    clipboardCopy,
+    clipboardCut,
+    clipboardPaste,
+    deleteSelected,
+    startRename,
+    addTab,
+    closeTab,
+    nextTab,
+    prevTab,
+    addToStack,
+    pasteFromStack,
+  ]);
 
   // Determine which paths are "cut" for visual feedback
   const cutPaths = clipboard?.operation === "cut" ? new Set(clipboard.paths) : new Set<string>();
@@ -449,10 +470,7 @@ export function Panel() {
 
       {/* Properties dialog */}
       {propertiesEntry && (
-        <PropertiesDialog
-          entry={propertiesEntry}
-          onClose={() => setPropertiesEntry(null)}
-        />
+        <PropertiesDialog entry={propertiesEntry} onClose={() => setPropertiesEntry(null)} />
       )}
     </div>
   );

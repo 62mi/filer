@@ -1,17 +1,17 @@
-import { useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import {
-  Copy,
-  Scissors,
   ClipboardPaste,
-  Trash2,
-  PencilLine,
-  FolderPlus,
-  FilePlus,
+  Copy,
   ExternalLink,
+  FilePlus,
+  FolderPlus,
   Info,
   Layers,
+  PencilLine,
+  Scissors,
+  Trash2,
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useRef } from "react";
 import { useExplorerStore } from "../../stores/panelStore";
 import type { FileEntry } from "../../types";
 
@@ -109,26 +109,38 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     {
       label: "Copy",
       icon: <Copy className="w-4 h-4" />,
-      onClick: () => { clipboardCopy(); onClose(); },
+      onClick: () => {
+        clipboardCopy();
+        onClose();
+      },
       disabled: !hasSelection,
     },
     {
       label: "Cut",
       icon: <Scissors className="w-4 h-4" />,
-      onClick: () => { clipboardCut(); onClose(); },
+      onClick: () => {
+        clipboardCut();
+        onClose();
+      },
       disabled: !hasSelection,
     },
     {
       label: "Paste",
       icon: <ClipboardPaste className="w-4 h-4" />,
-      onClick: () => { clipboardPaste(); onClose(); },
+      onClick: () => {
+        clipboardPaste();
+        onClose();
+      },
       disabled: !clipboard,
     },
     { separator: true },
     {
       label: "Delete",
       icon: <Trash2 className="w-4 h-4" />,
-      onClick: () => { deleteSelected(); onClose(); },
+      onClick: () => {
+        deleteSelected();
+        onClose();
+      },
       disabled: !hasSelection,
     },
     ...(hasTarget
@@ -136,7 +148,10 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
           {
             label: "Rename",
             icon: <PencilLine className="w-4 h-4" />,
-            onClick: () => { startRename(targetIndex!); onClose(); },
+            onClick: () => {
+              startRename(targetIndex!);
+              onClose();
+            },
           } as MenuItem,
         ]
       : []),
@@ -146,9 +161,12 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
             label: "Add to Stack",
             icon: <Layers className="w-4 h-4" />,
             onClick: () => {
-              const indices = selectedIndices.size > 0
-                ? Array.from(selectedIndices)
-                : targetIndex !== null ? [targetIndex] : [];
+              const indices =
+                selectedIndices.size > 0
+                  ? Array.from(selectedIndices)
+                  : targetIndex !== null
+                    ? [targetIndex]
+                    : [];
               const paths = indices.map((i) => entries[i]?.path).filter(Boolean);
               if (paths.length > 0) addToStack(paths);
               onClose();
@@ -161,12 +179,18 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
           {
             label: `Paste from Stack (Move ${stackItems.length})`,
             icon: <Scissors className="w-4 h-4" />,
-            onClick: () => { pasteFromStack("move"); onClose(); },
+            onClick: () => {
+              pasteFromStack("move");
+              onClose();
+            },
           } as MenuItem,
           {
             label: `Paste from Stack (Copy ${stackItems.length})`,
             icon: <Copy className="w-4 h-4" />,
-            onClick: () => { pasteFromStack("copy"); onClose(); },
+            onClick: () => {
+              pasteFromStack("copy");
+              onClose();
+            },
           } as MenuItem,
         ]
       : []),
@@ -174,12 +198,18 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     {
       label: "New Folder",
       icon: <FolderPlus className="w-4 h-4" />,
-      onClick: () => { createNewFolder(); onClose(); },
+      onClick: () => {
+        createNewFolder();
+        onClose();
+      },
     },
     {
       label: "New File",
       icon: <FilePlus className="w-4 h-4" />,
-      onClick: () => { createNewFile(); onClose(); },
+      onClick: () => {
+        createNewFile();
+        onClose();
+      },
     },
     ...(hasTarget
       ? [
@@ -187,7 +217,9 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
           {
             label: "Properties",
             icon: <Info className="w-4 h-4" />,
-            onClick: () => { onProperties(entries[targetIndex!]); },
+            onClick: () => {
+              onProperties(entries[targetIndex!]);
+            },
           } as MenuItem,
         ]
       : []),

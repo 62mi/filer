@@ -1,6 +1,6 @@
-import { ArrowUp, ArrowDown } from "lucide-react";
-import { cn } from "../../utils/cn";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import type { SortKey, SortOrder } from "../../types";
+import { cn } from "../../utils/cn";
 
 interface ColumnHeaderProps {
   sortKey: SortKey;
@@ -33,7 +33,7 @@ export function ColumnHeader({ sortKey, sortOrder, onSort }: ColumnHeaderProps) 
           key={col.key}
           className={cn(
             "flex items-center shrink-0 hover:text-[#1a1a1a] transition-colors",
-            col.className
+            col.className,
           )}
           onClick={() => onSort(col.key)}
         >

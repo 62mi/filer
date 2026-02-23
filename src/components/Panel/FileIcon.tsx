@@ -1,13 +1,13 @@
 import {
-  Folder,
   File,
-  FileText,
-  FileImage,
-  FileVideo,
+  FileArchive,
   FileAudio,
   FileCode,
-  FileArchive,
+  FileImage,
   FileSpreadsheet,
+  FileText,
+  FileVideo,
+  Folder,
   type LucideProps,
 } from "lucide-react";
 

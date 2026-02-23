@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from "react";
-import { cn } from "../../utils/cn";
-import { formatFileSize, formatDate } from "../../utils/format";
-import { FileIcon } from "./FileIcon";
-import { getFileType } from "../../utils/fileType";
+import { useEffect, useRef, useState } from "react";
 import type { FileEntry } from "../../types";
+import { cn } from "../../utils/cn";
+import { getFileType } from "../../utils/fileType";
+import { formatDate, formatFileSize } from "../../utils/format";
+import { FileIcon } from "./FileIcon";
 
 interface FileRowProps {
   entry: FileEntry;
@@ -82,7 +82,7 @@ export function FileRow({
         isCursor && isSelected && "bg-[#a8d4f0] border-l-[#0078d4]",
         !isCursor && !isSelected && "hover:bg-[#f0f0f0]",
         isCut && "opacity-50",
-        isDropTarget && "bg-[#cce8ff] outline outline-1 outline-[#0078d4]"
+        isDropTarget && "bg-[#cce8ff] outline outline-1 outline-[#0078d4]",
       )}
       draggable={!isRenaming}
       onClick={(e) => {
@@ -108,10 +108,7 @@ export function FileRow({
       <FileIcon
         isDir={entry.is_dir}
         extension={entry.extension}
-        className={cn(
-          "w-4 h-4 mr-2 shrink-0",
-          entry.is_dir ? "text-amber-500" : "text-[#666]"
-        )}
+        className={cn("w-4 h-4 mr-2 shrink-0", entry.is_dir ? "text-amber-500" : "text-[#666]")}
       />
       {isRenaming ? (
         <input
@@ -132,9 +129,7 @@ export function FileRow({
       <span className="w-28 text-right text-[#888] shrink-0 ml-4 truncate">
         {formatDate(entry.modified)}
       </span>
-      <span className="w-32 text-[#666] shrink-0 ml-4 truncate">
-        {getFileType(entry)}
-      </span>
+      <span className="w-32 text-[#666] shrink-0 ml-4 truncate">{getFileType(entry)}</span>
       <span className="w-20 text-right text-[#666] shrink-0 ml-2">
         {entry.is_dir ? "" : formatFileSize(entry.size)}
       </span>

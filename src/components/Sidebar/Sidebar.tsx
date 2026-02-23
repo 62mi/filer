@@ -1,24 +1,24 @@
-import { useEffect, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  Monitor,
-  Download,
-  Image,
-  Music,
-  Video,
-  FileText,
-  HardDrive,
   ChevronDown,
   ChevronRight,
-  Layers,
-  Folder,
+  Download,
   File,
-  X,
+  FileText,
+  Folder,
+  HardDrive,
+  Image,
+  Layers,
+  Monitor,
+  Music,
   Trash2,
+  Video,
+  X,
 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { useExplorerStore } from "../../stores/panelStore";
-import { cn } from "../../utils/cn";
 import type { DriveInfo } from "../../types";
+import { cn } from "../../utils/cn";
 
 interface QuickAccessItem {
   label: string;
@@ -36,7 +36,6 @@ export function Sidebar() {
   const addToStack = useExplorerStore((s) => s.addToStack);
   const removeFromStack = useExplorerStore((s) => s.removeFromStack);
   const clearStack = useExplorerStore((s) => s.clearStack);
-
 
   const [drives, setDrives] = useState<DriveInfo[]>([]);
   const [homeDir, setHomeDir] = useState("");
@@ -58,8 +57,16 @@ export function Sidebar() {
   const quickAccess: QuickAccessItem[] = homeDir
     ? [
         { label: "Desktop", path: `${homeDir}\\Desktop`, icon: <Monitor className="w-4 h-4" /> },
-        { label: "Documents", path: `${homeDir}\\Documents`, icon: <FileText className="w-4 h-4" /> },
-        { label: "Downloads", path: `${homeDir}\\Downloads`, icon: <Download className="w-4 h-4" /> },
+        {
+          label: "Documents",
+          path: `${homeDir}\\Documents`,
+          icon: <FileText className="w-4 h-4" />,
+        },
+        {
+          label: "Downloads",
+          path: `${homeDir}\\Downloads`,
+          icon: <Download className="w-4 h-4" />,
+        },
         { label: "Pictures", path: `${homeDir}\\Pictures`, icon: <Image className="w-4 h-4" /> },
         { label: "Music", path: `${homeDir}\\Music`, icon: <Music className="w-4 h-4" /> },
         { label: "Videos", path: `${homeDir}\\Videos`, icon: <Video className="w-4 h-4" /> },
@@ -94,18 +101,15 @@ export function Sidebar() {
         // ignore
       }
     },
-    [addToStack]
+    [addToStack],
   );
 
   // Stack item context menu
-  const handleStackItemContextMenu = useCallback(
-    (e: React.MouseEvent, path: string | null) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setStackContextMenu({ x: e.clientX, y: e.clientY, path });
-    },
-    []
-  );
+  const handleStackItemContextMenu = useCallback((e: React.MouseEvent, path: string | null) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setStackContextMenu({ x: e.clientX, y: e.clientY, path });
+  }, []);
 
   // Close context menu
   useEffect(() => {
@@ -141,7 +145,11 @@ export function Sidebar() {
         className="flex items-center gap-1 px-2 py-1 hover:bg-[#e8e8e8] text-left w-full font-semibold text-[#1a1a1a]"
         onClick={() => setQuickAccessOpen(!quickAccessOpen)}
       >
-        {quickAccessOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        {quickAccessOpen ? (
+          <ChevronDown className="w-3 h-3" />
+        ) : (
+          <ChevronRight className="w-3 h-3" />
+        )}
         Quick access
       </button>
       {quickAccessOpen &&
@@ -150,7 +158,7 @@ export function Sidebar() {
             key={item.path}
             className={cn(
               "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[#e8e8e8] text-left w-full truncate",
-              isActive(item.path) && "bg-[#e8e8e8]"
+              isActive(item.path) && "bg-[#e8e8e8]",
             )}
             onClick={() => loadDirectory(item.path)}
             title={item.path}
@@ -174,7 +182,7 @@ export function Sidebar() {
             key={drive.path}
             className={cn(
               "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[#e8e8e8] text-left w-full",
-              isActive(drive.path) && "bg-[#e8e8e8]"
+              isActive(drive.path) && "bg-[#e8e8e8]",
             )}
             onClick={() => loadDirectory(drive.path)}
             title={drive.path}
@@ -209,7 +217,8 @@ export function Sidebar() {
         <div
           className={cn(
             "min-h-[40px] transition-colors",
-            stackDragOver && "bg-[#cce8ff] outline outline-1 outline-[#0078d4] outline-offset-[-1px]"
+            stackDragOver &&
+              "bg-[#cce8ff] outline outline-1 outline-[#0078d4] outline-offset-[-1px]",
           )}
           onDragOver={handleStackDragOver}
           onDragLeave={handleStackDragLeave}

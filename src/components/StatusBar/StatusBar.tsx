@@ -1,4 +1,4 @@
-import { PanelRightOpen, PanelRightClose } from "lucide-react";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useExplorerStore } from "../../stores/panelStore";
 import { formatFileSize } from "../../utils/format";
 
@@ -19,7 +19,7 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
 
   const selectedSize = Array.from(selectedIndices).reduce(
     (acc, idx) => acc + (entries[idx]?.size ?? 0),
-    0
+    0,
   );
 
   const totalItems = entries.length;

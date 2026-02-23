@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Sidebar } from "./components/Sidebar";
 import { NavigationBar } from "./components/NavigationBar";
-import { TabBar } from "./components/TabBar";
 import { Panel } from "./components/Panel";
 import { PreviewPanel } from "./components/PreviewPanel";
+import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
+import { TabBar } from "./components/TabBar";
 import { useExplorerStore } from "./stores/panelStore";
 
 function App() {
@@ -39,9 +39,9 @@ function App() {
   return (
     <div
       className="flex flex-col h-screen bg-white text-[#1a1a1a]"
-      onMouseMove={(dragging || previewDragging) ? handleMouseMove : undefined}
-      onMouseUp={(dragging || previewDragging) ? handleMouseUp : undefined}
-      onMouseLeave={(dragging || previewDragging) ? handleMouseUp : undefined}
+      onMouseMove={dragging || previewDragging ? handleMouseMove : undefined}
+      onMouseUp={dragging || previewDragging ? handleMouseUp : undefined}
+      onMouseLeave={dragging || previewDragging ? handleMouseUp : undefined}
     >
       {/* Tab bar */}
       <TabBar />
@@ -82,20 +82,14 @@ function App() {
               onMouseDown={handlePreviewMouseDown}
             />
             <div className="shrink-0 overflow-hidden" style={{ width: previewWidth }}>
-              <PreviewPanel
-                entry={cursorEntry}
-                onClose={() => setPreviewOpen(false)}
-              />
+              <PreviewPanel entry={cursorEntry} onClose={() => setPreviewOpen(false)} />
             </div>
           </>
         )}
       </div>
 
       {/* Status bar */}
-      <StatusBar
-        onTogglePreview={() => setPreviewOpen(!previewOpen)}
-        previewOpen={previewOpen}
-      />
+      <StatusBar onTogglePreview={() => setPreviewOpen(!previewOpen)} previewOpen={previewOpen} />
     </div>
   );
 }

@@ -1,15 +1,48 @@
-import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { X, FileText, Image, FileCode } from "lucide-react";
-import { formatFileSize, formatDate } from "../../utils/format";
+import { FileCode, FileText, Image, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { FileEntry } from "../../types";
+import { formatDate, formatFileSize } from "../../utils/format";
 
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico"]);
 const TEXT_EXTENSIONS = new Set([
-  "txt", "md", "log", "csv", "json", "xml", "yaml", "yml", "toml", "ini", "cfg",
-  "ts", "tsx", "js", "jsx", "rs", "py", "html", "css", "scss", "less",
-  "sh", "bat", "ps1", "c", "cpp", "h", "hpp", "java", "go", "rb", "php",
-  "sql", "graphql", "env", "gitignore", "dockerfile",
+  "txt",
+  "md",
+  "log",
+  "csv",
+  "json",
+  "xml",
+  "yaml",
+  "yml",
+  "toml",
+  "ini",
+  "cfg",
+  "ts",
+  "tsx",
+  "js",
+  "jsx",
+  "rs",
+  "py",
+  "html",
+  "css",
+  "scss",
+  "less",
+  "sh",
+  "bat",
+  "ps1",
+  "c",
+  "cpp",
+  "h",
+  "hpp",
+  "java",
+  "go",
+  "rb",
+  "php",
+  "sql",
+  "graphql",
+  "env",
+  "gitignore",
+  "dockerfile",
 ]);
 
 const MIME_MAP: Record<string, string> = {
@@ -102,7 +135,9 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
         ) : isImage ? (
           <div className="flex flex-col items-center">
             {loading ? (
-              <div className="flex items-center justify-center h-32 text-xs text-[#999]">Loading...</div>
+              <div className="flex items-center justify-center h-32 text-xs text-[#999]">
+                Loading...
+              </div>
             ) : imageDataUrl ? (
               <img
                 src={imageDataUrl}
@@ -110,7 +145,9 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
                 className="max-w-full max-h-[400px] object-contain rounded border border-[#e5e5e5]"
               />
             ) : (
-              <div className="flex items-center justify-center h-32 text-xs text-[#999]">Unable to load image</div>
+              <div className="flex items-center justify-center h-32 text-xs text-[#999]">
+                Unable to load image
+              </div>
             )}
             <div className="mt-3 text-xs text-[#666] text-center space-y-0.5">
               <div className="font-medium text-[#1a1a1a]">{entry.name}</div>
@@ -121,14 +158,18 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
         ) : isText ? (
           <div className="flex flex-col h-full">
             <div className="flex items-center gap-1 mb-2">
-              {entry.extension && ["ts", "tsx", "js", "jsx", "rs", "py", "html", "css"].includes(entry.extension)
-                ? <FileCode className="w-3.5 h-3.5 text-[#666]" />
-                : <FileText className="w-3.5 h-3.5 text-[#666]" />
-              }
+              {entry.extension &&
+              ["ts", "tsx", "js", "jsx", "rs", "py", "html", "css"].includes(entry.extension) ? (
+                <FileCode className="w-3.5 h-3.5 text-[#666]" />
+              ) : (
+                <FileText className="w-3.5 h-3.5 text-[#666]" />
+              )}
               <span className="text-xs font-medium text-[#1a1a1a] truncate">{entry.name}</span>
             </div>
             {loading ? (
-              <div className="flex-1 flex items-center justify-center text-xs text-[#999]">Loading...</div>
+              <div className="flex-1 flex items-center justify-center text-xs text-[#999]">
+                Loading...
+              </div>
             ) : textContent !== null ? (
               <pre className="flex-1 text-xs text-[#333] bg-[#f8f8f8] rounded p-2 overflow-auto whitespace-pre-wrap break-all font-mono border border-[#e5e5e5]">
                 {textContent}

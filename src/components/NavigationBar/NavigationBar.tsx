@@ -1,14 +1,5 @@
-import {
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  RotateCw,
-  Eye,
-  EyeOff,
-  Search,
-} from "lucide-react";
-import { X } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { ArrowLeft, ArrowRight, ArrowUp, Eye, EyeOff, RotateCw, Search, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useExplorerStore } from "../../stores/panelStore";
 import { cn } from "../../utils/cn";
 
@@ -27,7 +18,7 @@ function NavButton({
     <button
       className={cn(
         "p-1.5 rounded hover:bg-[#e8e8e8] transition-colors text-[#666]",
-        disabled && "opacity-30 cursor-not-allowed hover:bg-transparent"
+        disabled && "opacity-30 cursor-not-allowed hover:bg-transparent",
       )}
       onClick={onClick}
       title={title}
@@ -79,11 +70,7 @@ export function NavigationBar() {
   return (
     <div className="flex items-center gap-1 h-10 px-2 bg-white border-b border-[#e5e5e5] shrink-0">
       {/* Navigation buttons */}
-      <NavButton
-        onClick={navigateBack}
-        title="Back (Alt+Left)"
-        disabled={tab.historyIndex <= 0}
-      >
+      <NavButton onClick={navigateBack} title="Back (Alt+Left)" disabled={tab.historyIndex <= 0}>
         <ArrowLeft className="w-4 h-4" />
       </NavButton>
       <NavButton
@@ -96,10 +83,7 @@ export function NavigationBar() {
       <NavButton onClick={navigateUp} title="Up (Alt+Up)">
         <ArrowUp className="w-4 h-4" />
       </NavButton>
-      <NavButton
-        onClick={() => loadDirectory(tab.path, false)}
-        title="Refresh (F5)"
-      >
+      <NavButton onClick={() => loadDirectory(tab.path, false)} title="Refresh (F5)">
         <RotateCw className="w-3.5 h-3.5" />
       </NavButton>
 
@@ -133,9 +117,7 @@ export function NavigationBar() {
                   : segmentPath;
               return (
                 <span key={i} className="flex items-center shrink-0">
-                  {i > 0 && (
-                    <span className="mx-1 text-[#999] text-xs">{"\u203A"}</span>
-                  )}
+                  {i > 0 && <span className="mx-1 text-[#999] text-xs">{"\u203A"}</span>}
                   <button
                     className="hover:text-[#0078d4] hover:underline transition-colors"
                     onClick={(e) => {
@@ -154,11 +136,7 @@ export function NavigationBar() {
 
       {/* Hidden files toggle */}
       <NavButton onClick={toggleHidden} title="Toggle hidden files (Ctrl+H)">
-        {showHidden ? (
-          <Eye className="w-4 h-4" />
-        ) : (
-          <EyeOff className="w-4 h-4 text-[#999]" />
-        )}
+        {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4 text-[#999]" />}
       </NavButton>
 
       {/* Search bar */}

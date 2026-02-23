@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
-import { FileIcon } from "../Panel/FileIcon";
-import { formatFileSize, formatDate } from "../../utils/format";
-import { getFileType } from "../../utils/fileType";
+import { useEffect, useState } from "react";
 import type { FileEntry } from "../../types";
+import { getFileType } from "../../utils/fileType";
+import { formatDate, formatFileSize } from "../../utils/format";
+import { FileIcon } from "../Panel/FileIcon";
 
 interface FileProperties {
   name: string;
@@ -55,7 +55,12 @@ export function PropertiesDialog({ entry, onClose }: PropertiesDialogProps) {
     ? [
         { label: "Type", value: props.is_dir ? "File Folder" : getFileType(entry) },
         { label: "Location", value: props.path.substring(0, props.path.lastIndexOf("\\")) },
-        { label: "Size", value: props.is_dir ? `${formatFileSize(props.size)} (${props.file_count} files, ${props.dir_count} folders)` : formatFileSize(props.size) },
+        {
+          label: "Size",
+          value: props.is_dir
+            ? `${formatFileSize(props.size)} (${props.file_count} files, ${props.dir_count} folders)`
+            : formatFileSize(props.size),
+        },
         { label: "Created", value: formatDate(props.created) },
         { label: "Modified", value: formatDate(props.modified) },
         { label: "Accessed", value: formatDate(props.accessed) },
@@ -70,7 +75,10 @@ export function PropertiesDialog({ entry, onClose }: PropertiesDialogProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+      onClick={onClose}
+    >
       <div
         className="bg-white rounded-lg shadow-xl border border-[#e0e0e0] w-96 max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -80,10 +88,7 @@ export function PropertiesDialog({ entry, onClose }: PropertiesDialogProps) {
           <span className="font-semibold text-sm text-[#1a1a1a] flex-1 truncate">
             {entry.name} Properties
           </span>
-          <button
-            className="p-1 rounded hover:bg-[#e8e8e8] text-[#666]"
-            onClick={onClose}
-          >
+          <button className="p-1 rounded hover:bg-[#e8e8e8] text-[#666]" onClick={onClose}>
             <X className="w-4 h-4" />
           </button>
         </div>
