@@ -237,30 +237,8 @@ pub fn hicon_to_data_url(
     let hbm_color = icon_info.hbmColor;
     let hbm_mask = icon_info.hbmMask;
 
-    let icon_size: i32 = 16;
-    let pixel_count = (icon_size * icon_size) as usize;
-
-    let color_pixels = extract_bitmap_bits(hbm_color, icon_size)?;
-    let mask_pixels = extract_bitmap_bits(hbm_mask, icon_size);
-
-    let mut rgba = vec![0u8; pixel_count * 4];
-    let has_alpha = color_pixels.iter().skip(3).step_by(4).any(|&a| a != 0);
-
-    for i in 0..pixel_count {
-        let base = i * 4;
-        rgba[base] = color_pixels[base + 2];
-        rgba[base + 1] = color_pixels[base + 1];
-        rgba[base + 2] = color_pixels[base];
-
-        if has_alpha {
-            rgba[base + 3] = color_pixels[base + 3];
-        } else if let Ok(ref mask) = mask_pixels {
-            let mask_val = mask[base];
-            rgba[base + 3] = if mask_val == 0 { 255 } else { 0 };
-        } else {
-            rgba[base + 3] = 255;
-        }
-    }
+    // bitmap→RGBA変換。エラー時もDeleteObjectを確実に呼ぶ
+    let result = convert_bitmaps_to_data_url(hbm_color, hbm_mask, 16);
 
     unsafe {
         if !hbm_color.is_null() {
@@ -271,20 +249,7 @@ pub fn hicon_to_data_url(
         }
     }
 
-    let img: ImageBuffer<image::Rgba<u8>, Vec<u8>> =
-        ImageBuffer::from_raw(icon_size as u32, icon_size as u32, rgba)
-            .ok_or("Failed to create image buffer")?;
-
-    let mut png_buf = std::io::Cursor::new(Vec::new());
-    img.write_to(&mut png_buf, image::ImageFormat::Png)
-        .map_err(|e| e.to_string())?;
-
-    let b64 = base64::Engine::encode(
-        &base64::engine::general_purpose::STANDARD,
-        png_buf.into_inner(),
-    );
-
-    Ok(format!("data:image/png;base64,{}", b64))
+    result
 }
 
 /// HICON を任意サイズの PNG base64 data URL に変換する
@@ -293,7 +258,6 @@ pub fn hicon_to_data_url_sized(
     hicon: windows_sys::Win32::UI::WindowsAndMessaging::HICON,
     icon_size: i32,
 ) -> Result<String, String> {
-    use image::ImageBuffer;
     use std::mem;
     use windows_sys::Win32::Graphics::Gdi::DeleteObject;
     use windows_sys::Win32::UI::WindowsAndMessaging::{GetIconInfo, ICONINFO};
@@ -307,8 +271,31 @@ pub fn hicon_to_data_url_sized(
     let hbm_color = icon_info.hbmColor;
     let hbm_mask = icon_info.hbmMask;
 
-    let pixel_count = (icon_size * icon_size) as usize;
+    // bitmap→RGBA変換。エラー時もDeleteObjectを確実に呼ぶ
+    let result = convert_bitmaps_to_data_url(hbm_color, hbm_mask, icon_size);
 
+    unsafe {
+        if !hbm_color.is_null() {
+            DeleteObject(hbm_color as _);
+        }
+        if !hbm_mask.is_null() {
+            DeleteObject(hbm_mask as _);
+        }
+    }
+
+    result
+}
+
+/// ビットマップハンドルからRGBAピクセルを生成し、PNG data URLに変換する
+#[cfg(windows)]
+fn convert_bitmaps_to_data_url(
+    hbm_color: windows_sys::Win32::Graphics::Gdi::HBITMAP,
+    hbm_mask: windows_sys::Win32::Graphics::Gdi::HBITMAP,
+    icon_size: i32,
+) -> Result<String, String> {
+    use image::ImageBuffer;
+
+    let pixel_count = (icon_size * icon_size) as usize;
     let color_pixels = extract_bitmap_bits(hbm_color, icon_size)?;
     let mask_pixels = extract_bitmap_bits(hbm_mask, icon_size);
 
@@ -328,15 +315,6 @@ pub fn hicon_to_data_url_sized(
             rgba[base + 3] = if mask_val == 0 { 255 } else { 0 };
         } else {
             rgba[base + 3] = 255;
-        }
-    }
-
-    unsafe {
-        if !hbm_color.is_null() {
-            DeleteObject(hbm_color as _);
-        }
-        if !hbm_mask.is_null() {
-            DeleteObject(hbm_mask as _);
         }
     }
 
