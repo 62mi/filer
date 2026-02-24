@@ -13,9 +13,39 @@ use db::rules::*;
 use db::Database;
 use tauri::Manager;
 
+/// Windows MessageBox でエラーを表示する
+#[cfg(windows)]
+fn show_error_dialog(title: &str, message: &str) {
+    use std::ptr;
+    let title_wide: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+    let msg_wide: Vec<u16> = message.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe {
+        windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW(
+            ptr::null_mut(),
+            msg_wide.as_ptr(),
+            title_wide.as_ptr(),
+            windows_sys::Win32::UI::WindowsAndMessaging::MB_OK
+                | windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONERROR,
+        );
+    }
+}
+
+#[cfg(not(windows))]
+fn show_error_dialog(_title: &str, message: &str) {
+    eprintln!("{}", message);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let database = Database::new().expect("Failed to initialize database");
+    let database = match Database::new() {
+        Ok(db) => db,
+        Err(e) => {
+            let msg = format!("データベースの初期化に失敗しました:\n{}", e);
+            eprintln!("{}", msg);
+            show_error_dialog("Filer - 起動エラー", &msg);
+            return;
+        }
+    };
     database.cleanup_old_entries().ok();
 
     tauri::Builder::default()
@@ -85,5 +115,9 @@ pub fn run() {
             clear_completed_copies,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .unwrap_or_else(|e| {
+            let msg = format!("アプリケーションの実行中にエラーが発生しました:\n{}", e);
+            eprintln!("{}", msg);
+            show_error_dialog("Filer - 実行エラー", &msg);
+        });
 }
