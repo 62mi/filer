@@ -138,7 +138,7 @@ fn copy_dir_recursive_chunked(
         if src_path.is_dir() {
             copy_dir_recursive_chunked(&src_path, &dst_path, copied_bytes, files_done, current_file, paused, cancelled)?;
         } else {
-            *current_file.lock().unwrap() = Some(src_path.to_string_lossy().to_string());
+            *current_file.lock().unwrap_or_else(|e| e.into_inner()) = Some(src_path.to_string_lossy().to_string());
             copy_file_chunked(&src_path, &dst_path, copied_bytes, paused, cancelled)?;
             files_done.fetch_add(1, Ordering::Relaxed);
         }
@@ -153,9 +153,9 @@ fn emit_progress(app: &AppHandle, state: &QueueItemState) {
         copied_bytes: state.copied_bytes.load(Ordering::Relaxed),
         file_count: state.file_count.load(Ordering::Relaxed) as usize,
         files_done: state.files_done.load(Ordering::Relaxed) as usize,
-        status: state.status.lock().unwrap().clone(),
-        error: state.error.lock().unwrap().clone(),
-        current_file: state.current_file.lock().unwrap().clone(),
+        status: state.status.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+        error: state.error.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+        current_file: state.current_file.lock().unwrap_or_else(|e| e.into_inner()).clone(),
     };
     let _ = app.emit("copy-progress", &progress);
 }
@@ -187,7 +187,7 @@ pub fn enqueue_copy(
         error: Arc::new(Mutex::new(None)),
     });
 
-    queue_manager.items.lock().unwrap().push(state.clone());
+    queue_manager.items.lock().unwrap_or_else(|e| e.into_inner()).push(state.clone());
 
     // 即座にcalculatingステータスを通知
     emit_progress(&app, &state);
@@ -214,7 +214,7 @@ pub fn enqueue_copy(
         state_clone.total_bytes.store(total_bytes, Ordering::Relaxed);
         state_clone.file_count.store(file_count, Ordering::Relaxed);
 
-        *state_clone.status.lock().unwrap() = "running".to_string();
+        *state_clone.status.lock().unwrap_or_else(|e| e.into_inner()) = "running".to_string();
         emit_progress(&app_clone, &state_clone);
 
         let mut had_error = false;
@@ -243,7 +243,7 @@ pub fn enqueue_copy(
                     &state_clone.cancelled,
                 )
             } else {
-                *state_clone.current_file.lock().unwrap() = Some(source.clone());
+                *state_clone.current_file.lock().unwrap_or_else(|e| e.into_inner()) = Some(source.clone());
                 let r = copy_file_chunked(
                     src_path,
                     &target,
@@ -259,10 +259,10 @@ pub fn enqueue_copy(
 
             if let Err(e) = result {
                 if e == "Cancelled" {
-                    *state_clone.status.lock().unwrap() = "cancelled".to_string();
+                    *state_clone.status.lock().unwrap_or_else(|e| e.into_inner()) = "cancelled".to_string();
                 } else {
-                    *state_clone.error.lock().unwrap() = Some(e);
-                    *state_clone.status.lock().unwrap() = "error".to_string();
+                    *state_clone.error.lock().unwrap_or_else(|e| e.into_inner()) = Some(e);
+                    *state_clone.status.lock().unwrap_or_else(|e| e.into_inner()) = "error".to_string();
                     had_error = true;
                 }
                 emit_progress(&app_clone, &state_clone);
@@ -284,7 +284,7 @@ pub fn enqueue_copy(
                     }
                 }
             }
-            *state_clone.status.lock().unwrap() = "completed".to_string();
+            *state_clone.status.lock().unwrap_or_else(|e| e.into_inner()) = "completed".to_string();
             emit_progress(&app_clone, &state_clone);
         }
     });
@@ -295,10 +295,10 @@ pub fn enqueue_copy(
 #[tauri::command]
 pub fn pause_copy(app: AppHandle, id: String) -> Result<(), String> {
     let queue = app.state::<CopyQueueManager>();
-    let items = queue.items.lock().unwrap();
+    let items = queue.items.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(item) = items.iter().find(|i| i.id == id) {
         item.paused.store(true, Ordering::Relaxed);
-        *item.status.lock().unwrap() = "paused".to_string();
+        *item.status.lock().unwrap_or_else(|e| e.into_inner()) = "paused".to_string();
         emit_progress(&app, item);
         Ok(())
     } else {
@@ -309,10 +309,10 @@ pub fn pause_copy(app: AppHandle, id: String) -> Result<(), String> {
 #[tauri::command]
 pub fn resume_copy(app: AppHandle, id: String) -> Result<(), String> {
     let queue = app.state::<CopyQueueManager>();
-    let items = queue.items.lock().unwrap();
+    let items = queue.items.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(item) = items.iter().find(|i| i.id == id) {
         item.paused.store(false, Ordering::Relaxed);
-        *item.status.lock().unwrap() = "running".to_string();
+        *item.status.lock().unwrap_or_else(|e| e.into_inner()) = "running".to_string();
         emit_progress(&app, item);
         Ok(())
     } else {
@@ -323,10 +323,10 @@ pub fn resume_copy(app: AppHandle, id: String) -> Result<(), String> {
 #[tauri::command]
 pub fn cancel_copy(app: AppHandle, id: String) -> Result<(), String> {
     let queue = app.state::<CopyQueueManager>();
-    let items = queue.items.lock().unwrap();
+    let items = queue.items.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(item) = items.iter().find(|i| i.id == id) {
         item.cancelled.store(true, Ordering::Relaxed);
-        *item.status.lock().unwrap() = "cancelled".to_string();
+        *item.status.lock().unwrap_or_else(|e| e.into_inner()) = "cancelled".to_string();
         emit_progress(&app, item);
         Ok(())
     } else {
@@ -337,7 +337,7 @@ pub fn cancel_copy(app: AppHandle, id: String) -> Result<(), String> {
 #[tauri::command]
 pub fn get_copy_queue(app: AppHandle) -> Vec<CopyQueueItem> {
     let queue = app.state::<CopyQueueManager>();
-    let items = queue.items.lock().unwrap();
+    let items = queue.items.lock().unwrap_or_else(|e| e.into_inner());
     items
         .iter()
         .map(|item| CopyQueueItem {
@@ -349,9 +349,9 @@ pub fn get_copy_queue(app: AppHandle) -> Vec<CopyQueueItem> {
             copied_bytes: item.copied_bytes.load(Ordering::Relaxed),
             file_count: item.file_count.load(Ordering::Relaxed) as usize,
             files_done: item.files_done.load(Ordering::Relaxed) as usize,
-            status: item.status.lock().unwrap().clone(),
-            error: item.error.lock().unwrap().clone(),
-            current_file: item.current_file.lock().unwrap().clone(),
+            status: item.status.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+            error: item.error.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+            current_file: item.current_file.lock().unwrap_or_else(|e| e.into_inner()).clone(),
         })
         .collect()
 }
@@ -359,9 +359,9 @@ pub fn get_copy_queue(app: AppHandle) -> Vec<CopyQueueItem> {
 #[tauri::command]
 pub fn clear_completed_copies(app: AppHandle) {
     let queue = app.state::<CopyQueueManager>();
-    let mut items = queue.items.lock().unwrap();
+    let mut items = queue.items.lock().unwrap_or_else(|e| e.into_inner());
     items.retain(|item| {
-        let status = item.status.lock().unwrap().clone();
+        let status = item.status.lock().unwrap_or_else(|e| e.into_inner()).clone();
         status != "completed" && status != "cancelled" && status != "error"
     });
 }
