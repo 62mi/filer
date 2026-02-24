@@ -82,6 +82,9 @@ pub async fn has_api_key() -> Result<bool, String> {
     }
 }
 
+// === 定数 ===
+const MAX_FILE_COLLECT: usize = 1000;
+
 // === 型定義 ===
 
 #[derive(Debug)]
@@ -89,8 +92,6 @@ struct FileInfo {
     rel_path: String,
     size: u64,
     modified: f64,
-    #[allow(dead_code)]
-    extension: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -211,20 +212,14 @@ fn collect_files(folder_path: &str) -> Result<Vec<FileInfo>, String> {
         .max_depth(10)
         .into_iter()
         .filter_map(|e| e.ok())
+        .filter(|e| e.metadata().map(|m| !m.is_dir()).unwrap_or(false))
+        .take(MAX_FILE_COLLECT * 2) // ソート前に十分な量を確保しつつメモリを制限
     {
         let metadata = match entry.metadata() {
             Ok(m) => m,
             Err(_) => continue,
         };
-        if metadata.is_dir() {
-            continue;
-        }
         let path = entry.path();
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
-            .to_lowercase();
         let rel_path = path
             .strip_prefix(dir_path)
             .unwrap_or(path)
@@ -241,7 +236,6 @@ fn collect_files(folder_path: &str) -> Result<Vec<FileInfo>, String> {
             rel_path,
             size: metadata.len(),
             modified,
-            extension: ext,
         });
     }
 
@@ -250,7 +244,7 @@ fn collect_files(folder_path: &str) -> Result<Vec<FileInfo>, String> {
             .partial_cmp(&a.modified)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    files.truncate(1000);
+    files.truncate(MAX_FILE_COLLECT);
     Ok(files)
 }
 
