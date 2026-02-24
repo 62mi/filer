@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { Loader } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAiStore } from "../../stores/aiStore";
+import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
+import { useCopyQueueStore } from "../../stores/copyQueueStore";
 import { useIconStore } from "../../stores/iconStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useRuleStore } from "../../stores/ruleStore";
@@ -92,7 +94,7 @@ export function Panel() {
 
   // Initial load
   useEffect(() => {
-    loadDirectory(tab.path);
+    loadDirectory(tab.path, false);
   }, [loadDirectory, tab.path]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reload on showHidden change
@@ -327,7 +329,7 @@ export function Panel() {
         const operation = e.ctrlKey ? "copy" : "move";
         if (fromStack) {
           if (e.ctrlKey) {
-            await invoke("copy_files", { sources: paths, dest: targetEntry.path });
+            await useCopyQueueStore.getState().enqueue(paths, targetEntry.path, "copy");
             useUndoStore.getState().pushAction({ type: "copy", entries: undoEntries });
           } else {
             await invoke("move_files", { sources: paths, dest: targetEntry.path });
@@ -335,7 +337,7 @@ export function Panel() {
             paths.forEach((p) => removeFromStack(p));
           }
         } else if (e.ctrlKey) {
-          await invoke("copy_files", { sources: paths, dest: targetEntry.path });
+          await useCopyQueueStore.getState().enqueue(paths, targetEntry.path, "copy");
           useUndoStore.getState().pushAction({ type: "copy", entries: undoEntries });
         } else {
           await invoke("move_files", { sources: paths, dest: targetEntry.path });
@@ -425,7 +427,7 @@ export function Panel() {
 
         if (fromStack) {
           if (e.ctrlKey) {
-            await invoke("copy_files", { sources: paths, dest: tab.path });
+            await useCopyQueueStore.getState().enqueue(paths, tab.path, "copy");
             useUndoStore.getState().pushAction({ type: "copy", entries: undoEntries });
             recordMove(paths[0]?.substring(0, paths[0].lastIndexOf("\\")) || "", "copy");
           } else {
@@ -447,7 +449,7 @@ export function Panel() {
         if (isFromHere) return;
 
         if (e.ctrlKey) {
-          await invoke("copy_files", { sources: paths, dest: tab.path });
+          await useCopyQueueStore.getState().enqueue(paths, tab.path, "copy");
           useUndoStore.getState().pushAction({ type: "copy", entries: undoEntries });
           recordMove(sourceDir, "copy");
         } else {
@@ -459,6 +461,68 @@ export function Panel() {
       } catch (_err) {}
     },
     [tab.path, loadDirectory, removeFromStack, schedulePatternRecheck],
+  );
+
+  // クリップボードからファイル生成
+  const handleClipboardToFile = useCallback(
+    async (dirPath: string) => {
+      try {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          // 画像を優先チェック
+          const imageType = item.types.find((t) => t.startsWith("image/"));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const buffer = await blob.arrayBuffer();
+            const data = Array.from(new Uint8Array(buffer));
+            const ext = imageType.split("/")[1] === "jpeg" ? "jpg" : imageType.split("/")[1] || "png";
+            const createdPath: string = await invoke("write_clipboard_file", {
+              dir: dirPath,
+              data,
+              extension: ext,
+            });
+            useUndoStore.getState().pushAction({
+              type: "create_file",
+              entries: [{ sourcePath: "", destPath: createdPath }],
+            });
+            toast.success(`クリップボードから画像ファイルを作成しました`);
+            await loadDirectory(dirPath, false);
+            return;
+          }
+
+          // テキスト
+          if (item.types.includes("text/plain")) {
+            const blob = await item.getType("text/plain");
+            const text = await blob.text();
+            // ファイルパスっぽい文字列はスキップ
+            if (
+              text.trim().startsWith("/") ||
+              text.trim().match(/^[A-Za-z]:\\/) ||
+              text.trim().startsWith("\\\\")
+            ) {
+              return;
+            }
+            if (!text.trim()) return;
+            const data = Array.from(new TextEncoder().encode(text));
+            const createdPath: string = await invoke("write_clipboard_file", {
+              dir: dirPath,
+              data,
+              extension: "txt",
+            });
+            useUndoStore.getState().pushAction({
+              type: "create_file",
+              entries: [{ sourcePath: "", destPath: createdPath }],
+            });
+            toast.success(`クリップボードからテキストファイルを作成しました`);
+            await loadDirectory(dirPath, false);
+            return;
+          }
+        }
+      } catch {
+        // クリップボードアクセス失敗時は何もしない
+      }
+    },
+    [loadDirectory],
   );
 
   // Keyboard handling
@@ -562,9 +626,16 @@ export function Panel() {
           }
           break;
         case "v":
-          if (e.ctrlKey) {
+          if (e.ctrlKey && !e.shiftKey) {
             e.preventDefault();
-            clipboardPaste();
+            // Filer内部クリップボードがあればそれを優先
+            const internalClipboard = useExplorerStore.getState().clipboard;
+            if (internalClipboard) {
+              clipboardPaste();
+            } else {
+              // システムクリップボードからファイル生成を試みる
+              handleClipboardToFile(activeTab.path).catch(() => {});
+            }
           }
           break;
         case "S":
@@ -617,6 +688,12 @@ export function Panel() {
           if (e.ctrlKey) {
             e.preventDefault();
             useSettingsStore.getState().openSettings();
+          }
+          break;
+        case "k":
+          if (e.ctrlKey) {
+            e.preventDefault();
+            useCommandPaletteStore.getState().open();
           }
           break;
         case "h":

@@ -2,6 +2,8 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import { AiSettings } from "./components/AiSettings";
 import { BookmarkBar } from "./components/BookmarkBar";
+import { CommandPalette } from "./components/CommandPalette";
+import { CopyQueuePanel } from "./components/CopyQueue";
 import { NavigationBar } from "./components/NavigationBar";
 import { Panel } from "./components/Panel";
 import { PreviewPanel } from "./components/PreviewPanel";
@@ -11,7 +13,9 @@ import { SettingsDialog } from "./components/SettingsDialog/SettingsDialog";
 import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { TabBar } from "./components/TabBar";
+import { TemplateManager } from "./components/TemplateManager";
 import { useAiStore } from "./stores/aiStore";
+import { useCopyQueueStore } from "./stores/copyQueueStore";
 import { useExplorerStore } from "./stores/panelStore";
 import { useRuleSuggestionStore } from "./stores/ruleSuggestionStore";
 import { toast, useToastStore } from "./stores/toastStore";
@@ -31,6 +35,14 @@ function App() {
   useEffect(() => {
     useAiStore.getState().checkApiKey();
     useAiStore.getState().loadUsage();
+  }, []);
+
+  // コピーキューのイベントリスナー
+  useEffect(() => {
+    const unlistenPromise = useCopyQueueStore.getState().initListener();
+    return () => {
+      unlistenPromise.then((fn) => fn()).catch(() => {});
+    };
   }, []);
 
   // ルール自動実行の通知をリッスン
@@ -172,6 +184,15 @@ function App() {
 
       {/* UI Settings Dialog */}
       <SettingsDialog />
+
+      {/* Command Palette */}
+      <CommandPalette />
+
+      {/* Template Manager Dialog */}
+      <TemplateManager />
+
+      {/* Copy Queue Panel */}
+      <CopyQueuePanel />
 
       {/* Toast notifications */}
       {toasts.length > 0 && (

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import type { FileEntry, SortKey, SortOrder } from "../types";
+import { useCopyQueueStore } from "./copyQueueStore";
 import { useUndoStore } from "./undoStore";
 
 function sortEntries(entries: FileEntry[], key: SortKey, order: SortOrder): FileEntry[] {
@@ -418,9 +419,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       });
 
       if (clipboard.operation === "copy") {
-        await invoke("copy_files", { sources: clipboard.paths, dest: tab.path });
+        // コピーはキュー経由（バックグラウンド進捗付き）
+        await useCopyQueueStore.getState().enqueue(clipboard.paths, tab.path, "copy");
         useUndoStore.getState().pushAction({ type: "copy", entries });
       } else {
+        // 移動はrename（同ドライブなら即座）なので直接実行
         await invoke("move_files", { sources: clipboard.paths, dest: tab.path });
         useUndoStore.getState().pushAction({ type: "move", entries });
         set({ clipboard: null });

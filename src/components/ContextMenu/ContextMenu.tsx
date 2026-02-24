@@ -1,12 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
+  ChevronRight,
   ClipboardPaste,
   Copy,
   ExternalLink,
   FilePlus,
+  Folder,
   FolderPlus,
   Info,
   Layers,
+  LayoutTemplate,
   PencilLine,
   Scissors,
   Sparkles,
@@ -14,11 +17,14 @@ import {
   Wand2,
   Zap,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAiStore } from "../../stores/aiStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useRuleStore } from "../../stores/ruleStore";
 import { useRuleWizardStore } from "../../stores/ruleWizardStore";
+import { useTemplateStore } from "../../stores/templateStore";
+import { toast } from "../../stores/toastStore";
+import { useUndoStore } from "../../stores/undoStore";
 import type { FileEntry } from "../../types";
 
 interface ContextMenuProps {
@@ -35,13 +41,20 @@ interface MenuItem {
   onClick: () => void;
   disabled?: boolean;
   separator?: false;
+  submenu?: undefined;
 }
 
 interface MenuSeparator {
   separator: true;
 }
 
-type MenuEntry = MenuItem | MenuSeparator;
+interface SubmenuItem {
+  label: string;
+  icon: React.ReactNode;
+  submenu: MenuItem[];
+}
+
+type MenuEntry = MenuItem | MenuSeparator | SubmenuItem;
 
 export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -241,6 +254,49 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
         onClose();
       },
     },
+    (() => {
+      if (!useTemplateStore.getState().loaded) {
+        useTemplateStore.getState().loadTemplates();
+      }
+      const templates = useTemplateStore.getState().templates;
+      const submenuItems: MenuItem[] = templates.map((tmpl) => ({
+        label: tmpl.name,
+        icon: <Folder className="w-4 h-4 text-amber-500" />,
+        onClick: async () => {
+          try {
+            const createdPaths: string[] = await invoke("create_from_template", {
+              basePath: tab.path,
+              nodes: tmpl.nodes,
+            });
+            if (createdPaths.length > 0) {
+              useUndoStore.getState().pushAction({
+                type: "create_dir",
+                entries: createdPaths.map((p) => ({ sourcePath: "", destPath: p })),
+              });
+            }
+            toast.success(`テンプレート「${tmpl.name}」を展開しました`);
+            useExplorerStore.getState().refreshDirectory();
+          } catch (err) {
+            toast.error(`テンプレート展開に失敗: ${err}`);
+          }
+          onClose();
+        },
+      }));
+      // 常に末尾に Template Manager を追加
+      submenuItems.push({
+        label: "Template Manager...",
+        icon: <LayoutTemplate className="w-4 h-4" />,
+        onClick: () => {
+          useTemplateStore.getState().openDialog();
+          onClose();
+        },
+      });
+      return {
+        label: "テンプレートから作成",
+        icon: <LayoutTemplate className="w-4 h-4" />,
+        submenu: submenuItems,
+      } as SubmenuItem;
+    })(),
     ...(hasTarget
       ? [
           { separator: true as const },
@@ -255,6 +311,20 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
       : []),
   ];
 
+  const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
+  const submenuTimeoutRef = useRef<number | null>(null);
+
+  const handleSubmenuEnter = (index: number) => {
+    if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
+    setOpenSubmenu(index);
+  };
+
+  const handleSubmenuLeave = () => {
+    submenuTimeoutRef.current = window.setTimeout(() => {
+      setOpenSubmenu(null);
+    }, 150);
+  };
+
   return (
     <div
       ref={menuRef}
@@ -264,6 +334,42 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
       {items.map((item, i) => {
         if ("separator" in item && item.separator) {
           return <div key={i} className="h-px bg-[#e5e5e5] my-1" />;
+        }
+        // サブメニュー
+        if ("submenu" in item && item.submenu) {
+          const sub = item as SubmenuItem;
+          return (
+            <div
+              key={i}
+              className="relative"
+              onMouseEnter={() => handleSubmenuEnter(i)}
+              onMouseLeave={handleSubmenuLeave}
+            >
+              <div className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[#e8e8e8] transition-colors cursor-default">
+                <span className="text-[#666]">{sub.icon}</span>
+                <span className="flex-1">{sub.label}</span>
+                <ChevronRight className="w-3.5 h-3.5 text-[#999]" />
+              </div>
+              {openSubmenu === i && (
+                <div
+                  className="absolute left-full top-0 ml-0.5 min-w-44 bg-white border border-[#e0e0e0] rounded-lg shadow-lg py-1 z-50"
+                  onMouseEnter={() => handleSubmenuEnter(i)}
+                  onMouseLeave={handleSubmenuLeave}
+                >
+                  {sub.submenu.map((subItem, j) => (
+                    <button
+                      key={j}
+                      className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[#e8e8e8] transition-colors"
+                      onClick={subItem.onClick}
+                    >
+                      <span className="text-[#666]">{subItem.icon}</span>
+                      {subItem.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
         }
         const menuItem = item as MenuItem;
         return (

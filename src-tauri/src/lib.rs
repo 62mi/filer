@@ -3,6 +3,8 @@ mod db;
 mod watcher;
 
 use commands::ai::*;
+use commands::clipboard::*;
+use commands::copy_queue::*;
 use commands::fs::*;
 use commands::icons::*;
 use commands::system::*;
@@ -23,6 +25,7 @@ pub fn run() {
         .manage(IconCache { cache: std::sync::Mutex::new(std::collections::HashMap::new()) })
         .manage(IconCacheLarge { cache: std::sync::Mutex::new(std::collections::HashMap::new()) })
         .manage(ThumbnailCache { cache: std::sync::Mutex::new(std::collections::HashMap::new()) })
+        .manage(CopyQueueManager::new())
         .setup(|app| {
             let handle = app.handle().clone();
             let watcher_manager = watcher::WatcherManager::new(handle);
@@ -72,6 +75,14 @@ pub fn run() {
             get_file_icons,
             get_file_icons_large,
             get_thumbnails,
+            write_clipboard_file,
+            create_from_template,
+            enqueue_copy,
+            pause_copy,
+            resume_copy,
+            cancel_copy,
+            get_copy_queue,
+            clear_completed_copies,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

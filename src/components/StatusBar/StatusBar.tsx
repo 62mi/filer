@@ -1,4 +1,5 @@
 import { PanelRightClose, PanelRightOpen, Sparkles } from "lucide-react";
+import { CopyQueueMiniIndicator } from "../CopyQueue";
 import { useAiStore } from "../../stores/aiStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -59,6 +60,9 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
       )}
 
       <div className="flex-1" />
+
+      {/* コピーキュー進捗インジケータ */}
+      <CopyQueueMiniIndicator />
 
       {/* AI使用量バジェットインジケータ */}
       {hasApiKey && (

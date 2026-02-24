@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Read;
 use std::path::Path;
@@ -305,12 +305,13 @@ fn find_common_prefix(names: &[String]) -> Option<String> {
 }
 
 #[tauri::command]
-pub fn search_files(path: String, query: String, max_results: Option<usize>) -> Result<Vec<FileEntry>, String> {
+pub fn search_files(path: String, query: String, max_results: Option<usize>, max_depth: Option<usize>) -> Result<Vec<FileEntry>, String> {
     let max = max_results.unwrap_or(200);
+    let depth = max_depth.unwrap_or(5);
     let query_lower = query.to_lowercase();
     let mut results = Vec::new();
 
-    for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(&path).max_depth(depth).into_iter().filter_map(|e| e.ok()) {
         if results.len() >= max {
             break;
         }
@@ -463,4 +464,58 @@ pub fn get_file_properties(path: String) -> Result<FileProperties, String> {
         file_count,
         dir_count,
     })
+}
+
+/// テンプレートノード
+#[derive(Debug, Deserialize)]
+pub struct TemplateNode {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub node_type: String, // "directory" or "file"
+    pub children: Option<Vec<TemplateNode>>,
+    pub content: Option<String>,
+}
+
+/// テンプレートからフォルダ構造を作成
+/// base_path: 作成先のベースディレクトリ
+/// nodes: テンプレートノードのツリー
+/// 戻り値: 作成されたパスの一覧
+#[tauri::command]
+pub fn create_from_template(base_path: String, nodes: Vec<TemplateNode>) -> Result<Vec<String>, String> {
+    let base = Path::new(&base_path);
+    if !base.is_dir() {
+        return Err(format!("Directory not found: {}", base_path));
+    }
+
+    let mut created_paths = Vec::new();
+    create_nodes_recursive(base, &nodes, &mut created_paths)?;
+    Ok(created_paths)
+}
+
+fn create_nodes_recursive(
+    parent: &Path,
+    nodes: &[TemplateNode],
+    created_paths: &mut Vec<String>,
+) -> Result<(), String> {
+    for node in nodes {
+        validate_name(&node.name)?;
+        let path = parent.join(&node.name);
+
+        if node.node_type == "directory" {
+            fs::create_dir_all(&path)
+                .map_err(|e| format!("Failed to create directory {}: {}", node.name, e))?;
+            created_paths.push(path.to_string_lossy().to_string());
+
+            if let Some(children) = &node.children {
+                create_nodes_recursive(&path, children, created_paths)?;
+            }
+        } else {
+            // file
+            let content = node.content.as_deref().unwrap_or("");
+            fs::write(&path, content)
+                .map_err(|e| format!("Failed to create file {}: {}", node.name, e))?;
+            created_paths.push(path.to_string_lossy().to_string());
+        }
+    }
+    Ok(())
 }
