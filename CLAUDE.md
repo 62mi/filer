@@ -23,8 +23,10 @@ filer/
 │   │   ├── main.rs     # エントリポイント
 │   │   ├── lib.rs      # Tauriアプリ初期化・コマンド登録
 │   │   ├── commands/   # Tauri コマンド (IPC)
-│   │   │   ├── fs.rs   # ファイル操作 (読取・作成・削除・リネーム)
+│   │   │   ├── fs.rs   # ファイル操作 (読取・作成・削除・リネーム・テンプレート展開)
 │   │   │   ├── ai.rs   # AI自動整理 (Claude API連携)
+│   │   │   ├── clipboard.rs # クリップボード→ファイル生成
+│   │   │   ├── copy_queue.rs # コピーキュー (バックグラウンドコピー)
 │   │   │   ├── icons.rs # Windows Shellアイコン抽出
 │   │   │   └── system.rs # システム情報 (ドライブ一覧等)
 │   │   ├── db/         # SQLite データベース
@@ -53,7 +55,10 @@ filer/
 │   │   ├── ContextMenu/ # 右クリックメニュー
 │   │   ├── DragSuggestion/ # ドラッグ時の移動先サジェスト
 │   │   ├── PropertiesDialog/ # プロパティダイアログ
-│   │   └── SettingsDialog/ # 設定ダイアログ
+│   │   ├── SettingsDialog/ # 設定ダイアログ
+│   │   ├── CommandPalette/ # コマンドパレット (Ctrl+K)
+│   │   ├── CopyQueue/    # コピーキューパネル
+│   │   └── TemplateManager/ # テンプレート管理ダイアログ
 │   ├── stores/         # Zustand ストア
 │   │   ├── panelStore.ts # パネル・タブ・ファイル一覧
 │   │   ├── aiStore.ts  # AI整理状態
@@ -62,7 +67,15 @@ filer/
 │   │   ├── settingsStore.ts # アプリ設定
 │   │   ├── undoStore.ts # Undo/Redoスタック
 │   │   ├── toastStore.ts # グローバル通知
-│   │   └── ...         # その他 (icon, thumbnail, suggestion等)
+│   │   ├── copyQueueStore.ts # コピーキュー状態
+│   │   ├── commandPaletteStore.ts # コマンドパレット状態
+│   │   ├── templateStore.ts # テンプレート管理
+│   │   ├── iconStore.ts # アイコンキャッシュ
+│   │   ├── thumbnailStore.ts # サムネイルキャッシュ
+│   │   ├── suggestionStore.ts # ドラッグ移動先サジェスト
+│   │   ├── ruleSuggestionStore.ts # ルール提案状態
+│   │   └── ruleWizardStore.ts # ルール作成ウィザード状態
+│   ├── commands/       # コマンドレジストリ (コマンドパレット用)
 │   ├── types/          # TypeScript 型定義
 │   ├── utils/          # ユーティリティ
 │   ├── App.tsx
@@ -114,6 +127,12 @@ pnpm check                   # lint:fix + tsc --noEmit
 git tag -a v1.1.0 -m "v1.1.0: 説明" && git push origin v1.1.0
 ```
 `.github/workflows/release.yml` が Windows ランナー上で `pnpm tauri build` を実行し、MSI/EXEをGitHub Releaseに添付する。
+
+## 開発フロー
+機能追加・バグ修正などの作業を始める前に、以下を必ず行う:
+1. **GitHub Issue作成**: 作業内容をIssueとして登録する（`gh issue create`）
+2. **ブランチ作成**: Issue番号を含むブランチを切る（例: `feat/#19-custom-titlebar`）
+3. masterへの直接コミットは避ける
 
 ## コーディング規約
 - 日本語コメントOK（ユーザーが日本語話者）

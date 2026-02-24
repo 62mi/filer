@@ -48,7 +48,7 @@ interface SettingsData {
 }
 
 const DEFAULTS: SettingsData = {
-  tabBarHeight: 44,
+  tabBarHeight: 32,
   bookmarkBarHeight: 36,
   bookmarkItemHeight: 28,
   toolbarHeight: 40,
