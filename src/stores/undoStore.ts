@@ -1,6 +1,22 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 
+/** Windowsパスから親ディレクトリを取得（"/"と"\\"の両方に対応） */
+function getParentDir(filePath: string): string {
+  const normalized = filePath.replace(/\//g, "\\");
+  const lastSep = normalized.lastIndexOf("\\");
+  if (lastSep <= 0) return normalized;
+  // "C:\" のようなルートの場合はそのまま返す
+  if (lastSep === 2 && normalized[1] === ":") return normalized.substring(0, 3);
+  return normalized.substring(0, lastSep);
+}
+
+/** Windowsパスからファイル名を取得（"/"と"\\"の両方に対応） */
+function getFileName(filePath: string): string {
+  const normalized = filePath.replace(/\//g, "\\");
+  return normalized.substring(normalized.lastIndexOf("\\") + 1);
+}
+
 // 操作タイプ
 export type UndoActionType =
   | "move"
@@ -57,7 +73,7 @@ async function executeUndo(action: UndoAction): Promise<void> {
       for (const entry of action.entries) {
         await invoke("move_files", {
           sources: [entry.destPath],
-          dest: entry.sourcePath.substring(0, entry.sourcePath.lastIndexOf("\\")),
+          dest: getParentDir(entry.sourcePath),
         });
       }
       break;
@@ -71,8 +87,10 @@ async function executeUndo(action: UndoAction): Promise<void> {
     case "rename": {
       // リネームの逆: 新名 → 旧名に戻す
       for (const entry of action.entries) {
-        const oldName = entry.sourcePath.substring(entry.sourcePath.lastIndexOf("\\") + 1);
-        await invoke("rename_file", { path: entry.destPath, newName: oldName });
+        await invoke("rename_file", {
+          path: entry.destPath,
+          newName: getFileName(entry.sourcePath),
+        });
       }
       break;
     }
@@ -93,7 +111,7 @@ async function executeUndo(action: UndoAction): Promise<void> {
       for (const entry of action.entries) {
         await invoke("move_files", {
           sources: [entry.destPath],
-          dest: entry.sourcePath.substring(0, entry.sourcePath.lastIndexOf("\\")),
+          dest: getParentDir(entry.sourcePath),
         });
       }
       // 作成されたフォルダを削除（空のはず）
@@ -111,29 +129,24 @@ async function executeRedo(action: UndoAction): Promise<void> {
     case "move": {
       // 移動を再実行
       const sources = action.entries.map((e) => e.sourcePath);
-      // 全エントリの移動先ディレクトリは同じはず
-      const destDir = action.entries[0].destPath.substring(
-        0,
-        action.entries[0].destPath.lastIndexOf("\\"),
-      );
+      const destDir = getParentDir(action.entries[0].destPath);
       await invoke("move_files", { sources, dest: destDir });
       break;
     }
     case "copy": {
       // コピーを再実行
       const sources = action.entries.map((e) => e.sourcePath);
-      const destDir = action.entries[0].destPath.substring(
-        0,
-        action.entries[0].destPath.lastIndexOf("\\"),
-      );
+      const destDir = getParentDir(action.entries[0].destPath);
       await invoke("copy_files", { sources, dest: destDir });
       break;
     }
     case "rename": {
       // リネームを再実行
       for (const entry of action.entries) {
-        const newName = entry.destPath.substring(entry.destPath.lastIndexOf("\\") + 1);
-        await invoke("rename_file", { path: entry.sourcePath, newName });
+        await invoke("rename_file", {
+          path: entry.sourcePath,
+          newName: getFileName(entry.destPath),
+        });
       }
       break;
     }
@@ -145,31 +158,32 @@ async function executeRedo(action: UndoAction): Promise<void> {
     }
     case "create_dir": {
       for (const entry of action.entries) {
-        const parent = entry.destPath.substring(0, entry.destPath.lastIndexOf("\\"));
-        const name = entry.destPath.substring(entry.destPath.lastIndexOf("\\") + 1);
-        await invoke("create_directory", { path: parent, name });
+        await invoke("create_directory", {
+          path: getParentDir(entry.destPath),
+          name: getFileName(entry.destPath),
+        });
       }
       break;
     }
     case "create_file": {
       for (const entry of action.entries) {
-        const parent = entry.destPath.substring(0, entry.destPath.lastIndexOf("\\"));
-        const name = entry.destPath.substring(entry.destPath.lastIndexOf("\\") + 1);
-        await invoke("create_file", { path: parent, name });
+        await invoke("create_file", {
+          path: getParentDir(entry.destPath),
+          name: getFileName(entry.destPath),
+        });
       }
       break;
     }
     case "folderize": {
       // フォルダ化を再実行: フォルダ作成→ファイル移動
       if (action.createdFolder) {
-        const parent = action.createdFolder.substring(0, action.createdFolder.lastIndexOf("\\"));
-        const name = action.createdFolder.substring(action.createdFolder.lastIndexOf("\\") + 1);
-        await invoke("create_directory", { path: parent, name });
+        await invoke("create_directory", {
+          path: getParentDir(action.createdFolder),
+          name: getFileName(action.createdFolder),
+        });
       }
       const sources = action.entries.map((e) => e.sourcePath);
-      const destDir =
-        action.createdFolder ||
-        action.entries[0].destPath.substring(0, action.entries[0].destPath.lastIndexOf("\\"));
+      const destDir = action.createdFolder || getParentDir(action.entries[0].destPath);
       await invoke("move_files", { sources, dest: destDir });
       break;
     }

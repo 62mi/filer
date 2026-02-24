@@ -4,6 +4,23 @@ import type { FileEntry, SortKey, SortOrder } from "../types";
 import { useCopyQueueStore } from "./copyQueueStore";
 import { useUndoStore } from "./undoStore";
 
+/** Windowsパスから親ディレクトリを取得 */
+function getParentDir(filePath: string): string {
+  const normalized = filePath.replace(/\//g, "\\");
+  const lastSep = normalized.lastIndexOf("\\");
+  if (lastSep <= 0) return normalized;
+  if (lastSep === 2 && normalized[1] === ":") return normalized.substring(0, 3);
+  return normalized.substring(0, lastSep);
+}
+
+/** Windowsパスから拡張子を取得 */
+function getExtension(filePath: string): string {
+  const normalized = filePath.replace(/\//g, "\\");
+  const dot = normalized.lastIndexOf(".");
+  const sep = normalized.lastIndexOf("\\");
+  return dot > sep ? normalized.substring(dot + 1).toLowerCase() : "";
+}
+
 function sortEntries(entries: FileEntry[], key: SortKey, order: SortOrder): FileEntry[] {
   return [...entries].sort((a, b) => {
     if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
@@ -430,14 +447,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       }
       // 移動履歴記録
       const exts = clipboard.paths
-        .map((p) => {
-          const dot = p.lastIndexOf(".");
-          const sep = p.lastIndexOf("\\");
-          return dot > sep ? p.substring(dot + 1).toLowerCase() : "";
-        })
+        .map((p) => getExtension(p))
         .filter((v, i, a) => a.indexOf(v) === i);
       invoke("record_move_operation", {
-        sourceDir: clipboard.paths[0]?.substring(0, clipboard.paths[0].lastIndexOf("\\")) || "",
+        sourceDir: clipboard.paths[0] ? getParentDir(clipboard.paths[0]) : "",
         destDir: tab.path,
         extensions: exts,
         operation: clipboard.operation === "copy" ? "copy" : "move",
@@ -714,15 +727,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         set({ stackItems: [] });
       }
       // 移動履歴記録
-      const exts = stackItems
-        .map((p) => {
-          const dot = p.lastIndexOf(".");
-          const sep = p.lastIndexOf("\\");
-          return dot > sep ? p.substring(dot + 1).toLowerCase() : "";
-        })
-        .filter((v, i, a) => a.indexOf(v) === i);
+      const exts = stackItems.map((p) => getExtension(p)).filter((v, i, a) => a.indexOf(v) === i);
       invoke("record_move_operation", {
-        sourceDir: stackItems[0]?.substring(0, stackItems[0].lastIndexOf("\\")) || "",
+        sourceDir: stackItems[0] ? getParentDir(stackItems[0]) : "",
         destDir: tab.path,
         extensions: exts,
         operation,
