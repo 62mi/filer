@@ -1,21 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import {
-  ChevronRight,
-  File,
-  Folder,
-  FolderOpen,
-  Pencil,
-  Plus,
-  Trash2,
-  X,
-} from "lucide-react";
+import { ChevronRight, File, Folder, FolderOpen, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useExplorerStore } from "../../stores/panelStore";
-import {
-  type Template,
-  type TemplateNode,
-  useTemplateStore,
-} from "../../stores/templateStore";
+import { type Template, type TemplateNode, useTemplateStore } from "../../stores/templateStore";
 import { toast } from "../../stores/toastStore";
 import { useUndoStore } from "../../stores/undoStore";
 
@@ -131,10 +118,7 @@ export function TemplateManager() {
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-[#e5e5e5]">
           <h2 className="font-semibold text-base">テンプレート管理</h2>
-          <button
-            className="p-1 rounded hover:bg-[#e8e8e8] text-[#999]"
-            onClick={closeDialog}
-          >
+          <button className="p-1 rounded hover:bg-[#e8e8e8] text-[#999]" onClick={closeDialog}>
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -235,9 +219,7 @@ export function TemplateManager() {
                   />
 
                   {/* ルートレベルの追加 */}
-                  {addingPath !== null &&
-                    addingPath.length === 0 &&
-                    renderAddForm()}
+                  {addingPath !== null && addingPath.length === 0 && renderAddForm()}
 
                   {addingPath === null && (
                     <button
@@ -299,16 +281,10 @@ export function TemplateManager() {
           }}
           autoFocus
         />
-        <button
-          className="text-xs text-[#0078d4] px-1"
-          onClick={() => addNodeAt(addingPath!)}
-        >
+        <button className="text-xs text-[#0078d4] px-1" onClick={() => addNodeAt(addingPath!)}>
           OK
         </button>
-        <button
-          className="text-xs text-[#999] px-1"
-          onClick={() => setAddingPath(null)}
-        >
+        <button className="text-xs text-[#999] px-1" onClick={() => setAddingPath(null)}>
           Cancel
         </button>
       </div>
@@ -336,17 +312,12 @@ function NodeTree({
         const currentPath = [...path, i];
         const isDir = node.type === "directory";
         const isAdding =
-          addingPath !== null &&
-          JSON.stringify(addingPath) === JSON.stringify(currentPath);
+          addingPath !== null && JSON.stringify(addingPath) === JSON.stringify(currentPath);
 
         return (
           <div key={i} className="group">
             <div className="flex items-center gap-1 py-0.5 px-1 rounded hover:bg-[#f5f5f5]">
-              {isDir ? (
-                <ChevronRight className="w-3 h-3 text-[#999]" />
-              ) : (
-                <span className="w-3" />
-              )}
+              {isDir ? <ChevronRight className="w-3 h-3 text-[#999]" /> : <span className="w-3" />}
               {isDir ? (
                 <Folder className="w-3.5 h-3.5 text-amber-500" />
               ) : (

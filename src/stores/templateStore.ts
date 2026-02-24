@@ -40,7 +40,12 @@ const BUILTIN_TEMPLATES: Template[] = [
         name: "src",
         type: "directory",
         children: [
-          { name: "index.html", type: "file", content: "<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Project</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <script src=\"main.js\"></script>\n</body>\n</html>" },
+          {
+            name: "index.html",
+            type: "file",
+            content:
+              '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="UTF-8">\n  <title>Project</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <script src="main.js"></script>\n</body>\n</html>',
+          },
           { name: "style.css", type: "file", content: "/* styles */\n" },
           { name: "main.js", type: "file", content: "// entry point\n" },
         ],
@@ -62,10 +67,14 @@ const BUILTIN_TEMPLATES: Template[] = [
     builtin: true,
     nodes: [
       { name: "Sprites", type: "directory" },
-      { name: "Audio", type: "directory", children: [
-        { name: "BGM", type: "directory" },
-        { name: "SE", type: "directory" },
-      ]},
+      {
+        name: "Audio",
+        type: "directory",
+        children: [
+          { name: "BGM", type: "directory" },
+          { name: "SE", type: "directory" },
+        ],
+      },
       { name: "Scenes", type: "directory" },
       { name: "Scripts", type: "directory" },
       { name: "Prefabs", type: "directory" },
@@ -77,10 +86,14 @@ const BUILTIN_TEMPLATES: Template[] = [
     name: "Document Project",
     builtin: true,
     nodes: [
-      { name: "docs", type: "directory", children: [
-        { name: "drafts", type: "directory" },
-        { name: "final", type: "directory" },
-      ]},
+      {
+        name: "docs",
+        type: "directory",
+        children: [
+          { name: "drafts", type: "directory" },
+          { name: "final", type: "directory" },
+        ],
+      },
       { name: "references", type: "directory" },
       { name: "exports", type: "directory" },
       { name: "README.md", type: "file", content: "# Document Project\n" },
@@ -112,9 +125,7 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
 
   updateTemplate: (id, name, nodes) => {
     set((s) => ({
-      templates: s.templates.map((t) =>
-        t.id === id ? { ...t, name, nodes } : t,
-      ),
+      templates: s.templates.map((t) => (t.id === id ? { ...t, name, nodes } : t)),
     }));
     get().saveTemplates();
   },
@@ -130,10 +141,7 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
       const saved: Template[] = data ? JSON.parse(data) : [];
       // ビルトインをマージ（保存されたビルトインで上書き）
       const savedIds = new Set(saved.map((t) => t.id));
-      const merged = [
-        ...BUILTIN_TEMPLATES.filter((bt) => !savedIds.has(bt.id)),
-        ...saved,
-      ];
+      const merged = [...BUILTIN_TEMPLATES.filter((bt) => !savedIds.has(bt.id)), ...saved];
       set({ templates: merged, loaded: true });
     } catch {
       set({ templates: [...BUILTIN_TEMPLATES], loaded: true });

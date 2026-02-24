@@ -1,11 +1,4 @@
-import {
-  Check,
-  Pause,
-  Play,
-  Trash2,
-  X,
-  XCircle,
-} from "lucide-react";
+import { Check, Pause, Play, Trash2, X, XCircle } from "lucide-react";
 import { useCopyQueueStore } from "../../stores/copyQueueStore";
 import { formatFileSize } from "../../utils/format";
 
@@ -35,10 +28,7 @@ export function CopyQueuePanel() {
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
-          <button
-            className="p-1 rounded hover:bg-[#e8e8e8] text-[#999]"
-            onClick={closePanel}
-          >
+          <button className="p-1 rounded hover:bg-[#e8e8e8] text-[#999]" onClick={closePanel}>
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -84,28 +74,31 @@ function QueueItem({
 }) {
   const progress =
     item.total_bytes > 0 ? Math.round((item.copied_bytes / item.total_bytes) * 100) : 0;
-  const isActive = item.status === "running" || item.status === "paused" || item.status === "calculating";
+  const isActive =
+    item.status === "running" || item.status === "paused" || item.status === "calculating";
   const destName = item.dest?.split("\\").pop() || item.dest || "";
 
-  const statusLabel = {
-    calculating: "計算中...",
-    pending: "待機中",
-    running: `${progress}%`,
-    paused: "一時停止",
-    completed: "完了",
-    cancelled: "キャンセル",
-    error: "エラー",
-  }[item.status] || item.status;
+  const statusLabel =
+    {
+      calculating: "計算中...",
+      pending: "待機中",
+      running: `${progress}%`,
+      paused: "一時停止",
+      completed: "完了",
+      cancelled: "キャンセル",
+      error: "エラー",
+    }[item.status] || item.status;
 
-  const statusColor = {
-    calculating: "text-[#0078d4]",
-    pending: "text-[#999]",
-    running: "text-[#0078d4]",
-    paused: "text-amber-500",
-    completed: "text-green-600",
-    cancelled: "text-[#999]",
-    error: "text-red-500",
-  }[item.status] || "text-[#999]";
+  const statusColor =
+    {
+      calculating: "text-[#0078d4]",
+      pending: "text-[#999]",
+      running: "text-[#0078d4]",
+      paused: "text-amber-500",
+      completed: "text-green-600",
+      cancelled: "text-[#999]",
+      error: "text-red-500",
+    }[item.status] || "text-[#999]";
 
   return (
     <div className="px-4 py-2 border-b border-[#f0f0f0] last:border-0">
@@ -140,7 +133,8 @@ function QueueItem({
           {isActive && item.current_file
             ? item.current_file.split("\\").pop()
             : `${item.files_done}/${item.file_count} files`}
-          {isActive && ` · ${formatFileSize(item.copied_bytes)}/${formatFileSize(item.total_bytes)}`}
+          {isActive &&
+            ` · ${formatFileSize(item.copied_bytes)}/${formatFileSize(item.total_bytes)}`}
         </span>
 
         {isActive && (
@@ -172,9 +166,7 @@ function QueueItem({
           </div>
         )}
 
-        {item.status === "completed" && (
-          <Check className="w-3.5 h-3.5 text-green-600 shrink-0" />
-        )}
+        {item.status === "completed" && <Check className="w-3.5 h-3.5 text-green-600 shrink-0" />}
 
         {item.status === "error" && (
           <span className="text-xs text-red-500 truncate ml-2" title={item.error || undefined}>
@@ -191,7 +183,9 @@ export function CopyQueueMiniIndicator() {
   const items = useCopyQueueStore((s) => s.items);
   const togglePanel = useCopyQueueStore((s) => s.togglePanel);
 
-  const activeItems = items.filter((i) => i.status === "running" || i.status === "paused" || i.status === "calculating");
+  const activeItems = items.filter(
+    (i) => i.status === "running" || i.status === "paused" || i.status === "calculating",
+  );
   if (activeItems.length === 0) return null;
 
   const totalBytes = activeItems.reduce((sum, i) => sum + i.total_bytes, 0);

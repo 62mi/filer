@@ -1,9 +1,9 @@
 import { PanelRightClose, PanelRightOpen, Sparkles } from "lucide-react";
-import { CopyQueueMiniIndicator } from "../CopyQueue";
 import { useAiStore } from "../../stores/aiStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { formatFileSize } from "../../utils/format";
+import { CopyQueueMiniIndicator } from "../CopyQueue";
 
 interface StatusBarProps {
   onTogglePreview: () => void;

@@ -21,7 +21,9 @@
         "useSemanticElements": "off",
         "noNoninteractiveElementToInteractiveRole": "off",
         "useButtonType": "off",
-        "noLabelWithoutControl": "off"
+        "noLabelWithoutControl": "off",
+        "noSvgWithoutTitle": "off",
+        "noAutofocus": "off"
       },
       "correctness": {
         "noUnusedVariables": "warn",

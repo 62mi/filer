@@ -52,27 +52,28 @@ export const useCopyQueueStore = create<CopyQueueStore>((set, get) => ({
       if (exists) {
         return {
           isPanelOpen: true,
-          items: s.items.map((i) =>
-            i.id === id ? { ...i, sources, dest, operation } : i,
-          ),
+          items: s.items.map((i) => (i.id === id ? { ...i, sources, dest, operation } : i)),
         };
       }
       // まだイベント未到着の場合、プレースホルダーを追加
       return {
         isPanelOpen: true,
-        items: [...s.items, {
-          id,
-          sources,
-          dest,
-          operation,
-          total_bytes: 0,
-          copied_bytes: 0,
-          file_count: 0,
-          files_done: 0,
-          status: "calculating",
-          error: null,
-          current_file: null,
-        }],
+        items: [
+          ...s.items,
+          {
+            id,
+            sources,
+            dest,
+            operation,
+            total_bytes: 0,
+            copied_bytes: 0,
+            file_count: 0,
+            files_done: 0,
+            status: "calculating",
+            error: null,
+            current_file: null,
+          },
+        ],
       };
     });
     return id;

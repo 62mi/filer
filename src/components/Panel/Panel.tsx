@@ -475,7 +475,8 @@ export function Panel() {
             const blob = await item.getType(imageType);
             const buffer = await blob.arrayBuffer();
             const data = Array.from(new Uint8Array(buffer));
-            const ext = imageType.split("/")[1] === "jpeg" ? "jpg" : imageType.split("/")[1] || "png";
+            const ext =
+              imageType.split("/")[1] === "jpeg" ? "jpg" : imageType.split("/")[1] || "png";
             const createdPath: string = await invoke("write_clipboard_file", {
               dir: dirPath,
               data,
@@ -784,6 +785,7 @@ export function Panel() {
     prevTab,
     addToStack,
     pasteFromStack,
+    handleClipboardToFile,
   ]);
 
   // マウスサイドボタンで戻る/進む

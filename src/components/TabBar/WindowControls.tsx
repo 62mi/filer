@@ -3,9 +3,9 @@ import { useEffect, useState } from "react";
 
 export function WindowControls() {
   const [maximized, setMaximized] = useState(false);
-  const appWindow = getCurrentWindow();
 
   useEffect(() => {
+    const appWindow = getCurrentWindow();
     // 初期状態を取得
     appWindow.isMaximized().then(setMaximized);
 
@@ -18,6 +18,8 @@ export function WindowControls() {
       unlisten.then((fn) => fn());
     };
   }, []);
+
+  const appWindow = getCurrentWindow();
 
   return (
     <div className="flex items-center shrink-0 h-full">
@@ -44,12 +46,29 @@ export function WindowControls() {
           // 復元アイコン（重なった四角）
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
             <rect x="2" y="0" width="8" height="8" rx="0.5" stroke="currentColor" strokeWidth="1" />
-            <rect x="0" y="2" width="8" height="8" rx="0.5" stroke="currentColor" strokeWidth="1" fill="#e8e8e8" />
+            <rect
+              x="0"
+              y="2"
+              width="8"
+              height="8"
+              rx="0.5"
+              stroke="currentColor"
+              strokeWidth="1"
+              fill="#e8e8e8"
+            />
           </svg>
         ) : (
           // 最大化アイコン（四角）
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <rect x="0.5" y="0.5" width="9" height="9" rx="0.5" stroke="currentColor" strokeWidth="1" />
+            <rect
+              x="0.5"
+              y="0.5"
+              width="9"
+              height="9"
+              rx="0.5"
+              stroke="currentColor"
+              strokeWidth="1"
+            />
           </svg>
         )}
       </button>

@@ -1,12 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import {
-  Bookmark,
-  ChevronRight,
-  Command,
-  File,
-  Folder,
-  Search,
-} from "lucide-react";
+import { Bookmark, ChevronRight, Command, File, Folder, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Command as CommandDef, fuzzyScore, getCommands } from "../../commands/registry";
 import { useBookmarkStore } from "../../stores/bookmarkStore";
@@ -219,9 +212,7 @@ export function CommandPalette() {
               <button
                 key={item.id}
                 className={`flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors ${
-                  i === selectedIndex
-                    ? "bg-[#0078d4] text-white"
-                    : "text-[#333] hover:bg-[#f0f0f0]"
+                  i === selectedIndex ? "bg-[#0078d4] text-white" : "text-[#333] hover:bg-[#f0f0f0]"
                 }`}
                 onClick={item.action}
                 onMouseEnter={() => setSelectedIndex(i)}
@@ -249,9 +240,7 @@ export function CommandPalette() {
 
         {/* 空の場合 */}
         {query.trim() && results.length === 0 && (
-          <div className="px-4 py-6 text-center text-sm text-[#999]">
-            結果が見つかりません
-          </div>
+          <div className="px-4 py-6 text-center text-sm text-[#999]">結果が見つかりません</div>
         )}
 
         {/* ヒント */}

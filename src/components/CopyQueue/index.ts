@@ -1,1 +1,1 @@
-export { CopyQueuePanel, CopyQueueMiniIndicator } from "./CopyQueuePanel";
+export { CopyQueueMiniIndicator, CopyQueuePanel } from "./CopyQueuePanel";
