@@ -192,8 +192,12 @@ export const useAiStore = create<AiStore>((set, get) => ({
       set({ organizationPlan: plan, loading: false, phase: "plan", progress: null });
       // 使用量を更新
       get().loadUsage();
-    } catch (err) {
-      set({ error: String(err), loading: false, progress: null });
+    } catch (err: unknown) {
+      set({
+        error: err instanceof Error ? err.message : String(err),
+        loading: false,
+        progress: null,
+      });
     } finally {
       unlisten();
     }
@@ -217,8 +221,12 @@ export const useAiStore = create<AiStore>((set, get) => ({
       set({ suggestedActions: actions, loading: false, phase: "preview", progress: null });
       // 使用量を更新
       get().loadUsage();
-    } catch (err) {
-      set({ error: String(err), loading: false, progress: null });
+    } catch (err: unknown) {
+      set({
+        error: err instanceof Error ? err.message : String(err),
+        loading: false,
+        progress: null,
+      });
     } finally {
       unlisten();
     }
@@ -236,8 +244,8 @@ export const useAiStore = create<AiStore>((set, get) => ({
         actions: selected,
       });
       set({ executionResults: results, executing: false, phase: "results" });
-    } catch (err) {
-      set({ error: String(err), executing: false });
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : String(err), executing: false });
     }
   },
 

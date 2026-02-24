@@ -5,6 +5,10 @@ use std::path::Path;
 use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 
+const DEFAULT_SEARCH_MAX_RESULTS: usize = 200;
+const DEFAULT_SEARCH_MAX_DEPTH: usize = 5;
+const DEFAULT_READ_MAX_BYTES: usize = 50_000;
+
 /// ファイル名にパス区切り文字やトラバーサル文字列が含まれていないか検証
 fn validate_name(name: &str) -> Result<(), String> {
     if name.is_empty() {
@@ -306,8 +310,8 @@ fn find_common_prefix(names: &[String]) -> Option<String> {
 
 #[tauri::command]
 pub fn search_files(path: String, query: String, max_results: Option<usize>, max_depth: Option<usize>) -> Result<Vec<FileEntry>, String> {
-    let max = max_results.unwrap_or(200);
-    let depth = max_depth.unwrap_or(5);
+    let max = max_results.unwrap_or(DEFAULT_SEARCH_MAX_RESULTS);
+    let depth = max_depth.unwrap_or(DEFAULT_SEARCH_MAX_DEPTH);
     let query_lower = query.to_lowercase();
     let mut results = Vec::new();
 
@@ -353,7 +357,7 @@ pub fn search_files(path: String, query: String, max_results: Option<usize>, max
 
 #[tauri::command]
 pub fn read_text_file(path: String, max_bytes: Option<usize>) -> Result<String, String> {
-    let max = max_bytes.unwrap_or(50_000);
+    let max = max_bytes.unwrap_or(DEFAULT_READ_MAX_BYTES);
     let mut file = fs::File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
     let mut buf = vec![0u8; max];
     let n = file.read(&mut buf).map_err(|e| format!("Failed to read file: {}", e))?;
