@@ -1,9 +1,11 @@
 import { Check, ChevronDown, ChevronUp, Loader, Send, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { ACTION_LABELS, CONDITION_LABELS, type ConditionType } from "../../stores/ruleStore";
+import { useTranslation } from "../../i18n";
+import { type ConditionType } from "../../stores/ruleStore";
 import { type GeneratedRulePreview, useRuleWizardStore } from "../../stores/ruleWizardStore";
 
 export function RuleWizard() {
+  const t = useTranslation();
   const open = useRuleWizardStore((s) => s.open);
   const folderPath = useRuleWizardStore((s) => s.folderPath);
   const messages = useRuleWizardStore((s) => s.messages);
@@ -66,7 +68,7 @@ export function RuleWizard() {
         <div className="flex items-center h-10 px-4 border-b border-[#e5e5e5] shrink-0">
           <Sparkles className="w-4 h-4 text-purple-500 mr-2" />
           <span className="font-semibold text-sm text-[#1a1a1a] flex-1 truncate">
-            AI ルールウィザード — {folderName}
+            {t.ruleWizard.title} — {folderName}
           </span>
           <button
             className="p-1 rounded hover:bg-[#e8e8e8] text-[#666] transition-colors"
@@ -87,11 +89,11 @@ export function RuleWizard() {
           {messages.length === 0 && !loading && (
             <div className="text-center py-8 space-y-3">
               <Sparkles className="w-10 h-10 text-purple-300 mx-auto" />
-              <div className="text-sm text-[#999]">どんなルールを作りたいですか？</div>
+              <div className="text-sm text-[#999]">{t.ruleWizard.welcomeMessage}</div>
               <div className="text-[10px] text-[#bbb] space-y-1">
-                <div>例: 「PDFファイルをDocumentsフォルダに移動して」</div>
-                <div>例: 「スクリーンショットを自動で画像フォルダに整理」</div>
-                <div>例: 「1ヶ月以上前のtmpファイルを削除」</div>
+                <div>{t.ruleWizard.example1}</div>
+                <div>{t.ruleWizard.example2}</div>
+                <div>{t.ruleWizard.example3}</div>
               </div>
             </div>
           )}
@@ -122,7 +124,7 @@ export function RuleWizard() {
           {loading && (
             <div className="flex items-center gap-2 text-sm text-purple-500">
               <Loader className="w-4 h-4 animate-spin" />
-              AIが考え中...
+              {t.ruleWizard.aiThinking}
             </div>
           )}
 
@@ -144,9 +146,9 @@ export function RuleWizard() {
                 onClick={confirmRule}
               >
                 <Check className="w-3.5 h-3.5" />
-                ルールを作成
+                {t.ruleWizard.createRule}
               </button>
-              <span className="text-[10px] text-[#999]">または下の入力欄で調整を続けられます</span>
+              <span className="text-[10px] text-[#999]">{t.ruleWizard.orContinueAdjusting}</span>
             </div>
           )}
 
@@ -157,7 +159,7 @@ export function RuleWizard() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="ルールの内容を自由に説明してください..."
+              placeholder={t.ruleWizard.inputPlaceholder}
               className="flex-1 px-3 py-1.5 text-sm border border-[#d0d0d0] rounded focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400/30"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) {
@@ -184,10 +186,10 @@ export function RuleWizard() {
 // === ルールプレビューカード ===
 
 function RulePreviewCard({ preview }: { preview: GeneratedRulePreview }) {
+  const t = useTranslation();
   const [showFiles, setShowFiles] = useState(false);
 
-  const actionLabel =
-    ACTION_LABELS[preview.action_type as keyof typeof ACTION_LABELS] || preview.action_type;
+  const actionLabel = t.ruleLabels.actions[preview.action_type] || preview.action_type;
   const destName = preview.action_dest
     ? preview.action_dest.split("\\").filter(Boolean).pop() || preview.action_dest
     : null;
@@ -197,7 +199,7 @@ function RulePreviewCard({ preview }: { preview: GeneratedRulePreview }) {
       {/* ヘッダー */}
       <div className="flex items-center gap-2 px-3 py-2 bg-purple-50/50 border-b border-purple-100">
         <Sparkles className="w-3.5 h-3.5 text-purple-500" />
-        <span className="text-xs font-medium text-purple-700">ルールプレビュー</span>
+        <span className="text-xs font-medium text-purple-700">{t.ruleWizard.rulePreview}</span>
       </div>
 
       <div className="px-3 py-2 space-y-2">
@@ -211,20 +213,21 @@ function RulePreviewCard({ preview }: { preview: GeneratedRulePreview }) {
               key={i}
               className="inline-flex items-center px-2 py-0.5 text-[10px] bg-[#f0f0f0] text-[#666] rounded"
             >
-              {CONDITION_LABELS[c.cond_type as ConditionType] || c.cond_type}: {c.cond_value}
+              {t.ruleLabels.conditions[c.cond_type as ConditionType] || c.cond_type}: {c.cond_value}
             </span>
           ))}
         </div>
 
         {/* アクション */}
         <div className="text-xs text-[#666]">
-          アクション: <span className="font-medium text-[#1a1a1a]">{actionLabel}</span>
+          {t.ruleWizard.action}: <span className="font-medium text-[#1a1a1a]">{actionLabel}</span>
           {destName && <span className="text-[#999]"> → {destName}</span>}
         </div>
 
         {/* 自動実行 */}
         <div className="text-[10px] text-[#999]">
-          モード: {preview.auto_execute ? "自動実行" : "サジェスト（確認後に実行）"}
+          {t.ruleWizard.mode}:{" "}
+          {preview.auto_execute ? t.ruleWizard.autoExecute : t.ruleWizard.suggestMode}
         </div>
 
         {/* マッチするファイル */}
@@ -235,7 +238,8 @@ function RulePreviewCard({ preview }: { preview: GeneratedRulePreview }) {
               onClick={() => setShowFiles(!showFiles)}
             >
               {showFiles ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              マッチするファイル: {preview.matching_files.length}件
+              {t.ruleWizard.matchingFiles}: {preview.matching_files.length}
+              {t.aiOrganizer.items}
             </button>
             {showFiles && (
               <div className="mt-1 pl-3 space-y-0.5 max-h-24 overflow-auto">
@@ -250,9 +254,7 @@ function RulePreviewCard({ preview }: { preview: GeneratedRulePreview }) {
         )}
 
         {preview.matching_files.length === 0 && (
-          <div className="text-[10px] text-amber-600">
-            現在のフォルダにマッチするファイルはありません
-          </div>
+          <div className="text-[10px] text-amber-600">{t.ruleWizard.noMatchingFiles}</div>
         )}
       </div>
     </div>

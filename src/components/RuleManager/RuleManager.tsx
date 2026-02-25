@@ -10,11 +10,13 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { ACTION_LABELS, type FolderRule, useRuleStore } from "../../stores/ruleStore";
+import { type Translations, useTranslation } from "../../i18n";
+import { type FolderRule, useRuleStore } from "../../stores/ruleStore";
 import { useRuleWizardStore } from "../../stores/ruleWizardStore";
 import { RuleEditor } from "./RuleEditor";
 
 export function RuleManager() {
+  const t = useTranslation();
   const dialogOpen = useRuleStore((s) => s.dialogOpen);
   const dialogFolderPath = useRuleStore((s) => s.dialogFolderPath);
   const rules = useRuleStore((s) => s.rules);
@@ -123,7 +125,7 @@ export function RuleManager() {
             <div className="flex items-center h-10 px-4 border-b border-[#e5e5e5] shrink-0">
               <Zap className="w-4 h-4 text-amber-500 mr-2" />
               <span className="font-semibold text-sm text-[#1a1a1a] flex-1 truncate">
-                フォルダルール — {folderName}
+                {t.ruleManager.title} — {folderName}
               </span>
               <button
                 className="p-1 rounded hover:bg-[#e8e8e8] text-[#666] transition-colors"
@@ -142,15 +144,13 @@ export function RuleManager() {
             <div className="flex-1 overflow-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-full text-sm text-[#999]">
-                  読み込み中...
+                  {t.common.loading}
                 </div>
               ) : rules.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-sm text-[#999] gap-2">
                   <Zap className="w-8 h-8 text-[#ddd]" />
-                  <span>ルールがありません</span>
-                  <span className="text-xs text-[#bbb]">
-                    「新規ルール」をクリックして自動整理ルールを作成
-                  </span>
+                  <span>{t.ruleManager.noRules}</span>
+                  <span className="text-xs text-[#bbb]">{t.ruleManager.noRulesHint}</span>
                 </div>
               ) : (
                 <div className="divide-y divide-[#f0f0f0]">
@@ -170,11 +170,11 @@ export function RuleManager() {
                             {rule.name}
                           </span>
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#f0f0f0] text-[#666] shrink-0">
-                            {ACTION_LABELS[rule.action_type] || rule.action_type}
+                            {t.ruleLabels.actions[rule.action_type] || rule.action_type}
                           </span>
                         </div>
                         <div className="text-[10px] text-[#999] truncate mt-0.5">
-                          {summarizeConditions(rule)}
+                          {summarizeConditions(rule, t)}
                           {rule.action_dest && (
                             <span>
                               {" → "}
@@ -189,7 +189,7 @@ export function RuleManager() {
                         <button
                           className="p-1 rounded hover:bg-[#e8e8e8] text-[#666] transition-colors"
                           onClick={() => handleEdit(rule)}
-                          title="編集"
+                          title={t.common.edit}
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -198,13 +198,13 @@ export function RuleManager() {
                             className="px-2 py-0.5 text-[10px] rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
                             onClick={() => handleDelete(rule.id)}
                           >
-                            削除確認
+                            {t.ruleManager.confirmDelete}
                           </button>
                         ) : (
                           <button
                             className="p-1 rounded hover:bg-red-50 text-[#999] hover:text-red-500 transition-colors"
                             onClick={() => setConfirmDelete(rule.id)}
-                            title="削除"
+                            title={t.common.delete}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -215,7 +215,7 @@ export function RuleManager() {
                       <button
                         className="shrink-0 transition-colors"
                         onClick={() => handleToggle(rule.id, rule.enabled)}
-                        title={rule.enabled ? "無効にする" : "有効にする"}
+                        title={rule.enabled ? t.ruleManager.disable : t.ruleManager.enable}
                       >
                         {rule.enabled ? (
                           <ToggleRight className="w-5 h-5 text-[#0078d4]" />
@@ -237,7 +237,7 @@ export function RuleManager() {
                   onClick={handleNew}
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  新規ルール
+                  {t.ruleManager.newRule}
                 </button>
                 <button
                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 rounded text-white transition-colors"
@@ -248,14 +248,14 @@ export function RuleManager() {
                   }}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  AIで作成
+                  {t.ruleManager.createWithAi}
                 </button>
               </div>
               <button
                 className="px-4 py-1.5 text-sm bg-[#f0f0f0] hover:bg-[#e0e0e0] rounded border border-[#d0d0d0] text-[#1a1a1a] transition-colors"
                 onClick={closeDialog}
               >
-                閉じる
+                {t.common.close}
               </button>
             </div>
           </>
@@ -265,8 +265,8 @@ export function RuleManager() {
   );
 }
 
-function summarizeConditions(rule: FolderRule): string {
-  if (rule.conditions.length === 0) return "条件なし";
+function summarizeConditions(rule: FolderRule, t: Translations): string {
+  if (rule.conditions.length === 0) return t.ruleManager.noConditions;
   return rule.conditions
     .map((c) => {
       switch (c.cond_type) {
@@ -275,13 +275,13 @@ function summarizeConditions(rule: FolderRule): string {
         case "name_glob":
           return `glob: ${c.cond_value}`;
         case "name_contains":
-          return `含む: ${c.cond_value}`;
+          return `${t.ruleManager.contains}: ${c.cond_value}`;
         case "size_min":
           return `>${formatBytes(Number(c.cond_value))}`;
         case "size_max":
           return `<${formatBytes(Number(c.cond_value))}`;
         case "age_days":
-          return `${c.cond_value}日以上`;
+          return `${c.cond_value}${t.ruleManager.daysOrMore}`;
         default:
           return c.cond_value;
       }

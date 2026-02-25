@@ -1,15 +1,11 @@
 import { Check, ChevronDown, ChevronUp, X, Zap } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "../../i18n";
 import { useExplorerStore } from "../../stores/panelStore";
 import { type RuleSuggestion, useRuleSuggestionStore } from "../../stores/ruleSuggestionStore";
 
-const ACTION_LABELS: Record<string, string> = {
-  move: "移動",
-  copy: "コピー",
-  delete: "削除",
-};
-
 export function RuleSuggestionBanner() {
+  const t = useTranslation();
   const suggestions = useRuleSuggestionStore((s) => s.suggestions);
   const acceptSuggestion = useRuleSuggestionStore((s) => s.acceptSuggestion);
   const dismissSuggestion = useRuleSuggestionStore((s) => s.dismissSuggestion);
@@ -52,12 +48,13 @@ export function RuleSuggestionBanner() {
       <div className="flex items-center gap-2 px-3 py-1.5">
         <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
         <span className="text-xs font-medium text-amber-700 flex-1">
-          ルールマッチ — {folderSuggestions.length}件のサジェスト
+          {t.ruleSuggestion.ruleMatch} — {folderSuggestions.length}
+          {t.ruleSuggestion.suggestions}
         </span>
         <button
           className="p-0.5 rounded hover:bg-amber-200/50 text-amber-500 transition-colors"
           onClick={() => setExpanded(!expanded)}
-          title={expanded ? "折りたたむ" : "展開する"}
+          title={expanded ? t.common.collapse : t.common.expand}
         >
           {expanded ? (
             <ChevronUp className="w-3.5 h-3.5" />
@@ -68,7 +65,7 @@ export function RuleSuggestionBanner() {
         <button
           className="p-0.5 rounded hover:bg-amber-200/50 text-amber-400 transition-colors"
           onClick={() => folderSuggestions.forEach((s) => dismissSuggestion(s.filePath))}
-          title="すべて非表示"
+          title={t.common.hideAll}
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -86,7 +83,7 @@ export function RuleSuggestionBanner() {
               <div className="flex-1 min-w-0">
                 <div className="text-xs text-[#1a1a1a] truncate font-medium">{s.fileName}</div>
                 <div className="text-[10px] text-amber-600 truncate">
-                  ルール「{s.ruleName}」: {ACTION_LABELS[s.actionType] || s.actionType}
+                  ルール「{s.ruleName}」: {t.ruleLabels.actions[s.actionType] || s.actionType}
                   {s.actionDest && ` → ${destName(s.actionDest)}`}
                 </div>
               </div>
@@ -99,14 +96,14 @@ export function RuleSuggestionBanner() {
                   title="サジェストを受理"
                 >
                   <Check className="w-3 h-3" />
-                  {ACTION_LABELS[s.actionType] || "実行"}
+                  {t.ruleLabels.actions[s.actionType] || s.actionType}
                 </button>
                 <button
                   className="px-2 py-0.5 text-[10px] text-amber-600 hover:bg-amber-100 rounded transition-colors"
                   onClick={() => handleAlways(s)}
                   title="今後このルールを自動実行する"
                 >
-                  常に実行
+                  {t.ruleSuggestion.alwaysExecute}
                 </button>
                 <button
                   className="p-0.5 rounded hover:bg-amber-100 text-amber-400 transition-colors"
@@ -121,7 +118,7 @@ export function RuleSuggestionBanner() {
 
           {hiddenCount > 0 && (
             <div className="text-[10px] text-amber-500 text-center py-0.5">
-              他 {hiddenCount} 件のサジェスト
+              +{hiddenCount} {t.ruleSuggestion.moreSuggestions}
             </div>
           )}
         </div>

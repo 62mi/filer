@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Bookmark, ChevronRight, Command, File, Folder, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Command as CommandDef, fuzzyScore, getCommands } from "../../commands/registry";
+import { useTranslation } from "../../i18n";
 import { useBookmarkStore } from "../../stores/bookmarkStore";
 import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
 import { useExplorerStore } from "../../stores/panelStore";
@@ -19,6 +20,7 @@ interface ResultItem {
 const MAX_RESULTS = 15;
 
 export function CommandPalette() {
+  const t = useTranslation();
   const isOpen = useCommandPaletteStore((s) => s.isOpen);
   const query = useCommandPaletteStore((s) => s.query);
   const selectedIndex = useCommandPaletteStore((s) => s.selectedIndex);
@@ -198,7 +200,7 @@ export function CommandPalette() {
             ref={inputRef}
             type="text"
             className="flex-1 text-base outline-none bg-transparent placeholder:text-[#bbb]"
-            placeholder="ファイル検索... (> でコマンド)"
+            placeholder={t.commandPalette.placeholder}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -240,23 +242,29 @@ export function CommandPalette() {
 
         {/* 空の場合 */}
         {query.trim() && results.length === 0 && (
-          <div className="px-4 py-6 text-center text-sm text-[#999]">結果が見つかりません</div>
+          <div className="px-4 py-6 text-center text-sm text-[#999]">
+            {t.commandPalette.noResults}
+          </div>
         )}
 
         {/* ヒント */}
         {!query.trim() && (
           <div className="px-4 py-3 text-xs text-[#bbb] flex gap-4">
             <span>
-              <kbd className="px-1 py-0.5 bg-[#f0f0f0] rounded text-[#666]">↑↓</kbd> 選択
+              <kbd className="px-1 py-0.5 bg-[#f0f0f0] rounded text-[#666]">↑↓</kbd>{" "}
+              {t.commandPalette.hintSelect}
             </span>
             <span>
-              <kbd className="px-1 py-0.5 bg-[#f0f0f0] rounded text-[#666]">Enter</kbd> 実行
+              <kbd className="px-1 py-0.5 bg-[#f0f0f0] rounded text-[#666]">Enter</kbd>{" "}
+              {t.commandPalette.hintExecute}
             </span>
             <span>
-              <kbd className="px-1 py-0.5 bg-[#f0f0f0] rounded text-[#666]">Esc</kbd> 閉じる
+              <kbd className="px-1 py-0.5 bg-[#f0f0f0] rounded text-[#666]">Esc</kbd>{" "}
+              {t.commandPalette.hintClose}
             </span>
             <span>
-              <kbd className="px-1 py-0.5 bg-[#f0f0f0] rounded text-[#666]">&gt;</kbd> コマンド
+              <kbd className="px-1 py-0.5 bg-[#f0f0f0] rounded text-[#666]">&gt;</kbd>{" "}
+              {t.commandPalette.hintCommand}
             </span>
           </div>
         )}

@@ -1,8 +1,11 @@
 import { Check, Pause, Play, Trash2, X, XCircle } from "lucide-react";
+import type { Translations } from "../../i18n";
+import { useTranslation } from "../../i18n";
 import { useCopyQueueStore } from "../../stores/copyQueueStore";
 import { formatFileSize } from "../../utils/format";
 
 export function CopyQueuePanel() {
+  const t = useTranslation();
   const isOpen = useCopyQueueStore((s) => s.isPanelOpen);
   const items = useCopyQueueStore((s) => s.items);
   const { closePanel, pause, resume, cancel, clearCompleted } = useCopyQueueStore.getState();
@@ -17,13 +20,15 @@ export function CopyQueuePanel() {
     <div className="fixed bottom-10 right-4 z-[55] w-[360px] bg-white rounded-xl shadow-2xl border border-[#d0d0d0] overflow-hidden animate-fade-scale-in">
       {/* ヘッダー */}
       <div className="flex items-center justify-between px-4 py-2 bg-[#f9f9f9] border-b border-[#e5e5e5]">
-        <span className="text-sm font-medium">コピーキュー ({items.length})</span>
+        <span className="text-sm font-medium">
+          {t.copyQueue.title} ({items.length})
+        </span>
         <div className="flex items-center gap-1">
           {hasCompleted && (
             <button
               className="p-1 rounded hover:bg-[#e8e8e8] text-[#999]"
               onClick={clearCompleted}
-              title="完了済みをクリア"
+              title={t.copyQueue.clearCompleted}
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -40,6 +45,7 @@ export function CopyQueuePanel() {
           <QueueItem
             key={item.id}
             item={item}
+            t={t}
             onPause={() => pause(item.id)}
             onResume={() => resume(item.id)}
             onCancel={() => cancel(item.id)}
@@ -52,6 +58,7 @@ export function CopyQueuePanel() {
 
 function QueueItem({
   item,
+  t,
   onPause,
   onResume,
   onCancel,
@@ -68,6 +75,7 @@ function QueueItem({
     current_file: string | null;
     dest: string;
   };
+  t: Translations;
   onPause: () => void;
   onResume: () => void;
   onCancel: () => void;
@@ -80,13 +88,13 @@ function QueueItem({
 
   const statusLabel =
     {
-      calculating: "計算中...",
-      pending: "待機中",
+      calculating: t.copyQueue.statusCalculating,
+      pending: t.copyQueue.statusPending,
       running: `${progress}%`,
-      paused: "一時停止",
-      completed: "完了",
-      cancelled: "キャンセル",
-      error: "エラー",
+      paused: t.copyQueue.statusPaused,
+      completed: t.copyQueue.statusCompleted,
+      cancelled: t.copyQueue.statusCancelled,
+      error: t.copyQueue.statusError,
     }[item.status] || item.status;
 
   const statusColor =
@@ -104,7 +112,7 @@ function QueueItem({
     <div className="px-4 py-2 border-b border-[#f0f0f0] last:border-0">
       <div className="flex items-center gap-2 mb-1">
         <span className="text-xs font-medium uppercase text-[#999]">
-          {item.operation === "move" ? "Move" : "Copy"}
+          {item.operation === "move" ? t.copyQueue.operationMove : t.copyQueue.operationCopy}
         </span>
         <span className="text-xs text-[#666] truncate flex-1" title={item.dest}>
           → {destName}
@@ -132,7 +140,7 @@ function QueueItem({
         <span className="text-xs text-[#999] truncate" title={item.current_file || undefined}>
           {isActive && item.current_file
             ? item.current_file.split("\\").pop()
-            : `${item.files_done}/${item.file_count} files`}
+            : `${item.files_done}/${item.file_count} ${t.copyQueue.files}`}
           {isActive &&
             ` · ${formatFileSize(item.copied_bytes)}/${formatFileSize(item.total_bytes)}`}
         </span>
@@ -143,7 +151,7 @@ function QueueItem({
               <button
                 className="p-0.5 rounded hover:bg-[#e8e8e8] text-[#0078d4]"
                 onClick={onResume}
-                title="再開"
+                title={t.copyQueue.resume}
               >
                 <Play className="w-3.5 h-3.5" />
               </button>
@@ -151,7 +159,7 @@ function QueueItem({
               <button
                 className="p-0.5 rounded hover:bg-[#e8e8e8] text-amber-500"
                 onClick={onPause}
-                title="一時停止"
+                title={t.copyQueue.pause}
               >
                 <Pause className="w-3.5 h-3.5" />
               </button>
@@ -159,7 +167,7 @@ function QueueItem({
             <button
               className="p-0.5 rounded hover:bg-red-50 text-[#999] hover:text-red-500"
               onClick={onCancel}
-              title="キャンセル"
+              title={t.copyQueue.cancel}
             >
               <XCircle className="w-3.5 h-3.5" />
             </button>
@@ -180,6 +188,7 @@ function QueueItem({
 
 /** StatusBarに表示するミニインジケータ */
 export function CopyQueueMiniIndicator() {
+  const t = useTranslation();
   const items = useCopyQueueStore((s) => s.items);
   const togglePanel = useCopyQueueStore((s) => s.togglePanel);
 
@@ -196,7 +205,7 @@ export function CopyQueueMiniIndicator() {
     <button
       className="flex items-center gap-1.5 px-2 py-0.5 mr-2 rounded hover:bg-[#e0e0e0] transition-colors text-[#0078d4]"
       onClick={togglePanel}
-      title={`${activeItems.length} 件のコピー進行中 (${progress}%)`}
+      title={`${activeItems.length} ${t.copyQueue.copyInProgress} (${progress}%)`}
     >
       <div className="w-12 h-1.5 bg-[#e5e5e5] rounded-full overflow-hidden">
         <div

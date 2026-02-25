@@ -234,9 +234,7 @@ export function FileRow({
             }}
           />
         )}
-        <span className="relative z-10">
-          {entry.is_dir ? "" : formatFileSize(entry.size)}
-        </span>
+        <span className="relative z-10">{entry.is_dir ? "" : formatFileSize(entry.size)}</span>
       </span>
     </div>
   );

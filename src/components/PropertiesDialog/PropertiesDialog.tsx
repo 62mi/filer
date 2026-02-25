@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "../../i18n";
 import type { FileEntry } from "../../types";
 import { getFileType } from "../../utils/fileType";
 import { formatDate, formatFileSize } from "../../utils/format";
@@ -27,6 +28,7 @@ interface PropertiesDialogProps {
 }
 
 export function PropertiesDialog({ entry, onClose }: PropertiesDialogProps) {
+  const t = useTranslation();
   const [props, setProps] = useState<FileProperties | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -53,25 +55,31 @@ export function PropertiesDialog({ entry, onClose }: PropertiesDialogProps) {
 
   const rows: { label: string; value: string }[] = props
     ? [
-        { label: "Type", value: props.is_dir ? "File Folder" : getFileType(entry) },
-        { label: "Location", value: props.path.substring(0, props.path.lastIndexOf("\\")) },
         {
-          label: "Size",
+          label: t.properties.type,
+          value: props.is_dir ? t.properties.fileFolder : getFileType(entry),
+        },
+        {
+          label: t.properties.location,
+          value: props.path.substring(0, props.path.lastIndexOf("\\")),
+        },
+        {
+          label: t.properties.size,
           value: props.is_dir
-            ? `${formatFileSize(props.size)} (${props.file_count} files, ${props.dir_count} folders)`
+            ? `${formatFileSize(props.size)} (${props.file_count} ${t.properties.files}, ${props.dir_count} ${t.properties.folders})`
             : formatFileSize(props.size),
         },
-        { label: "Created", value: formatDate(props.created) },
-        { label: "Modified", value: formatDate(props.modified) },
-        { label: "Accessed", value: formatDate(props.accessed) },
+        { label: t.properties.created, value: formatDate(props.created) },
+        { label: t.properties.modified, value: formatDate(props.modified) },
+        { label: t.properties.accessed, value: formatDate(props.accessed) },
       ]
     : [];
 
   const attrs: string[] = [];
   if (props) {
-    if (props.is_readonly) attrs.push("Read-only");
-    if (props.is_hidden) attrs.push("Hidden");
-    if (props.is_system) attrs.push("System");
+    if (props.is_readonly) attrs.push(t.properties.readOnly);
+    if (props.is_hidden) attrs.push(t.properties.hidden);
+    if (props.is_system) attrs.push(t.properties.system);
   }
 
   return (
@@ -86,7 +94,7 @@ export function PropertiesDialog({ entry, onClose }: PropertiesDialogProps) {
         {/* Title bar */}
         <div className="flex items-center h-10 px-4 border-b border-[#e5e5e5] shrink-0">
           <span className="font-semibold text-sm text-[#1a1a1a] flex-1 truncate">
-            {entry.name} Properties
+            {entry.name} {t.properties.title}
           </span>
           <button
             className="p-1 rounded hover:bg-[#e8e8e8] text-[#666] transition-colors duration-100"
@@ -100,7 +108,7 @@ export function PropertiesDialog({ entry, onClose }: PropertiesDialogProps) {
         <div className="flex-1 overflow-auto p-4">
           {loading ? (
             <div className="flex items-center justify-center h-32 text-sm text-[#999]">
-              Loading properties...
+              {t.properties.loadingProperties}
             </div>
           ) : props ? (
             <div className="space-y-4">
@@ -128,7 +136,7 @@ export function PropertiesDialog({ entry, onClose }: PropertiesDialogProps) {
               {attrs.length > 0 && (
                 <div className="pt-3 border-t border-[#e5e5e5]">
                   <div className="flex text-sm">
-                    <span className="w-24 text-[#666] shrink-0">Attributes:</span>
+                    <span className="w-24 text-[#666] shrink-0">{t.properties.attributes}:</span>
                     <span className="text-[#1a1a1a]">{attrs.join(", ")}</span>
                   </div>
                 </div>
@@ -136,7 +144,7 @@ export function PropertiesDialog({ entry, onClose }: PropertiesDialogProps) {
             </div>
           ) : (
             <div className="flex items-center justify-center h-32 text-sm text-[#999]">
-              Failed to load properties
+              {t.properties.failedToLoad}
             </div>
           )}
         </div>
