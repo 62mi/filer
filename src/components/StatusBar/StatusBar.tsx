@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import { PanelRightClose, PanelRightOpen, Sparkles } from "lucide-react";
 import { useAiStore } from "../../stores/aiStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { formatFileSize } from "../../utils/format";
+import { calculateQuickTidiness, getScoreColor, getStars } from "../../utils/tidiness";
 import { CopyQueueMiniIndicator } from "../CopyQueue";
 
 interface StatusBarProps {
@@ -32,6 +34,12 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
 
   const totalItems = entries.length;
 
+  // 煩雑度スコア: Rust結果があればそれを使用、なければフロントエンド即時計算
+  const tidiness = useMemo(() => {
+    if (tab.path === "home:" || entries.length === 0) return null;
+    return tab.tidinessScore ?? calculateQuickTidiness(entries);
+  }, [tab.path, entries, tab.tidinessScore]);
+
   // バジェットインジケータの色
   const getBudgetColor = () => {
     if (!usageInfo || !usageInfo.budget_usd) return "text-[#999]";
@@ -55,6 +63,18 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
           <span className="mx-2 text-[#ccc]">|</span>
           <span className="text-[#0078d4]">
             {selectedCount} selected ({formatFileSize(selectedSize)})
+          </span>
+        </span>
+      )}
+
+      {tidiness && (
+        <span className="animate-fade-in flex items-center">
+          <span className="mx-2 text-[#ccc]">|</span>
+          <span
+            className={`${getScoreColor(tidiness.total)} cursor-default`}
+            title={`整理スコア: ${tidiness.total}/100\n${getStars(tidiness.total)}\n\n拡張子の種類: ${tidiness.ext_score} (${tidiness.ext_count}種類)\n古いファイル: ${tidiness.age_score}\nファイル数: ${tidiness.count_score} (${tidiness.file_count}件)\nネスト構造: ${tidiness.nest_score}${tidiness.max_depth > 0 ? ` (深さ${tidiness.max_depth})` : ""}`}
+          >
+            {getStars(tidiness.total)} {tidiness.total}
           </span>
         </span>
       )}

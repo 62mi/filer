@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Loader } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAiStore } from "../../stores/aiStore";
 import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
 import { useCopyQueueStore } from "../../stores/copyQueueStore";
@@ -91,6 +91,15 @@ export function Panel() {
 
   // The entries to display: search results or normal directory entries
   const displayEntries = tab.searchResults ?? tab.entries;
+
+  // サイズバー用: ファイルの最大サイズを算出
+  const maxFileSize = useMemo(() => {
+    let max = 0;
+    for (const e of displayEntries) {
+      if (!e.is_dir && e.size > max) max = e.size;
+    }
+    return max;
+  }, [displayEntries]);
 
   // Initial load
   useEffect(() => {
@@ -974,6 +983,7 @@ export function Panel() {
                 onClearSelection={clearSelection}
                 selectedCount={tab.selectedIndices.size}
                 onStartRename={startRename}
+                maxFileSize={maxFileSize}
               />
             ))
           ) : (

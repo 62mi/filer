@@ -107,6 +107,7 @@ pub fn run() {
             get_thumbnails,
             write_clipboard_file,
             create_from_template,
+            calculate_tidiness_score,
             enqueue_copy,
             pause_copy,
             resume_copy,

@@ -96,6 +96,12 @@ export function getCommands(): Command[] {
       label: "テンプレート管理",
       action: () => useTemplateStore.getState().openDialog(),
     },
+    {
+      id: "go-home",
+      label: "ホーム画面に移動",
+      shortcut: "Alt+Home",
+      action: () => useExplorerStore.getState().loadDirectory("home:"),
+    },
   ];
 }
 

@@ -4,7 +4,7 @@ import { useSettingsStore } from "../../stores/settingsStore";
 import type { FileEntry } from "../../types";
 import { cn } from "../../utils/cn";
 import { getFileType } from "../../utils/fileType";
-import { formatDate, formatFileSize } from "../../utils/format";
+import { formatDate, formatFileSize, getSizeBarColor } from "../../utils/format";
 import { FileIcon } from "./FileIcon";
 
 interface FileRowProps {
@@ -33,6 +33,7 @@ interface FileRowProps {
   onClearSelection: () => void;
   selectedCount: number;
   onStartRename: (index: number) => void;
+  maxFileSize: number;
 }
 
 export function FileRow({
@@ -60,6 +61,7 @@ export function FileRow({
   onClearSelection,
   selectedCount,
   onStartRename,
+  maxFileSize,
 }: FileRowProps) {
   const [renameValue, setRenameValue] = useState(entry.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -222,8 +224,19 @@ export function FileRow({
         {formatDate(entry.modified)}
       </span>
       <span className="w-36 text-[#666] shrink-0 ml-4 truncate">{getFileType(entry)}</span>
-      <span className="w-20 text-right text-[#666] shrink-0 ml-2">
-        {entry.is_dir ? "" : formatFileSize(entry.size)}
+      <span className="w-20 text-right text-[#666] shrink-0 ml-2 relative overflow-hidden">
+        {!entry.is_dir && maxFileSize > 0 && (
+          <span
+            className="absolute inset-y-0 right-0 opacity-20 rounded-sm"
+            style={{
+              width: `${(entry.size / maxFileSize) * 100}%`,
+              backgroundColor: getSizeBarColor(entry.size),
+            }}
+          />
+        )}
+        <span className="relative z-10">
+          {entry.is_dir ? "" : formatFileSize(entry.size)}
+        </span>
       </span>
     </div>
   );
