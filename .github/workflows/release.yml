@@ -33,6 +33,23 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
+      - name: Extract release notes from CHANGELOG.md
+        id: changelog
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # [x.y.z] セクションの本文を抽出（次の ## まで）
+          NOTES=$(awk "/^## \\[${VERSION}\\]/{found=1; next} /^## \\[/{if(found) exit} found{print}" CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            NOTES="リリースノートは CHANGELOG.md を参照してください。"
+          fi
+          # multiline output
+          {
+            echo "notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -41,13 +58,29 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "Filer ${{ github.ref_name }}"
           releaseBody: |
-            ## Filer ${{ github.ref_name }}
+            ${{ steps.changelog.outputs.notes }}
+
+            ---
 
             ### インストール方法
-            - **MSI**: `Filer_x.x.x_x64_ja-JP.msi` をダウンロードして実行
-            - **EXE**: `Filer_x.x.x_x64-setup.exe` をダウンロードして実行
+            - **MSI**: `.msi` をダウンロードして実行
+            - **EXE**: `-setup.exe` をダウンロードして実行
 
             ### 動作環境
             - Windows 10/11 (64bit)
           releaseDraft: false
           prerelease: false
+
+      - name: Upload to Cloudflare R2
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ENDPOINT="https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          aws s3 cp "src-tauri/target/release/bundle/nsis/Filer_${VERSION}_x64-setup.exe" \
+            "s3://filer/Filer_${VERSION}_x64-setup.exe" --endpoint-url "$ENDPOINT"
+          aws s3 cp "src-tauri/target/release/bundle/msi/Filer_${VERSION}_x64_en-US.msi" \
+            "s3://filer/Filer_${VERSION}_x64_en-US.msi" --endpoint-url "$ENDPOINT"
