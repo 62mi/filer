@@ -377,6 +377,16 @@ export const en: Translations = {
     terminalFailed: "Failed to open terminal",
   },
 
+  sidebar: {
+    quickAccess: "Quick access",
+    thisPC: "This PC",
+    stack: "Stack",
+    clearStack: "Clear stack",
+    dragFilesHere: "Drag files here",
+    remove: "Remove",
+    clearAll: "Clear all",
+  },
+
   format: {
     bytes: "bytes",
   },

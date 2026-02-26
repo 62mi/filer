@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "../../i18n";
 import { useIconStore } from "../../stores/iconStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import type { DriveInfo } from "../../types";
@@ -36,6 +37,7 @@ function SidebarIcon({ ext, fallback }: { ext: string; fallback: React.ReactNode
 }
 
 export function Sidebar() {
+  const t = useTranslation();
   const currentPath = useExplorerStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeTabId) || s.tabs[0];
     return tab.path;
@@ -71,20 +73,32 @@ export function Sidebar() {
 
   const quickAccess: QuickAccessItem[] = homeDir
     ? [
-        { label: "Desktop", path: `${homeDir}\\Desktop`, icon: <Monitor className="w-4 h-4" /> },
         {
-          label: "Documents",
+          label: t.homeView.desktop,
+          path: `${homeDir}\\Desktop`,
+          icon: <Monitor className="w-4 h-4" />,
+        },
+        {
+          label: t.homeView.documents,
           path: `${homeDir}\\Documents`,
           icon: <FileText className="w-4 h-4" />,
         },
         {
-          label: "Downloads",
+          label: t.homeView.downloads,
           path: `${homeDir}\\Downloads`,
           icon: <Download className="w-4 h-4" />,
         },
-        { label: "Pictures", path: `${homeDir}\\Pictures`, icon: <Image className="w-4 h-4" /> },
-        { label: "Music", path: `${homeDir}\\Music`, icon: <Music className="w-4 h-4" /> },
-        { label: "Videos", path: `${homeDir}\\Videos`, icon: <Video className="w-4 h-4" /> },
+        {
+          label: t.homeView.pictures,
+          path: `${homeDir}\\Pictures`,
+          icon: <Image className="w-4 h-4" />,
+        },
+        { label: t.homeView.music, path: `${homeDir}\\Music`, icon: <Music className="w-4 h-4" /> },
+        {
+          label: t.homeView.videos,
+          path: `${homeDir}\\Videos`,
+          icon: <Video className="w-4 h-4" />,
+        },
       ]
     : [];
 
@@ -173,7 +187,7 @@ export function Sidebar() {
             quickAccessOpen && "rotate-90",
           )}
         />
-        Quick access
+        {t.sidebar.quickAccess}
       </button>
       {quickAccessOpen &&
         quickAccess.map((item) => (
@@ -201,7 +215,7 @@ export function Sidebar() {
         <ChevronRight
           className={cn("w-3 h-3 transition-transform duration-200", pcOpen && "rotate-90")}
         />
-        This PC
+        {t.sidebar.thisPC}
       </button>
       {pcOpen &&
         drives.map((drive) => (
@@ -232,7 +246,7 @@ export function Sidebar() {
           className={cn("w-3 h-3 transition-transform duration-200", stackOpen && "rotate-90")}
         />
         <Layers className="w-3.5 h-3.5 mr-0.5" />
-        Stack
+        {t.sidebar.stack}
         {stackItems.length > 0 && (
           <span
             className="ml-auto text-[10px] bg-[#0078d4] text-white rounded-full px-1.5 min-w-[18px] text-center hover:bg-[#c42b1c] cursor-pointer transition-colors"
@@ -240,7 +254,7 @@ export function Sidebar() {
               e.stopPropagation();
               clearStack();
             }}
-            title="Clear stack"
+            title={t.sidebar.clearStack}
           >
             {stackItems.length}
           </span>
@@ -260,7 +274,7 @@ export function Sidebar() {
         >
           {stackItems.length === 0 ? (
             <div className="flex items-center justify-center h-10 text-[11px] text-[#999] italic">
-              Drag files here
+              {t.sidebar.dragFilesHere}
             </div>
           ) : (
             stackItems.map((path) => {
@@ -309,7 +323,7 @@ export function Sidebar() {
                       e.stopPropagation();
                       removeFromStack(path);
                     }}
-                    title="Remove"
+                    title={t.sidebar.remove}
                   >
                     <X className="w-3 h-3 text-[#999]" />
                   </button>
@@ -336,7 +350,7 @@ export function Sidebar() {
               }}
             >
               <Trash2 className="w-4 h-4 text-[#666]" />
-              Remove
+              {t.sidebar.remove}
             </button>
           )}
           {stackContextMenu.path && <div className="h-px bg-[#e5e5e5] my-1" />}
@@ -349,7 +363,7 @@ export function Sidebar() {
             disabled={stackItems.length === 0}
           >
             <Trash2 className="w-4 h-4 text-[#666]" />
-            Clear all
+            {t.sidebar.clearAll}
           </button>
         </div>
       )}

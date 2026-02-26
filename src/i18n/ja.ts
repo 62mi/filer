@@ -397,6 +397,17 @@ export const ja = {
     terminalFailed: "ターミナルの起動に失敗しました",
   },
 
+  // ── サイドバー ──
+  sidebar: {
+    quickAccess: "クイック アクセス",
+    thisPC: "PC",
+    stack: "スタック",
+    clearStack: "スタッククリア",
+    dragFilesHere: "ここにファイルをドラッグ",
+    remove: "削除",
+    clearAll: "すべてクリア",
+  },
+
   // ── フォーマット ──
   format: {
     bytes: "バイト",
