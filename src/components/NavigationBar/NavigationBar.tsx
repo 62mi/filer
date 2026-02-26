@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import {
   ArrowLeft,
   ArrowRight,
@@ -10,9 +11,13 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "../../i18n";
 import { useBookmarkStore } from "../../stores/bookmarkStore";
 import { useExplorerStore } from "../../stores/panelStore";
+import { toast } from "../../stores/toastStore";
 import { cn } from "../../utils/cn";
+
+const TERMINAL_COMMANDS = new Set(["cmd", "powershell", "pwsh", "wt"]);
 
 function NavButton({
   onClick,
@@ -41,6 +46,7 @@ function NavButton({
 }
 
 export function NavigationBar() {
+  const t = useTranslation();
   const tab = useExplorerStore((s) => s.tabs.find((t) => t.id === s.activeTabId) || s.tabs[0]);
   const showHidden = useExplorerStore((s) => s.showHidden);
   const navigateBack = useExplorerStore((s) => s.navigateBack);
@@ -76,8 +82,22 @@ export function NavigationBar() {
     }
   }, [editing]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setEditing(false);
+    const value = editValue.trim().toLowerCase();
+
+    if (TERMINAL_COMMANDS.has(value)) {
+      try {
+        await invoke("open_terminal", { terminal: value, cwd: tab.path });
+      } catch (err: unknown) {
+        toast.error(
+          `${t.navigationBar.terminalFailed}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      setEditValue(tab.path);
+      return;
+    }
+
     if (editValue.trim() && editValue.trim() !== tab.path) {
       loadDirectory(editValue.trim());
     }

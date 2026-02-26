@@ -75,6 +75,7 @@ pub fn run() {
             get_home_dir,
             get_parent_dir,
             open_in_default_app,
+            open_terminal,
             search_files,
             read_text_file,
             read_image_base64,
