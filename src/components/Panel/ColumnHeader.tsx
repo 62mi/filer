@@ -1,4 +1,6 @@
 import { ArrowUp } from "lucide-react";
+import { useMemo } from "react";
+import { useTranslation } from "../../i18n";
 import { useSettingsStore } from "../../stores/settingsStore";
 import type { SortKey, SortOrder } from "../../types";
 import { cn } from "../../utils/cn";
@@ -22,14 +24,18 @@ function SortIndicator({ active, order }: { active: boolean; order: SortOrder })
 }
 
 export function ColumnHeader({ sortKey, sortOrder, onSort }: ColumnHeaderProps) {
+  const t = useTranslation();
   const columnHeaderHeight = useSettingsStore((s) => s.columnHeaderHeight);
   const uiFontSize = useSettingsStore((s) => s.uiFontSize);
-  const columns: { key: SortKey; label: string; className: string }[] = [
-    { key: "name", label: "名前", className: "flex-1" },
-    { key: "modified", label: "更新日時", className: "w-36 justify-end ml-4" },
-    { key: "extension", label: "種類", className: "w-36 ml-4" },
-    { key: "size", label: "サイズ", className: "w-20 justify-end ml-2" },
-  ];
+  const columns: { key: SortKey; label: string; className: string }[] = useMemo(
+    () => [
+      { key: "name", label: t.columnHeader.name, className: "flex-1" },
+      { key: "modified", label: t.columnHeader.modified, className: "w-36 justify-end ml-4" },
+      { key: "extension", label: t.columnHeader.type, className: "w-36 ml-4" },
+      { key: "size", label: t.columnHeader.size, className: "w-20 justify-end ml-2" },
+    ],
+    [t],
+  );
 
   return (
     <div

@@ -7,6 +7,16 @@ use std::path::Path;
 /// 戻り値: 作成されたファイルのフルパス
 #[tauri::command]
 pub fn write_clipboard_file(dir: String, data: Vec<u8>, extension: String) -> Result<String, String> {
+    // 拡張子のバリデーション（パストラバーサル防止）
+    if extension.is_empty()
+        || extension.contains('/')
+        || extension.contains('\\')
+        || extension.contains('\0')
+        || extension.contains("..")
+    {
+        return Err("Invalid extension".to_string());
+    }
+
     let dir_path = Path::new(&dir);
     if !dir_path.is_dir() {
         return Err(format!("Directory not found: {}", dir));

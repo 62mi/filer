@@ -25,7 +25,7 @@ export const useIconStore = create<IconStore>((set, get) => ({
     // Mark as pending to avoid duplicate requests
     set((s) => {
       const next = new Set(s.pending);
-      needed.forEach((ext) => next.add(ext));
+      for (const ext of needed) next.add(ext);
       return { pending: next };
     });
 
@@ -35,7 +35,7 @@ export const useIconStore = create<IconStore>((set, get) => ({
       });
       set((s) => {
         const next = new Set(s.pending);
-        needed.forEach((ext) => next.delete(ext));
+        for (const ext of needed) next.delete(ext);
         return {
           icons: { ...s.icons, ...result },
           pending: next,
@@ -44,7 +44,7 @@ export const useIconStore = create<IconStore>((set, get) => ({
     } catch (_err) {
       set((s) => {
         const next = new Set(s.pending);
-        needed.forEach((ext) => next.delete(ext));
+        for (const ext of needed) next.delete(ext);
         return { pending: next };
       });
     }
@@ -61,7 +61,7 @@ export const useIconStore = create<IconStore>((set, get) => ({
 
     set((s) => {
       const next = new Set(s.pendingLarge);
-      needed.forEach((ext) => next.add(ext));
+      for (const ext of needed) next.add(ext);
       return { pendingLarge: next };
     });
 
@@ -71,7 +71,7 @@ export const useIconStore = create<IconStore>((set, get) => ({
       });
       set((s) => {
         const next = new Set(s.pendingLarge);
-        needed.forEach((ext) => next.delete(ext));
+        for (const ext of needed) next.delete(ext);
         return {
           largeIcons: { ...s.largeIcons, ...result },
           pendingLarge: next,
@@ -80,7 +80,7 @@ export const useIconStore = create<IconStore>((set, get) => ({
     } catch (_err) {
       set((s) => {
         const next = new Set(s.pendingLarge);
-        needed.forEach((ext) => next.delete(ext));
+        for (const ext of needed) next.delete(ext);
         return { pendingLarge: next };
       });
     }

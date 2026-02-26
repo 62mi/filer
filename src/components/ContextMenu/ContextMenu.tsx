@@ -18,6 +18,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useRuleStore } from "../../stores/ruleStore";
@@ -57,6 +58,7 @@ interface SubmenuItem {
 type MenuEntry = MenuItem | MenuSeparator | SubmenuItem;
 
 export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: ContextMenuProps) {
+  const t = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const tab = useExplorerStore((s) => s.tabs.find((t) => t.id === s.activeTabId) || s.tabs[0]);
   const clipboard = useExplorerStore((s) => s.clipboard);
@@ -110,7 +112,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     ...(hasTarget
       ? [
           {
-            label: "Open",
+            label: t.contextMenu.open,
             icon: <ExternalLink className="w-4 h-4" />,
             onClick: () => {
               const entry = entries[targetIndex!];
@@ -126,7 +128,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
       : []),
     ...(hasTarget ? [{ separator: true as const }] : []),
     {
-      label: "Copy",
+      label: t.contextMenu.copy,
       icon: <Copy className="w-4 h-4" />,
       onClick: () => {
         clipboardCopy();
@@ -135,7 +137,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
       disabled: !hasSelection,
     },
     {
-      label: "Cut",
+      label: t.contextMenu.cut,
       icon: <Scissors className="w-4 h-4" />,
       onClick: () => {
         clipboardCut();
@@ -144,7 +146,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
       disabled: !hasSelection,
     },
     {
-      label: "Paste",
+      label: t.contextMenu.paste,
       icon: <ClipboardPaste className="w-4 h-4" />,
       onClick: () => {
         clipboardPaste();
@@ -154,7 +156,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     },
     { separator: true },
     {
-      label: "Delete",
+      label: t.contextMenu.delete,
       icon: <Trash2 className="w-4 h-4" />,
       onClick: () => {
         deleteSelected();
@@ -165,7 +167,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     ...(hasTarget
       ? [
           {
-            label: "Rename",
+            label: t.contextMenu.rename,
             icon: <PencilLine className="w-4 h-4" />,
             onClick: () => {
               startRename(targetIndex!);
@@ -177,7 +179,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     ...(hasSelection
       ? [
           {
-            label: "Add to Stack",
+            label: t.contextMenu.addToStack,
             icon: <Layers className="w-4 h-4" />,
             onClick: () => {
               const indices =
@@ -196,7 +198,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     ...(stackItems.length > 0
       ? [
           {
-            label: `Paste from Stack (Move ${stackItems.length})`,
+            label: `${t.contextMenu.pasteFromStackMove} (${stackItems.length})`,
             icon: <Scissors className="w-4 h-4" />,
             onClick: () => {
               pasteFromStack("move");
@@ -204,7 +206,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
             },
           } as MenuItem,
           {
-            label: `Paste from Stack (Copy ${stackItems.length})`,
+            label: `${t.contextMenu.pasteFromStackCopy} (${stackItems.length})`,
             icon: <Copy className="w-4 h-4" />,
             onClick: () => {
               pasteFromStack("copy");
@@ -215,7 +217,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
       : []),
     { separator: true },
     {
-      label: "Folder Rules",
+      label: t.contextMenu.folderRules,
       icon: <Zap className="w-4 h-4" />,
       onClick: () => {
         useRuleStore.getState().openDialog(tab.path);
@@ -223,7 +225,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
       },
     },
     {
-      label: "AI Rule Wizard",
+      label: t.contextMenu.aiRuleWizard,
       icon: <Wand2 className="w-4 h-4" />,
       onClick: () => {
         useRuleWizardStore.getState().openWizard(tab.path);
@@ -231,7 +233,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
       },
     },
     {
-      label: "AI Auto-Organize",
+      label: t.contextMenu.aiAutoOrganize,
       icon: <Sparkles className="w-4 h-4" />,
       onClick: () => {
         useAiStore.getState().openDialog(tab.path, tab.id);
@@ -239,7 +241,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
       },
     },
     {
-      label: "New Folder",
+      label: t.contextMenu.newFolder,
       icon: <FolderPlus className="w-4 h-4" />,
       onClick: () => {
         createNewFolder();
@@ -247,7 +249,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
       },
     },
     {
-      label: "New File",
+      label: t.contextMenu.newFile,
       icon: <FilePlus className="w-4 h-4" />,
       onClick: () => {
         createNewFile();
@@ -274,17 +276,19 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
                 entries: createdPaths.map((p) => ({ sourcePath: "", destPath: p })),
               });
             }
-            toast.success(`テンプレート「${tmpl.name}」を展開しました`);
+            toast.success(`${t.panel.templateDeployed}: ${tmpl.name}`);
             useExplorerStore.getState().refreshDirectory();
-          } catch (err) {
-            toast.error(`テンプレート展開に失敗: ${err}`);
+          } catch (err: unknown) {
+            toast.error(
+              `${t.panel.templateDeployFailed}: ${err instanceof Error ? err.message : String(err)}`,
+            );
           }
           onClose();
         },
       }));
       // 常に末尾に Template Manager を追加
       submenuItems.push({
-        label: "Template Manager...",
+        label: t.contextMenu.templateManager,
         icon: <LayoutTemplate className="w-4 h-4" />,
         onClick: () => {
           useTemplateStore.getState().openDialog();
@@ -292,7 +296,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
         },
       });
       return {
-        label: "テンプレートから作成",
+        label: t.contextMenu.createFromTemplate,
         icon: <LayoutTemplate className="w-4 h-4" />,
         submenu: submenuItems,
       } as SubmenuItem;
@@ -301,7 +305,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
       ? [
           { separator: true as const },
           {
-            label: "Properties",
+            label: t.contextMenu.properties,
             icon: <Info className="w-4 h-4" />,
             onClick: () => {
               onProperties(entries[targetIndex!]);

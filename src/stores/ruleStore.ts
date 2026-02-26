@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import { getTranslation } from "../i18n";
 import { toast } from "./toastStore";
 
 // === 型定義 ===
@@ -39,23 +40,6 @@ export interface ConditionInput {
   cond_type: ConditionType;
   cond_value: string;
 }
-
-// 条件タイプのラベル
-export const CONDITION_LABELS: Record<ConditionType, string> = {
-  extension: "拡張子",
-  name_glob: "名前パターン (glob)",
-  name_contains: "名前に含む",
-  size_min: "最小サイズ (bytes)",
-  size_max: "最大サイズ (bytes)",
-  age_days: "経過日数",
-};
-
-// アクションタイプのラベル
-export const ACTION_LABELS: Record<ActionType, string> = {
-  move: "移動",
-  copy: "コピー",
-  delete: "ゴミ箱へ",
-};
 
 // === Store ===
 
@@ -135,8 +119,8 @@ export const useRuleStore = create<RuleStore>((set, get) => ({
         folderPath,
       });
       set({ rules, loading: false });
-    } catch (err) {
-      set({ error: String(err), loading: false });
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : String(err), loading: false });
     }
   },
 
@@ -145,8 +129,8 @@ export const useRuleStore = create<RuleStore>((set, get) => ({
     try {
       const rules: FolderRule[] = await invoke("get_all_rules");
       set({ rules, loading: false });
-    } catch (err) {
-      set({ error: String(err), loading: false });
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : String(err), loading: false });
     }
   },
 
@@ -164,7 +148,11 @@ export const useRuleStore = create<RuleStore>((set, get) => ({
     // ウォッチャー再起動
     get()
       .refreshWatcher()
-      .catch((e) => toast.error(`ウォッチャー更新失敗: ${e}`));
+      .catch((e: unknown) =>
+        toast.error(
+          `${getTranslation().ruleExecution.watcherUpdateFailed}: ${e instanceof Error ? e.message : String(e)}`,
+        ),
+      );
     return rule;
   },
 
@@ -193,7 +181,11 @@ export const useRuleStore = create<RuleStore>((set, get) => ({
     }));
     get()
       .refreshWatcher()
-      .catch((e) => toast.error(`ウォッチャー更新失敗: ${e}`));
+      .catch((e: unknown) =>
+        toast.error(
+          `${getTranslation().ruleExecution.watcherUpdateFailed}: ${e instanceof Error ? e.message : String(e)}`,
+        ),
+      );
     return rule;
   },
 
@@ -204,7 +196,11 @@ export const useRuleStore = create<RuleStore>((set, get) => ({
     }));
     get()
       .refreshWatcher()
-      .catch((e) => toast.error(`ウォッチャー更新失敗: ${e}`));
+      .catch((e: unknown) =>
+        toast.error(
+          `${getTranslation().ruleExecution.watcherUpdateFailed}: ${e instanceof Error ? e.message : String(e)}`,
+        ),
+      );
   },
 
   toggleRule: async (id, enabled) => {
@@ -214,7 +210,11 @@ export const useRuleStore = create<RuleStore>((set, get) => ({
     }));
     get()
       .refreshWatcher()
-      .catch((e) => toast.error(`ウォッチャー更新失敗: ${e}`));
+      .catch((e: unknown) =>
+        toast.error(
+          `${getTranslation().ruleExecution.watcherUpdateFailed}: ${e instanceof Error ? e.message : String(e)}`,
+        ),
+      );
   },
 
   refreshWatcher: async () => {

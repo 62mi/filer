@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { Language } from "../i18n";
 
 interface SettingsState {
   // Bar heights (px)
@@ -18,6 +19,9 @@ interface SettingsState {
   fontSize: number; // 詳細ビューのファイル行
   gridFontSize: number; // グリッドセルのファイル名
   uiFontSize: number; // タブ・ブックマーク・ステータスバー等のUI
+
+  // Language
+  language: Language;
 
   // Settings dialog
   isOpen: boolean;
@@ -45,6 +49,7 @@ interface SettingsData {
   fontSize: number;
   gridFontSize: number;
   uiFontSize: number;
+  language: Language;
 }
 
 const DEFAULTS: SettingsData = {
@@ -60,6 +65,7 @@ const DEFAULTS: SettingsData = {
   fontSize: 14,
   gridFontSize: 12,
   uiFontSize: 12,
+  language: "ja",
 };
 
 function loadSettings(): Partial<SettingsData> {
@@ -85,6 +91,7 @@ function saveSettings(state: SettingsState) {
     fontSize: state.fontSize,
     gridFontSize: state.gridFontSize,
     uiFontSize: state.uiFontSize,
+    language: state.language,
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -108,6 +115,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   fontSize: saved.fontSize ?? DEFAULTS.fontSize,
   gridFontSize: saved.gridFontSize ?? DEFAULTS.gridFontSize,
   uiFontSize: saved.uiFontSize ?? DEFAULTS.uiFontSize,
+  language: saved.language ?? DEFAULTS.language,
 
   isOpen: false,
   openSettings: () => set({ isOpen: true }),

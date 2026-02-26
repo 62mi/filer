@@ -651,6 +651,8 @@ Rules:
 - file_name must be just the file name (not the path)
 - Files already in a correct category subfolder should be SKIPPED (no action needed)
 - If a file doesn't fit any category well, SKIP it (don't create an action)
+- For "delete" actions, set action_dest to null (file will be sent to system trash)
+- Use "delete" only when explicitly instructed or for clearly temporary/junk files
 - Provide a brief Japanese reason for each action
 - IMPORTANT: Process ALL files in the list, do NOT skip or truncate the output
 - IMPORTANT: actions must always be an array, never null. Use [] for no actions"#,
@@ -678,7 +680,7 @@ Rules:
                             "file_path": { "type": "string", "description": "Full absolute path of the file" },
                             "file_name": { "type": "string", "description": "File name only" },
                             "action_type": { "type": "string", "enum": ["move", "copy", "delete"] },
-                            "action_dest": { "type": "string", "description": "Destination folder absolute path" },
+                            "action_dest": { "type": ["string", "null"], "description": "Destination folder absolute path (null for delete actions)" },
                             "reason": { "type": "string", "description": "Brief reason in Japanese" }
                         },
                         "required": ["file_path", "file_name", "action_type", "reason"]

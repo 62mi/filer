@@ -106,3 +106,48 @@ pub fn get_parent_dir(path: String) -> Result<String, String> {
 pub fn open_in_default_app(path: String) -> Result<(), String> {
     open::that(&path).map_err(|e| format!("Failed to open: {}", e))
 }
+
+#[tauri::command]
+pub fn open_terminal(terminal: String, cwd: String) -> Result<(), String> {
+    let cwd_path = std::path::Path::new(&cwd);
+    if !cwd_path.exists() {
+        return Err(format!("Directory does not exist: {}", cwd));
+    }
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        use std::process::Command;
+        const DETACHED_PROCESS: u32 = 0x00000008;
+
+        let result = match terminal.as_str() {
+            "cmd" => Command::new("cmd")
+                .arg("/K")
+                .current_dir(&cwd)
+                .creation_flags(DETACHED_PROCESS)
+                .spawn(),
+            "powershell" => Command::new("powershell")
+                .arg("-NoExit")
+                .current_dir(&cwd)
+                .creation_flags(DETACHED_PROCESS)
+                .spawn(),
+            "pwsh" => Command::new("pwsh")
+                .arg("-NoExit")
+                .current_dir(&cwd)
+                .creation_flags(DETACHED_PROCESS)
+                .spawn(),
+            "wt" => Command::new("wt")
+                .arg("-d")
+                .arg(&cwd)
+                .creation_flags(DETACHED_PROCESS)
+                .spawn(),
+            _ => return Err(format!("Unknown terminal: {}", terminal)),
+        };
+        result.map(|_| ()).map_err(|e| format!("Failed to open {}: {}", terminal, e))
+    }
+
+    #[cfg(not(windows))]
+    {
+        Err("Terminal launch is only supported on Windows".to_string())
+    }
+}

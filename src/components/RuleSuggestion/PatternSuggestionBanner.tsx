@@ -1,7 +1,9 @@
 import { Plus, Sparkles, X } from "lucide-react";
+import { useTranslation } from "../../i18n";
 import { type RulePattern, useRuleStore } from "../../stores/ruleStore";
 
 export function PatternSuggestionBanner({ currentPath }: { currentPath: string }) {
+  const t = useTranslation();
   const allPatterns = useRuleStore((s) => s.suggestedPatterns);
   const show = useRuleStore((s) => s.showPatternSuggestion);
   const dismiss = useRuleStore((s) => s.dismissPatternSuggestion);
@@ -22,12 +24,12 @@ export function PatternSuggestionBanner({ currentPath }: { currentPath: string }
       <div className="flex items-center gap-2 px-3 py-1.5">
         <Sparkles className="w-3.5 h-3.5 text-purple-500 shrink-0" />
         <span className="text-xs font-medium text-purple-700 flex-1">
-          ルール提案 — よく行う操作が見つかりました
+          {t.patternSuggestion.title}
         </span>
         <button
           className="p-0.5 rounded hover:bg-purple-200/50 text-purple-400 transition-colors"
           onClick={dismiss}
-          title="非表示"
+          title={t.patternSuggestion.hide}
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -57,21 +59,28 @@ function PatternItem({
   onCreateRule: () => void;
   destName: string;
 }) {
+  const t = useTranslation();
   return (
     <div className="flex items-center gap-2 bg-white/70 rounded px-2.5 py-1.5 border border-purple-200/60">
       <div className="flex-1 min-w-0">
         <div className="text-xs text-[#1a1a1a]">
-          よく <span className="font-medium">.{pattern.extension}</span> ファイルを{" "}
-          <span className="font-medium">{destName}</span> に移動しています
+          {t.patternSuggestion.frequentlyMovingPre}
+          <span className="font-medium">.{pattern.extension}</span>
+          {t.patternSuggestion.frequentlyMovingMid}
+          <span className="font-medium">{destName}</span>
+          {t.patternSuggestion.frequentlyMovingPost}
         </div>
-        <div className="text-[10px] text-purple-500">{pattern.frequency}回の移動履歴</div>
+        <div className="text-[10px] text-purple-500">
+          {pattern.frequency}
+          {t.patternSuggestion.moveHistory}
+        </div>
       </div>
       <button
         className="flex items-center gap-1 px-2 py-0.5 text-[10px] bg-purple-500 hover:bg-purple-600 text-white rounded transition-colors shrink-0"
         onClick={onCreateRule}
       >
         <Plus className="w-3 h-3" />
-        ルール作成
+        {t.patternSuggestion.createRule}
       </button>
     </div>
   );

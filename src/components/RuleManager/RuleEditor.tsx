@@ -1,10 +1,9 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "../../i18n";
 import {
-  ACTION_LABELS,
   type ActionType,
-  CONDITION_LABELS,
   type ConditionInput,
   type ConditionType,
   type FolderRule,
@@ -23,6 +22,7 @@ const EMPTY_CONDITION: ConditionInput = {
 };
 
 export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
+  const t = useTranslation();
   const createRule = useRuleStore((s) => s.createRule);
   const updateRule = useRuleStore((s) => s.updateRule);
 
@@ -80,7 +80,7 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
     const selected = await open({
       directory: true,
       multiple: false,
-      title: "移動先フォルダを選択",
+      title: t.ruleEditor.selectDestFolder,
       defaultPath: folderPath,
     });
     if (selected) {
@@ -89,12 +89,13 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
   };
 
   const validate = (): string | null => {
-    if (!name.trim()) return "ルール名を入力してください";
-    if (conditions.length === 0) return "条件を1つ以上追加してください";
+    if (!name.trim()) return t.ruleEditor.errorRuleName;
+    if (conditions.length === 0) return t.ruleEditor.errorConditions;
     for (const c of conditions) {
-      if (!c.cond_value.trim()) return `「${CONDITION_LABELS[c.cond_type]}」の値を入力してください`;
+      if (!c.cond_value.trim())
+        return `${t.ruleLabels.conditions[c.cond_type]}${t.ruleEditor.errorConditionValue}`;
     }
-    if (needsDest && !actionDest.trim()) return "移動先/コピー先フォルダを指定してください";
+    if (needsDest && !actionDest.trim()) return t.ruleEditor.errorDestFolder;
     return null;
   };
 
@@ -130,8 +131,8 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
         );
       }
       onBack();
-    } catch (e) {
-      setError(String(e));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -144,12 +145,12 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
         <button
           className="p-1 rounded hover:bg-[#e8e8e8] text-[#666] transition-colors"
           onClick={onBack}
-          title="戻る"
+          title={t.common.back}
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
         <span className="text-sm font-semibold text-[#1a1a1a]">
-          {rule ? "ルール編集" : "新規ルール"}
+          {rule ? t.ruleEditor.editRule : t.ruleEditor.newRule}
         </span>
       </div>
 
@@ -157,12 +158,14 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
       <div className="flex-1 overflow-auto p-4 space-y-4">
         {/* ルール名 */}
         <div>
-          <label className="block text-xs font-medium text-[#666] mb-1">ルール名</label>
+          <label className="block text-xs font-medium text-[#666] mb-1">
+            {t.ruleEditor.ruleName}
+          </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="例: PDFをDocumentsへ移動"
+            placeholder={t.ruleEditor.ruleNamePlaceholder}
             className="w-full px-3 py-1.5 text-sm border border-[#d0d0d0] rounded focus:outline-none focus:border-[#0078d4] focus:ring-1 focus:ring-[#0078d4]/30"
           />
         </div>
@@ -171,14 +174,14 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-medium text-[#666]">
-              条件（すべて満たすファイルに適用）
+              {t.ruleEditor.conditionsLabel}
             </label>
             <button
               className="flex items-center gap-1 text-xs text-[#0078d4] hover:text-[#005a9e] transition-colors"
               onClick={addCondition}
             >
               <Plus className="w-3 h-3" />
-              追加
+              {t.common.add}
             </button>
           </div>
 
@@ -190,7 +193,7 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
                   onChange={(e) => updateCondition(i, "cond_type", e.target.value)}
                   className="w-36 px-2 py-1.5 text-sm border border-[#d0d0d0] rounded bg-white focus:outline-none focus:border-[#0078d4]"
                 >
-                  {Object.entries(CONDITION_LABELS).map(([key, label]) => (
+                  {Object.entries(t.ruleLabels.conditions).map(([key, label]) => (
                     <option key={key} value={key}>
                       {label}
                     </option>
@@ -207,7 +210,7 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
                   <button
                     className="p-1 rounded hover:bg-red-50 text-[#999] hover:text-red-500 transition-colors"
                     onClick={() => removeCondition(i)}
-                    title="削除"
+                    title={t.common.delete}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -219,25 +222,33 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
 
         {/* アクション */}
         <div>
-          <label className="block text-xs font-medium text-[#666] mb-1">アクション</label>
+          <label className="block text-xs font-medium text-[#666] mb-1">
+            {t.ruleEditor.action}
+          </label>
           <select
             value={actionType}
             onChange={(e) => setActionType(e.target.value as ActionType)}
             className="w-full px-3 py-1.5 text-sm border border-[#d0d0d0] rounded bg-white focus:outline-none focus:border-[#0078d4]"
           >
-            {Object.entries(ACTION_LABELS).map(([key, label]) => (
+            {Object.entries(t.ruleLabels.actions).map(([key, label]) => (
               <option key={key} value={key}>
                 {label}
               </option>
             ))}
           </select>
+          {actionType === "delete" && (
+            <div className="mt-1.5 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+              削除アクションはファイルをゴミ箱に送ります
+            </div>
+          )}
         </div>
 
         {/* 移動先/コピー先 */}
         {needsDest && (
           <div>
             <label className="block text-xs font-medium text-[#666] mb-1">
-              {actionType === "move" ? "移動先" : "コピー先"}フォルダ
+              {actionType === "move" ? t.ruleEditor.moveDestination : t.ruleEditor.copyDestination}
+              {t.ruleEditor.folder}
             </label>
             <div className="flex gap-2">
               <input
@@ -251,7 +262,7 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
                 onClick={pickFolder}
                 className="px-3 py-1.5 text-sm bg-[#f0f0f0] hover:bg-[#e0e0e0] rounded border border-[#d0d0d0] text-[#1a1a1a] transition-colors whitespace-nowrap"
               >
-                参照...
+                {t.common.browse}
               </button>
             </div>
           </div>
@@ -266,11 +277,14 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
               onChange={(e) => setAutoExecute(e.target.checked)}
               className="w-4 h-4 rounded border-[#d0d0d0] text-[#0078d4] focus:ring-[#0078d4]/30"
             />
-            <span className="text-sm text-[#1a1a1a]">自動実行</span>
+            <span className="text-sm text-[#1a1a1a]">{t.ruleEditor.autoExecute}</span>
           </label>
-          <p className="text-[10px] text-[#999] mt-1 ml-6">
-            ONにすると確認なしで自動的に実行します。OFFの場合はサジェストとして表示されます。
-          </p>
+          <p className="text-[10px] text-[#999] mt-1 ml-6">{t.ruleEditor.autoExecuteDescription}</p>
+          {actionType === "delete" && autoExecute && (
+            <p className="text-[10px] text-red-500 mt-1 ml-6">
+              削除の自動実行はファイルが確認なしでゴミ箱に送られます
+            </p>
+          )}
         </div>
 
         {/* エラー */}
@@ -288,14 +302,14 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
           onClick={onBack}
           disabled={saving}
         >
-          キャンセル
+          {t.common.cancel}
         </button>
         <button
           className="px-4 py-1.5 text-sm bg-[#0078d4] hover:bg-[#005a9e] rounded text-white transition-colors disabled:opacity-50"
           onClick={handleSave}
           disabled={saving}
         >
-          {saving ? "保存中..." : rule ? "更新" : "作成"}
+          {saving ? t.common.saving : rule ? t.common.update : t.common.create}
         </button>
       </div>
     </div>

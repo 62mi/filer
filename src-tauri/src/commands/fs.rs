@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Read;
 use std::path::Path;
-use std::time::UNIX_EPOCH;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use walkdir::WalkDir;
 
 const DEFAULT_SEARCH_MAX_RESULTS: usize = 200;
@@ -522,4 +522,199 @@ fn create_nodes_recursive(
         }
     }
     Ok(())
+}
+
+/// 煩雑度（整理度）スコア
+#[derive(Debug, Serialize)]
+pub struct TidinessScore {
+    pub total: u32,
+    pub ext_score: u32,
+    pub age_score: u32,
+    pub count_score: u32,
+    pub nest_score: u32,
+    pub ext_count: u32,
+    pub file_count: u64,
+    pub dir_count: u64,
+    pub max_depth: u32,
+    pub old_file_count: u64,
+}
+
+const TIDINESS_MAX_FILES: u64 = 50_000;
+const TIDINESS_MAX_DEPTH: usize = 6;
+const TIDINESS_TIMEOUT_SECS: u64 = 5;
+
+const DAY_SECS: f64 = 86400.0;
+
+/// ディレクトリの煩雑度スコアを計算（WalkDirでネスト構造も走査）
+#[tauri::command]
+pub fn calculate_tidiness_score(path: String) -> Result<TidinessScore, String> {
+    let dir_path = Path::new(&path);
+    if !dir_path.is_dir() {
+        return Err(format!("Not a directory: {}", path));
+    }
+
+    let start = Instant::now();
+    let now_secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs_f64())
+        .unwrap_or(0.0);
+
+    let mut file_count: u64 = 0;
+    let mut dir_count: u64 = 0;
+    let mut max_depth: u32 = 0;
+    let mut extensions = std::collections::HashSet::new();
+    let mut count_30d: u64 = 0;
+    let mut count_90d: u64 = 0;
+    let mut count_365d: u64 = 0;
+    let mut total_walked: u64 = 0;
+
+    // 直下アイテム数（count_scoreに使用）
+    let direct_items = fs::read_dir(dir_path)
+        .map(|rd| rd.count())
+        .unwrap_or(0) as u32;
+
+    for entry in WalkDir::new(dir_path)
+        .max_depth(TIDINESS_MAX_DEPTH)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        // タイムアウトチェック
+        if start.elapsed().as_secs() >= TIDINESS_TIMEOUT_SECS {
+            break;
+        }
+
+        let entry_path = entry.path();
+        if entry_path == dir_path {
+            continue;
+        }
+
+        total_walked += 1;
+        if total_walked > TIDINESS_MAX_FILES {
+            break;
+        }
+
+        let depth = entry.depth() as u32;
+        if depth > max_depth {
+            max_depth = depth;
+        }
+
+        if let Ok(m) = entry.metadata() {
+            if m.is_dir() {
+                dir_count += 1;
+            } else {
+                file_count += 1;
+
+                // 拡張子
+                if let Some(ext) = entry_path.extension().and_then(|e| e.to_str()) {
+                    extensions.insert(ext.to_lowercase());
+                } else {
+                    extensions.insert(String::new());
+                }
+
+                // ファイルの古さ
+                if let Ok(modified) = m.modified() {
+                    if let Ok(age) = modified.duration_since(UNIX_EPOCH) {
+                        let age_secs = now_secs - age.as_secs_f64();
+                        if age_secs > 30.0 * DAY_SECS {
+                            count_30d += 1;
+                        }
+                        if age_secs > 90.0 * DAY_SECS {
+                            count_90d += 1;
+                        }
+                        if age_secs > 365.0 * DAY_SECS {
+                            count_365d += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let ext_count = extensions.len() as u32;
+
+    // S_ext
+    let ext_score = if file_count <= 1 {
+        100
+    } else {
+        let base = if ext_count <= 2 { 100 }
+        else if ext_count <= 4 { 85 }
+        else if ext_count <= 6 { 70 }
+        else if ext_count <= 10 { 50 }
+        else if ext_count <= 15 { 30 }
+        else { (30i32 - (ext_count as i32 - 15) * 2).max(5) as u32 };
+
+        let ratio = ext_count as f64 / file_count as f64;
+        let bonus = if ratio < 0.05 { 10 } else if ratio < 0.1 { 5 } else { 0 };
+        (base + bonus).min(100)
+    };
+
+    // S_age
+    let age_score = if file_count == 0 {
+        100
+    } else {
+        let r30 = count_30d as f64 / file_count as f64;
+        let r90 = count_90d as f64 / file_count as f64;
+        let r365 = count_365d as f64 / file_count as f64;
+        let penalty = r30 * 20.0 + r90 * 30.0 + r365 * 40.0;
+        (100.0 - penalty).max(0.0).round() as u32
+    };
+
+    // S_count（直下アイテム数ベース）
+    let count_score = if direct_items <= 10 { 100 }
+    else if direct_items <= 30 { 90 }
+    else if direct_items <= 50 { 80 }
+    else if direct_items <= 100 { 65 }
+    else if direct_items <= 200 { 50 }
+    else if direct_items <= 500 { 30 }
+    else if direct_items <= 1000 { 15 }
+    else { 5 };
+
+    // S_nest
+    let depth_score: f64 = match max_depth {
+        0 | 1 => 90.0,
+        2 | 3 => 100.0,
+        4 | 5 => 85.0,
+        6 | 7 | 8 => 60.0,
+        _ => 30.0,
+    };
+
+    let flatness_penalty: f64 = if dir_count == 0 && file_count > 20 {
+        ((file_count - 20) as f64 * 0.5).min(40.0)
+    } else {
+        0.0
+    };
+
+    let total_items = file_count + dir_count;
+    let dir_ratio = if total_items > 0 { dir_count as f64 / total_items as f64 } else { 0.0 };
+    let ratio_score: f64 = if total_items < 5 {
+        100.0
+    } else if dir_ratio < 0.1 && file_count > 30 {
+        70.0
+    } else if dir_ratio > 0.8 {
+        75.0
+    } else {
+        100.0
+    };
+
+    let nest_score = (depth_score * 0.5 + ratio_score * 0.5 - flatness_penalty).max(0.0).round() as u32;
+
+    // 総合スコア
+    let total = (0.30 * ext_score as f64
+        + 0.20 * age_score as f64
+        + 0.30 * count_score as f64
+        + 0.20 * nest_score as f64)
+        .round() as u32;
+
+    Ok(TidinessScore {
+        total,
+        ext_score,
+        age_score,
+        count_score,
+        nest_score,
+        ext_count,
+        file_count,
+        dir_count,
+        max_depth,
+        old_file_count: count_365d,
+    })
 }

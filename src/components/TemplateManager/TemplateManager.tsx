@@ -1,12 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronRight, File, Folder, FolderOpen, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "../../i18n";
 import { useExplorerStore } from "../../stores/panelStore";
 import { type Template, type TemplateNode, useTemplateStore } from "../../stores/templateStore";
 import { toast } from "../../stores/toastStore";
 import { useUndoStore } from "../../stores/undoStore";
 
 export function TemplateManager() {
+  const t = useTranslation();
   const isOpen = useTemplateStore((s) => s.isDialogOpen);
   const templates = useTemplateStore((s) => s.templates);
   const closeDialog = useTemplateStore((s) => s.closeDialog);
@@ -117,7 +119,7 @@ export function TemplateManager() {
       <div className="w-[600px] max-h-[80vh] bg-white rounded-xl shadow-2xl border border-[#d0d0d0] flex flex-col animate-fade-scale-in">
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-[#e5e5e5]">
-          <h2 className="font-semibold text-base">テンプレート管理</h2>
+          <h2 className="font-semibold text-base">{t.templateManager.title}</h2>
           <button className="p-1 rounded hover:bg-[#e8e8e8] text-[#999]" onClick={closeDialog}>
             <X className="w-4 h-4" />
           </button>
@@ -155,28 +157,30 @@ export function TemplateManager() {
                             entries: createdPaths.map((p) => ({ sourcePath: "", destPath: p })),
                           });
                         }
-                        toast.success(`テンプレート「${tmpl.name}」を展開しました`);
+                        toast.success(`${t.panel.templateDeployed}: ${tmpl.name}`);
                         useExplorerStore.getState().refreshDirectory();
                         closeDialog();
-                      } catch (err) {
-                        toast.error(`テンプレート展開に失敗: ${err}`);
+                      } catch (err: unknown) {
+                        toast.error(
+                          `${t.panel.templateDeployFailed}: ${err instanceof Error ? err.message : String(err)}`,
+                        );
                       }
                     }}
-                    title="現在のフォルダに展開"
+                    title={t.templateManager.deployToFolder}
                   >
                     <FolderOpen className="w-3.5 h-3.5" />
                   </button>
                   <button
                     className="p-1 rounded hover:bg-[#e8e8e8] text-[#999]"
                     onClick={() => startEdit(tmpl)}
-                    title="編集"
+                    title={t.common.edit}
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button
                     className="p-1 rounded hover:bg-red-50 text-[#999] hover:text-red-500"
                     onClick={() => removeTemplate(tmpl.id)}
-                    title="削除"
+                    title={t.common.delete}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -187,14 +191,16 @@ export function TemplateManager() {
                 onClick={startNew}
               >
                 <Plus className="w-4 h-4" />
-                新しいテンプレート
+                {t.templateManager.newTemplate}
               </button>
             </div>
           ) : (
             /* テンプレート編集 */
             <div className="space-y-4">
               <div>
-                <label className="block text-xs text-[#666] mb-1">テンプレート名</label>
+                <label className="block text-xs text-[#666] mb-1">
+                  {t.templateManager.templateName}
+                </label>
                 <input
                   type="text"
                   className="w-full px-3 py-1.5 text-sm border border-[#d0d0d0] rounded-lg outline-none focus:border-[#0078d4]"
@@ -205,7 +211,9 @@ export function TemplateManager() {
               </div>
 
               <div>
-                <label className="block text-xs text-[#666] mb-1">構造</label>
+                <label className="block text-xs text-[#666] mb-1">
+                  {t.templateManager.structure}
+                </label>
                 <div className="border border-[#e5e5e5] rounded-lg p-2 min-h-[120px]">
                   <NodeTree
                     nodes={editNodes}
@@ -230,7 +238,7 @@ export function TemplateManager() {
                       }}
                     >
                       <Plus className="w-3 h-3" />
-                      追加
+                      {t.common.add}
                     </button>
                   )}
                 </div>
@@ -241,14 +249,14 @@ export function TemplateManager() {
                   className="px-4 py-1.5 text-sm rounded-lg border border-[#d0d0d0] hover:bg-[#f0f0f0]"
                   onClick={() => setEditingTemplate(null)}
                 >
-                  キャンセル
+                  {t.common.cancel}
                 </button>
                 <button
                   className="px-4 py-1.5 text-sm rounded-lg bg-[#0078d4] text-white hover:bg-[#106ebe] disabled:opacity-50"
                   onClick={saveEdit}
                   disabled={!editName.trim()}
                 >
-                  保存
+                  {t.common.save}
                 </button>
               </div>
             </div>
@@ -266,13 +274,13 @@ export function TemplateManager() {
           value={newItemType}
           onChange={(e) => setNewItemType(e.target.value as "directory" | "file")}
         >
-          <option value="directory">Folder</option>
-          <option value="file">File</option>
+          <option value="directory">{t.templateManager.folderOption}</option>
+          <option value="file">{t.templateManager.fileOption}</option>
         </select>
         <input
           type="text"
           className="flex-1 text-xs border border-[#d0d0d0] rounded px-2 py-0.5 outline-none focus:border-[#0078d4]"
-          placeholder="名前"
+          placeholder={t.templateManager.namePlaceholder}
           value={newItemName}
           onChange={(e) => setNewItemName(e.target.value)}
           onKeyDown={(e) => {
@@ -306,6 +314,7 @@ function NodeTree({
   onAdd: (path: number[]) => void;
   addingPath: number[] | null;
 }) {
+  const t = useTranslation();
   return (
     <div className="text-sm">
       {nodes.map((node, i) => {
@@ -329,7 +338,7 @@ function NodeTree({
                   <button
                     className="p-0.5 rounded hover:bg-[#e0e0e0] text-[#999]"
                     onClick={() => onAdd(currentPath)}
-                    title="子要素を追加"
+                    title={t.templateManager.addChild}
                   >
                     <Plus className="w-3 h-3" />
                   </button>
@@ -337,7 +346,7 @@ function NodeTree({
                 <button
                   className="p-0.5 rounded hover:bg-red-50 text-[#999] hover:text-red-500"
                   onClick={() => onRemove(currentPath)}
-                  title="削除"
+                  title={t.common.delete}
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>

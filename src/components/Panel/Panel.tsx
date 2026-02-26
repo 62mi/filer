@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Loader } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getTranslation, useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
 import { useCopyQueueStore } from "../../stores/copyQueueStore";
@@ -25,7 +26,8 @@ import { GridView } from "./GridView";
 import { Toolbar } from "./Toolbar";
 
 export function Panel() {
-  const tab = useExplorerStore((s) => s.tabs.find((t) => t.id === s.activeTabId) || s.tabs[0]);
+  const t = useTranslation();
+  const tab = useExplorerStore((s) => s.tabs.find((tt) => tt.id === s.activeTabId) || s.tabs[0]);
   const viewMode = tab.viewMode;
   const showHidden = useExplorerStore((s) => s.showHidden);
   const showHiddenRef = useRef(showHidden);
@@ -91,6 +93,15 @@ export function Panel() {
 
   // The entries to display: search results or normal directory entries
   const displayEntries = tab.searchResults ?? tab.entries;
+
+  // サイズバー用: ファイルの最大サイズを算出
+  const maxFileSize = useMemo(() => {
+    let max = 0;
+    for (const e of displayEntries) {
+      if (!e.is_dir && e.size > max) max = e.size;
+    }
+    return max;
+  }, [displayEntries]);
 
   // Initial load
   useEffect(() => {
@@ -334,7 +345,7 @@ export function Panel() {
           } else {
             await invoke("move_files", { sources: paths, dest: targetEntry.path });
             useUndoStore.getState().pushAction({ type: "move", entries: undoEntries });
-            paths.forEach((p) => removeFromStack(p));
+            for (const p of paths) removeFromStack(p);
           }
         } else if (e.ctrlKey) {
           await useCopyQueueStore.getState().enqueue(paths, targetEntry.path, "copy");
@@ -361,11 +372,20 @@ export function Panel() {
           .then(() => schedulePatternRecheck())
           .catch((_err) => {});
         await loadDirectory(tab.path, false);
-      } catch (err) {
-        toast.error(`ファイル操作に失敗しました: ${err}`);
+      } catch (err: unknown) {
+        toast.error(
+          `${t.panel.fileOperationFailed}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     },
-    [displayEntries, tab.path, loadDirectory, removeFromStack, schedulePatternRecheck],
+    [
+      displayEntries,
+      tab.path,
+      loadDirectory,
+      removeFromStack,
+      schedulePatternRecheck,
+      t.panel.fileOperationFailed,
+    ],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -433,7 +453,7 @@ export function Panel() {
           } else {
             await invoke("move_files", { sources: paths, dest: tab.path });
             useUndoStore.getState().pushAction({ type: "move", entries: undoEntries });
-            paths.forEach((p) => removeFromStack(p));
+            for (const p of paths) removeFromStack(p);
             recordMove(paths[0]?.substring(0, paths[0].lastIndexOf("\\")) || "", "move");
           }
           await loadDirectory(tab.path, false);
@@ -486,7 +506,7 @@ export function Panel() {
               type: "create_file",
               entries: [{ sourcePath: "", destPath: createdPath }],
             });
-            toast.success(`クリップボードから画像ファイルを作成しました`);
+            toast.success(t.panel.clipboardImageCreated);
             await loadDirectory(dirPath, false);
             return;
           }
@@ -514,7 +534,7 @@ export function Panel() {
               type: "create_file",
               entries: [{ sourcePath: "", destPath: createdPath }],
             });
-            toast.success(`クリップボードからテキストファイルを作成しました`);
+            toast.success(t.panel.clipboardTextCreated);
             await loadDirectory(dirPath, false);
             return;
           }
@@ -523,7 +543,7 @@ export function Panel() {
         // クリップボードアクセス失敗時は何もしない
       }
     },
-    [loadDirectory],
+    [loadDirectory, t.panel.clipboardImageCreated, t.panel.clipboardTextCreated],
   );
 
   // Keyboard handling
@@ -635,7 +655,11 @@ export function Panel() {
               clipboardPaste();
             } else {
               // システムクリップボードからファイル生成を試みる
-              handleClipboardToFile(activeTab.path).catch(() => {});
+              handleClipboardToFile(activeTab.path).catch((err: unknown) => {
+                toast.error(
+                  `${t.panel.fileOperationFailed}: ${err instanceof Error ? err.message : String(err)}`,
+                );
+              });
             }
           }
           break;
@@ -743,7 +767,7 @@ export function Panel() {
                 const currentTab = useExplorerStore.getState().getActiveTab();
                 loadDirectory(currentTab.path, false, true);
               })
-              .catch((err) => toast.error(`元に戻す操作に失敗しました: ${err}`));
+              .catch((err) => toast.error(`${getTranslation().panel.undoFailed}: ${err}`));
           }
           break;
         case "y":
@@ -756,7 +780,7 @@ export function Panel() {
                 const currentTab = useExplorerStore.getState().getActiveTab();
                 loadDirectory(currentTab.path, false, true);
               })
-              .catch((err) => toast.error(`やり直し操作に失敗しました: ${err}`));
+              .catch((err) => toast.error(`${getTranslation().panel.redoFailed}: ${err}`));
           }
           break;
       }
@@ -786,6 +810,7 @@ export function Panel() {
     addToStack,
     pasteFromStack,
     handleClipboardToFile,
+    t.panel.fileOperationFailed,
   ]);
 
   // マウスサイドボタンで戻る/進む
@@ -930,7 +955,7 @@ export function Panel() {
         {(tab.loading || tab.searching) && (
           <div className="flex items-center justify-center h-full text-[#999] gap-2">
             <Loader className="w-4 h-4 animate-spin" />
-            {tab.searching ? "検索中..." : "読み込み中..."}
+            {tab.searching ? t.panel.searching : t.panel.loading}
           </div>
         )}
         {tab.error && (
@@ -940,7 +965,7 @@ export function Panel() {
         )}
         {!tab.loading && !tab.searching && !tab.error && displayEntries.length === 0 && (
           <div className="flex items-center justify-center h-full text-[#999] animate-fade-in">
-            {tab.searchResults !== null ? "見つかりませんでした。" : "このフォルダーは空です。"}
+            {tab.searchResults !== null ? t.panel.noResults : t.panel.emptyFolder}
           </div>
         )}
         {!tab.loading &&
@@ -974,6 +999,7 @@ export function Panel() {
                 onClearSelection={clearSelection}
                 selectedCount={tab.selectedIndices.size}
                 onStartRename={startRename}
+                maxFileSize={maxFileSize}
               />
             ))
           ) : (

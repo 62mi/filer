@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
-import type { FileEntry, SortKey, SortOrder } from "../types";
+import type { FileEntry, SortKey, SortOrder, TidinessScore } from "../types";
 import { useCopyQueueStore } from "./copyQueueStore";
 import { useUndoStore } from "./undoStore";
 
@@ -68,6 +68,7 @@ interface TabState {
   searchResults: FileEntry[] | null;
   searching: boolean;
   viewMode: "details" | "icons";
+  tidinessScore: TidinessScore | null;
 }
 
 function createTabState(path: string): TabState {
@@ -89,6 +90,7 @@ function createTabState(path: string): TabState {
     searchResults: null,
     searching: false,
     viewMode: "details",
+    tidinessScore: null,
   };
 }
 
@@ -164,6 +166,9 @@ function updateActiveTab(
 }
 
 const initialTab = createTabState("C:\\");
+
+// 煩雑度スコアのデバウンスタイマー
+let tidyTimerId: number | null = null;
 
 export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   tabs: [initialTab],
@@ -256,6 +261,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           history,
           historyIndex,
           renamingIndex: null,
+          tidinessScore: null,
           ...(smooth ? {} : { searchResults: null, searchQuery: "", searching: false }),
         })),
       }));
@@ -272,11 +278,31 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           })),
         }));
       }
-    } catch (e) {
+
+      // 煩雑度スコア Phase B: 非同期でRust側の詳細計算を発火（300msデバウンス）
+      if (tidyTimerId) clearTimeout(tidyTimerId);
+      const scorePath = path;
+      tidyTimerId = window.setTimeout(() => {
+        tidyTimerId = null;
+        invoke<TidinessScore>("calculate_tidiness_score", { path: scorePath })
+          .then((score) => {
+            // パスが一致する場合のみ反映（高速フォルダ切替時の古い結果を破棄）
+            const current = get().tabs.find((t) => t.id === activeTabId);
+            if (current?.path === scorePath) {
+              set((s) => ({
+                tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+                  tidinessScore: score,
+                })),
+              }));
+            }
+          })
+          .catch(() => {});
+      }, 300);
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({
           loading: false,
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }
@@ -457,10 +483,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         fileCount: clipboard.paths.length,
       }).catch((_err) => {});
       await get().loadDirectory(tab.path, false);
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }
@@ -481,10 +507,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         entries: paths.map((p) => ({ sourcePath: p, destPath: "" })),
       });
       await get().loadDirectory(tab.path, false);
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }
@@ -507,10 +533,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         })),
       }));
       await get().loadDirectory(tab.path, false);
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }
@@ -533,10 +559,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         })),
       }));
       await get().loadDirectory(tab.path, false);
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }
@@ -575,10 +601,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         })),
       }));
       await get().loadDirectory(tab.path, false);
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
           renamingIndex: null,
         })),
       }));
@@ -599,10 +625,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           type: "rename",
           entries: [{ sourcePath: entry.path, destPath: newPath }],
         });
-      } catch (e) {
+      } catch (e: unknown) {
         set((s) => ({
           tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-            error: String(e),
+            error: e instanceof Error ? e.message : String(e),
             renamingIndex: null,
           })),
         }));
@@ -680,11 +706,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           searching: false,
         })),
       }));
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({
           searching: false,
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }
@@ -736,10 +762,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         fileCount: stackItems.length,
       }).catch((_err) => {});
       await get().loadDirectory(tab.path, false);
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }
