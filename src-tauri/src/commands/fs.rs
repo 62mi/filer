@@ -1,3 +1,4 @@
+use crate::db::Database;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Read;
@@ -522,6 +523,82 @@ fn create_nodes_recursive(
         }
     }
     Ok(())
+}
+
+/// フォルダサイズ計算結果
+#[derive(Debug, Serialize)]
+pub struct DirSizeEntry {
+    pub path: String,
+    pub size: u64,
+}
+
+/// キャッシュTTL: 10分
+const DIR_SIZE_CACHE_TTL: i64 = 600;
+/// 1フォルダあたりのタイムアウト: 5秒
+const DIR_SIZE_PER_DIR_TIMEOUT: u64 = 5;
+/// 全体のタイムアウト: 60秒
+const DIR_SIZE_TOTAL_TIMEOUT: u64 = 60;
+
+/// 複数フォルダのサイズを一括計算（キャッシュ付き）
+#[tauri::command]
+pub fn calculate_directory_sizes(
+    paths: Vec<String>,
+    state: tauri::State<'_, Database>,
+) -> Result<Vec<DirSizeEntry>, String> {
+    let total_start = Instant::now();
+    let mut results = Vec::new();
+
+    for dir_path in &paths {
+        // 全体タイムアウトチェック
+        if total_start.elapsed().as_secs() >= DIR_SIZE_TOTAL_TIMEOUT {
+            break;
+        }
+
+        // キャッシュ確認
+        if let Some(cached_size) = state.get_cached_dir_size(dir_path, DIR_SIZE_CACHE_TTL) {
+            results.push(DirSizeEntry {
+                path: dir_path.clone(),
+                size: cached_size,
+            });
+            continue;
+        }
+
+        // フォルダでなければスキップ
+        let p = Path::new(dir_path);
+        if !p.is_dir() {
+            results.push(DirSizeEntry {
+                path: dir_path.clone(),
+                size: 0,
+            });
+            continue;
+        }
+
+        // WalkDirで再帰計算
+        let start = Instant::now();
+        let mut size = 0u64;
+        for entry in WalkDir::new(p).into_iter().filter_map(|e| e.ok()) {
+            if start.elapsed().as_secs() >= DIR_SIZE_PER_DIR_TIMEOUT {
+                break;
+            }
+            if entry.path() == p {
+                continue;
+            }
+            if let Ok(m) = entry.metadata() {
+                if !m.is_dir() {
+                    size += m.len();
+                }
+            }
+        }
+
+        // キャッシュに保存
+        state.save_dir_size(dir_path, size).ok();
+        results.push(DirSizeEntry {
+            path: dir_path.clone(),
+            size,
+        });
+    }
+
+    Ok(results)
 }
 
 /// 煩雑度（整理度）スコア

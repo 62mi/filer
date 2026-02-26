@@ -2,6 +2,7 @@ import { PanelRightClose, PanelRightOpen, Sparkles } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
+import { useDirSizeStore } from "../../stores/dirSizeStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { formatFileSize } from "../../utils/format";
@@ -29,10 +30,12 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
   const totalDirs = entries.filter((e) => e.is_dir).length;
   const selectedCount = selectedIndices.size;
 
-  const selectedSize = Array.from(selectedIndices).reduce(
-    (acc, idx) => acc + (entries[idx]?.size ?? 0),
-    0,
-  );
+  const dirSizes = useDirSizeStore((s) => s.sizes);
+  const selectedSize = Array.from(selectedIndices).reduce((acc, idx) => {
+    const entry = entries[idx];
+    if (!entry) return acc;
+    return acc + (entry.is_dir ? (dirSizes[entry.path] ?? 0) : entry.size);
+  }, 0);
 
   const totalItems = entries.length;
 

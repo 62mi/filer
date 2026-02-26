@@ -109,6 +109,7 @@ pub fn run() {
             write_clipboard_file,
             create_from_template,
             calculate_tidiness_score,
+            calculate_directory_sizes,
             enqueue_copy,
             pause_copy,
             resume_copy,

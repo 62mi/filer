@@ -1,5 +1,6 @@
 import { Folder } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useDirSizeStore } from "../../stores/dirSizeStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import type { FileEntry } from "../../types";
 import { cn } from "../../utils/cn";
@@ -224,18 +225,40 @@ export function FileRow({
         {formatDate(entry.modified)}
       </span>
       <span className="w-36 text-[#666] shrink-0 ml-4 truncate">{getFileType(entry)}</span>
-      <span className="w-20 text-right text-[#666] shrink-0 ml-2 relative overflow-hidden">
-        {!entry.is_dir && maxFileSize > 0 && (
-          <span
-            className="absolute inset-y-0 right-0 opacity-20 rounded-sm"
-            style={{
-              width: `${(entry.size / maxFileSize) * 100}%`,
-              backgroundColor: getSizeBarColor(entry.size),
-            }}
-          />
-        )}
-        <span className="relative z-10">{entry.is_dir ? "" : formatFileSize(entry.size)}</span>
-      </span>
+      <DirSizeCell entry={entry} maxFileSize={maxFileSize} />
     </div>
+  );
+}
+
+/** サイズ列: ファイルはそのまま、フォルダは非同期計算サイズを表示 */
+function DirSizeCell({ entry, maxFileSize }: { entry: FileEntry; maxFileSize: number }) {
+  const dirSize = useDirSizeStore((s) => (entry.is_dir ? s.sizes[entry.path] : undefined));
+  const isCalculating = useDirSizeStore((s) =>
+    entry.is_dir ? s.calculatingPaths.has(entry.path) : false,
+  );
+
+  const displaySize = entry.is_dir ? dirSize : entry.size;
+  const hasSize = displaySize !== undefined && displaySize > 0;
+
+  return (
+    <span className="w-20 text-right text-[#666] shrink-0 ml-2 relative overflow-hidden">
+      {/* 計算中シマーアニメーション */}
+      {entry.is_dir && isCalculating && (
+        <span className="absolute inset-y-1 right-0 left-0 dir-size-calculating rounded-sm" />
+      )}
+      {/* サイズバー */}
+      {hasSize && maxFileSize > 0 && !isCalculating && (
+        <span
+          className="absolute inset-y-0 right-0 opacity-20 rounded-sm"
+          style={{
+            width: `${(displaySize / maxFileSize) * 100}%`,
+            backgroundColor: getSizeBarColor(displaySize),
+          }}
+        />
+      )}
+      <span className="relative z-10">
+        {isCalculating ? "" : hasSize ? formatFileSize(displaySize) : ""}
+      </span>
+    </span>
   );
 }

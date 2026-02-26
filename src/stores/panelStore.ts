@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import type { FileEntry, SortKey, SortOrder, TidinessScore } from "../types";
 import { useCopyQueueStore } from "./copyQueueStore";
+import { useDirSizeStore } from "./dirSizeStore";
 import { useUndoStore } from "./undoStore";
 
 /** Windowsパスから親ディレクトリを取得 */
@@ -278,6 +279,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           })),
         }));
       }
+
+      // フォルダサイズ計算: ディレクトリのパスを抽出してリクエスト
+      const dirPaths = sorted.filter((e) => e.is_dir).map((e) => e.path);
+      useDirSizeStore.getState().requestSizes(dirPaths);
 
       // 煩雑度スコア Phase B: 非同期でRust側の詳細計算を発火（300msデバウンス）
       if (tidyTimerId) clearTimeout(tidyTimerId);

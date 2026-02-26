@@ -143,6 +143,30 @@ body {
   animation: spin 1s linear infinite;
 }
 
+/* === Dir Size Calculating Animation === */
+
+@keyframes dirSizeShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.dir-size-calculating {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    #e0e0e0 40%,
+    #d0d0d0 50%,
+    #e0e0e0 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: dirSizeShimmer 1.5s ease-in-out infinite;
+}
+
 /* === Folderize Animation (おしゃれ・控えめ) === */
 
 @keyframes folderizeShimmer {

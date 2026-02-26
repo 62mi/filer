@@ -1,3 +1,4 @@
+pub mod dir_size_cache;
 pub mod history;
 pub mod rules;
 pub mod usage;
@@ -80,6 +81,12 @@ impl Database {
             CREATE TABLE IF NOT EXISTS ai_settings (
                 key     TEXT PRIMARY KEY,
                 value   TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS dir_size_cache (
+                path          TEXT PRIMARY KEY,
+                size          INTEGER NOT NULL,
+                calculated_at INTEGER NOT NULL
             );",
         )
         .map_err(|e| format!("Failed to init tables: {}", e))?;
@@ -101,6 +108,9 @@ impl Database {
             .map_err(|e| format!("Cleanup failed: {}", e))?;
         conn.execute("DELETE FROM ai_usage WHERE timestamp < ?1", [cutoff])
             .map_err(|e| format!("AI usage cleanup failed: {}", e))?;
+        // フォルダサイズキャッシュも90日でクリーンアップ
+        conn.execute("DELETE FROM dir_size_cache WHERE calculated_at < ?1", [cutoff])
+            .map_err(|e| format!("Dir size cache cleanup failed: {}", e))?;
         Ok(())
     }
 }

@@ -5,6 +5,7 @@ import { getTranslation, useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
 import { useCopyQueueStore } from "../../stores/copyQueueStore";
+import { useDirSizeStore } from "../../stores/dirSizeStore";
 import { useIconStore } from "../../stores/iconStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useRuleStore } from "../../stores/ruleStore";
@@ -94,14 +95,16 @@ export function Panel() {
   // The entries to display: search results or normal directory entries
   const displayEntries = tab.searchResults ?? tab.entries;
 
-  // サイズバー用: ファイルの最大サイズを算出
+  // サイズバー用: ファイル＋フォルダの最大サイズを算出
+  const dirSizes = useDirSizeStore((s) => s.sizes);
   const maxFileSize = useMemo(() => {
     let max = 0;
     for (const e of displayEntries) {
-      if (!e.is_dir && e.size > max) max = e.size;
+      const size = e.is_dir ? (dirSizes[e.path] ?? 0) : e.size;
+      if (size > max) max = size;
     }
     return max;
-  }, [displayEntries]);
+  }, [displayEntries, dirSizes]);
 
   // Initial load
   useEffect(() => {
