@@ -849,8 +849,8 @@ function ResultsPhase() {
 
         {/* 結果一覧 */}
         <div className="divide-y divide-[#f0f0f0]">
-          {results.map((result, i) => (
-            <ResultItem key={i} result={result} />
+          {results.map((result) => (
+            <ResultItem key={result.file_path} result={result} />
           ))}
         </div>
       </div>

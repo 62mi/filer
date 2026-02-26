@@ -177,7 +177,7 @@ export function NavigationBar() {
                     ? `${segmentPath}\\`
                     : segmentPath;
                 return (
-                  <span key={i} className="flex items-center shrink-0">
+                  <span key={fullPath} className="flex items-center shrink-0">
                     {i > 0 && <span className="mx-1 text-[#999] text-xs">{"\u203A"}</span>}
                     <button
                       className="hover:text-[#0078d4] hover:underline transition-colors"

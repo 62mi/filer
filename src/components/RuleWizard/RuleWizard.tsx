@@ -100,7 +100,7 @@ export function RuleWizard() {
 
           {/* メッセージ一覧 */}
           {messages.map((msg, i) => (
-            <div key={i}>
+            <div key={`${msg.role}-${i}`}>
               {msg.role === "user" ? (
                 <div className="flex justify-end">
                   <div className="bg-[#0078d4] text-white rounded-lg rounded-br-sm px-3 py-2 text-sm max-w-[80%]">
@@ -210,7 +210,7 @@ function RulePreviewCard({ preview }: { preview: GeneratedRulePreview }) {
         <div className="flex flex-wrap gap-1">
           {preview.conditions.map((c, i) => (
             <span
-              key={i}
+              key={`${c.cond_type}-${i}`}
               className="inline-flex items-center px-2 py-0.5 text-[10px] bg-[#f0f0f0] text-[#666] rounded"
             >
               {t.ruleLabels.conditions[c.cond_type as ConditionType] || c.cond_type}: {c.cond_value}
@@ -243,8 +243,8 @@ function RulePreviewCard({ preview }: { preview: GeneratedRulePreview }) {
             </button>
             {showFiles && (
               <div className="mt-1 pl-3 space-y-0.5 max-h-24 overflow-auto">
-                {preview.matching_files.map((f, i) => (
-                  <div key={i} className="text-[10px] text-[#666] truncate">
+                {preview.matching_files.map((f) => (
+                  <div key={f} className="text-[10px] text-[#666] truncate">
                     {f}
                   </div>
                 ))}

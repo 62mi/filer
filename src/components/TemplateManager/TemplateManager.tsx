@@ -324,7 +324,7 @@ function NodeTree({
           addingPath !== null && JSON.stringify(addingPath) === JSON.stringify(currentPath);
 
         return (
-          <div key={i} className="group">
+          <div key={`${node.name}-${i}`} className="group">
             <div className="flex items-center gap-1 py-0.5 px-1 rounded hover:bg-[#f5f5f5]">
               {isDir ? <ChevronRight className="w-3 h-3 text-[#999]" /> : <span className="w-3" />}
               {isDir ? (

@@ -55,7 +55,7 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
     const keys = needed.map((p) => cacheKey(p, size));
     set((s) => {
       const next = new Set(s.pending);
-      keys.forEach((k) => next.add(k));
+      for (const k of keys) next.add(k);
       return { pending: next };
     });
 
@@ -66,7 +66,7 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
       });
       set((s) => {
         const next = new Set(s.pending);
-        keys.forEach((k) => next.delete(k));
+        for (const k of keys) next.delete(k);
         const merged = { ...s.thumbnails };
         for (const [path, data] of Object.entries(result)) {
           merged[cacheKey(path, size)] = data;
@@ -76,7 +76,7 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
     } catch (_err) {
       set((s) => {
         const next = new Set(s.pending);
-        keys.forEach((k) => next.delete(k));
+        for (const k of keys) next.delete(k);
         return { pending: next };
       });
     }
@@ -133,7 +133,7 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
         const keys = todo.map((p) => cacheKey(p, size));
         set((s) => {
           const next = new Set(s.pending);
-          keys.forEach((k) => next.add(k));
+          for (const k of keys) next.add(k);
           return { pending: next };
         });
 
@@ -145,7 +145,7 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
           if (controller.signal.aborted) return;
           set((s) => {
             const next = new Set(s.pending);
-            keys.forEach((k) => next.delete(k));
+            for (const k of keys) next.delete(k);
             const merged = { ...s.thumbnails };
             for (const [path, data] of Object.entries(result)) {
               merged[cacheKey(path, size)] = data;
@@ -156,7 +156,7 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
           if (controller.signal.aborted) return;
           set((s) => {
             const next = new Set(s.pending);
-            keys.forEach((k) => next.delete(k));
+            for (const k of keys) next.delete(k);
             return { pending: next };
           });
         }

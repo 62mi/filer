@@ -337,14 +337,15 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     >
       {items.map((item, i) => {
         if ("separator" in item && item.separator) {
-          return <div key={i} className="h-px bg-[#e5e5e5] my-1" />;
+          // biome-ignore lint/suspicious/noArrayIndexKey: separators have no unique identifier
+          return <div key={`sep-${i}`} className="h-px bg-[#e5e5e5] my-1" />;
         }
         // サブメニュー
         if ("submenu" in item && item.submenu) {
           const sub = item as SubmenuItem;
           return (
             <div
-              key={i}
+              key={sub.label}
               className="relative"
               onMouseEnter={() => handleSubmenuEnter(i)}
               onMouseLeave={handleSubmenuLeave}
@@ -360,9 +361,9 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
                   onMouseEnter={() => handleSubmenuEnter(i)}
                   onMouseLeave={handleSubmenuLeave}
                 >
-                  {sub.submenu.map((subItem, j) => (
+                  {sub.submenu.map((subItem) => (
                     <button
-                      key={j}
+                      key={subItem.label}
                       className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[#e8e8e8] transition-colors"
                       onClick={subItem.onClick}
                     >
@@ -378,7 +379,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
         const menuItem = item as MenuItem;
         return (
           <button
-            key={i}
+            key={menuItem.label}
             className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[#e8e8e8] disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
             onClick={menuItem.onClick}
             disabled={menuItem.disabled}

@@ -187,7 +187,7 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
 
           <div className="space-y-2">
             {conditions.map((cond, i) => (
-              <div key={i} className="flex items-center gap-2">
+              <div key={`${cond.cond_type}-${i}`} className="flex items-center gap-2">
                 <select
                   value={cond.cond_type}
                   onChange={(e) => updateCondition(i, "cond_type", e.target.value)}
