@@ -16,6 +16,16 @@ export interface DriveInfo {
   icon: string | null;
 }
 
+export interface RecentFile {
+  name: string;
+  path: string;
+  location: string;
+  extension: string;
+  size: number;
+  accessed: number;
+  is_dir: boolean;
+}
+
 export type SortKey = "name" | "size" | "modified" | "extension";
 export type SortOrder = "asc" | "desc";
 

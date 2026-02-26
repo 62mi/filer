@@ -278,8 +278,10 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
             }
             toast.success(`${t.panel.templateDeployed}: ${tmpl.name}`);
             useExplorerStore.getState().refreshDirectory();
-          } catch (err) {
-            toast.error(`${t.panel.templateDeployFailed}: ${err}`);
+          } catch (err: unknown) {
+            toast.error(
+              `${t.panel.templateDeployFailed}: ${err instanceof Error ? err.message : String(err)}`,
+            );
           }
           onClose();
         },

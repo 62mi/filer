@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import { toast } from "./toastStore";
 
 export interface RuleSuggestion {
   ruleId: string;
@@ -53,7 +54,9 @@ export const useRuleSuggestionStore = create<RuleSuggestionStore>((set, get) => 
         filePath: s.filePath,
       });
       get().removeSuggestion(s.filePath);
-    } catch (_err) {}
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    }
   },
 
   dismissSuggestion: (filePath) => {
@@ -71,7 +74,9 @@ export const useRuleSuggestionStore = create<RuleSuggestionStore>((set, get) => 
       await invoke("refresh_watcher");
       // 今回のサジェストを受理
       await get().acceptSuggestion(s);
-    } catch (_err) {}
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    }
   },
 
   clearAll: () => set({ suggestions: [] }),

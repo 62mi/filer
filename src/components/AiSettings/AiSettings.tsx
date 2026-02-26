@@ -62,8 +62,8 @@ export function AiSettings() {
       await saveApiKey(keyInput.trim());
       setSaved(true);
       setKeyInput("");
-    } catch (e) {
-      setError(String(e));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -72,8 +72,8 @@ export function AiSettings() {
   const handleDelete = async () => {
     try {
       await deleteApiKey();
-    } catch (e) {
-      setError(String(e));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -87,8 +87,8 @@ export function AiSettings() {
       await setBudget(amount);
       setBudgetSaved(true);
       setTimeout(() => setBudgetSaved(false), 2000);
-    } catch (e) {
-      setError(String(e));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   };
 

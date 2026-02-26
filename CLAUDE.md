@@ -9,8 +9,10 @@
 - **スタイリング**: Tailwind CSS v4 (CSS-first config、tailwind.config不要)
 - **状態管理**: Zustand
 - **リンター/フォーマッター**: Biome v2 (`biome.json`)
-- **テスト**: Vitest (フロントエンド) / cargo test (バックエンド)
+- **テスト**: Vitest + happy-dom (フロントエンド) / cargo test (バックエンド)
+- **i18n**: 自前実装 (`src/i18n/` — ja.ts/en.ts)
 - **CI/CD**: GitHub Actions (タグpushで自動ビルド・リリース)
+- **pre-commit**: husky + lint-staged (Biome check)
 - **パッケージマネージャ**: pnpm
 
 ## ディレクトリ構成
@@ -35,6 +37,9 @@ filer/
 │   │   │   ├── history.rs # 操作履歴
 │   │   │   └── usage.rs # AI使用量トラッキング
 │   │   └── watcher/    # ファイル監視・ルール自動適用
+│   │       ├── mod.rs
+│   │       ├── engine.rs  # ルールマッチングエンジン
+│   │       └── directory.rs # ディレクトリ監視
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 ├── src/                # React フロントエンド
@@ -58,7 +63,8 @@ filer/
 │   │   ├── SettingsDialog/ # 設定ダイアログ
 │   │   ├── CommandPalette/ # コマンドパレット (Ctrl+K)
 │   │   ├── CopyQueue/    # コピーキューパネル
-│   │   └── TemplateManager/ # テンプレート管理ダイアログ
+│   │   ├── TemplateManager/ # テンプレート管理ダイアログ
+│   │   └── HomeView/     # ホーム画面
 │   ├── stores/         # Zustand ストア
 │   │   ├── panelStore.ts # パネル・タブ・ファイル一覧
 │   │   ├── aiStore.ts  # AI整理状態
@@ -75,11 +81,16 @@ filer/
 │   │   ├── suggestionStore.ts # ドラッグ移動先サジェスト
 │   │   ├── ruleSuggestionStore.ts # ルール提案状態
 │   │   └── ruleWizardStore.ts # ルール作成ウィザード状態
+│   ├── i18n/           # 国際化 (ja.ts/en.ts)
 │   ├── commands/       # コマンドレジストリ (コマンドパレット用)
 │   ├── types/          # TypeScript 型定義
 │   ├── utils/          # ユーティリティ
+│   ├── test/           # テスト基盤
+│   │   ├── setup.ts    # Tauri APIモック等
+│   │   └── __mocks__/  # lucide-react軽量モック
 │   ├── App.tsx
 │   └── main.tsx
+├── vitest.config.ts    # Vitest テスト設定
 ├── biome.json          # Biome リンター設定
 ├── CLAUDE.md
 ├── REQUIREMENTS.md
@@ -134,6 +145,22 @@ git tag -a v1.1.0 -m "v1.1.0: 説明" && git push origin v1.1.0
 2. **ブランチ作成**: Issue番号を含むブランチを切る（例: `feat/#19-custom-titlebar`）
 3. masterへの直接コミットは避ける
 
+## 並列実装ルール
+### セッション内（Taskエージェント並列起動）
+- 複数のTaskエージェントで同時にコード変更を行う場合は `isolation: "worktree"` を必ず使う
+- 調査・検索のみのエージェントには不要
+- worktree完了後のマージはメインコンテキストで行う
+
+### 独立セッション間（複数ターミナルで同時作業）
+- **セッション開始時に `git worktree list` を確認する**。他のworktreeが存在する場合、別セッションが作業中の可能性があるため、同じファイルを触らないよう注意する
+- 各セッションは必ず別ブランチで作業する
+- 同じディレクトリで複数セッションを同時に走らせない。2つ目以降は `git worktree` で分離する:
+  ```bash
+  git worktree add ../filer-<作業名> <ブランチ名>
+  # 例: git worktree add ../filer-sidebar feat/#30-sidebar
+  ```
+- 作業完了後は worktree を削除する: `git worktree remove ../filer-<作業名>`
+
 ## コーディング規約
 - 日本語コメントOK（ユーザーが日本語話者）
 - コンポーネントはfunction宣言 + named export
@@ -151,3 +178,9 @@ git tag -a v1.1.0 -m "v1.1.0: 説明" && git push origin v1.1.0
 - **プラグイン拡張**: 将来的にプラグインシステムを導入可能な設計に
 - **非同期処理**: ファイル操作はすべて非同期。UIをブロックしない
 - **セキュリティ**: APIキーはkeyring（Windows Credential Manager）で管理。ファイル名にはvalidate_name()、パス操作にはcanonicalize + starts_with検証でパストラバーサル防止
+
+## テスト基盤の注意事項
+- **DOM環境**: WSL2ではjsdomが極端に遅い（30秒以上ハング）。`happy-dom`を使用すること
+- **lucide-react**: 3308個のbarrel exportがvitestのモジュール解決をハングさせる。`vitest.config.ts`の`resolve.alias`で`src/test/__mocks__/lucide-react.ts`にリダイレクト必須。`vi.mock()`ではコンポーネント経由の間接importを防げない
+- **Tauri APIモック**: `src/test/setup.ts`で`@tauri-apps/api/core`, `@tauri-apps/api/event`, `@tauri-apps/plugin-dialog`をモック
+- **新しいアイコン使用時**: `src/test/__mocks__/lucide-react.ts`にexportを追加すること

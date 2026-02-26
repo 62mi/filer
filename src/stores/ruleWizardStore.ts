@@ -98,10 +98,10 @@ export const useRuleWizardStore = create<RuleWizardStore>((set, get) => ({
         rulePreview: preview,
         loading: false,
       }));
-    } catch (err) {
+    } catch (err: unknown) {
       set({
         loading: false,
-        error: String(err),
+        error: err instanceof Error ? err.message : String(err),
       });
     }
   },
@@ -126,10 +126,10 @@ export const useRuleWizardStore = create<RuleWizardStore>((set, get) => ({
 
       // 成功 → ウィザードを閉じる
       get().closeWizard();
-    } catch (err) {
+    } catch (err: unknown) {
       set({
         loading: false,
-        error: String(err),
+        error: err instanceof Error ? err.message : String(err),
       });
     }
   },

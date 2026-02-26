@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { type Translations, useTranslation } from "../../i18n";
 import { type FolderRule, useRuleStore } from "../../stores/ruleStore";
 import { useRuleWizardStore } from "../../stores/ruleWizardStore";
+import { toast } from "../../stores/toastStore";
 import { RuleEditor } from "./RuleEditor";
 
 export function RuleManager() {
@@ -90,7 +91,9 @@ export function RuleManager() {
       try {
         await deleteRule(id);
         setConfirmDelete(null);
-      } catch (_e) {}
+      } catch (e: unknown) {
+        toast.error(e instanceof Error ? e.message : String(e));
+      }
     },
     [deleteRule],
   );
@@ -99,7 +102,9 @@ export function RuleManager() {
     async (id: string, currentEnabled: boolean) => {
       try {
         await toggleRule(id, !currentEnabled);
-      } catch (_e) {}
+      } catch (e: unknown) {
+        toast.error(e instanceof Error ? e.message : String(e));
+      }
     },
     [toggleRule],
   );

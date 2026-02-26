@@ -14,6 +14,7 @@ import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { TabBar } from "./components/TabBar";
 import { TemplateManager } from "./components/TemplateManager";
+import { getTranslation } from "./i18n";
 import { useAiStore } from "./stores/aiStore";
 import { useCopyQueueStore } from "./stores/copyQueueStore";
 import { useExplorerStore } from "./stores/panelStore";
@@ -53,9 +54,19 @@ function App() {
       action_type: string;
     }>("rule-executed", (event) => {
       const { rule_name, file_name, action_type } = event.payload;
+      const t = getTranslation();
       const actionLabel =
-        action_type === "move" ? "移動" : action_type === "copy" ? "コピー" : "削除";
-      toast.success(`${rule_name}: ${file_name} を${actionLabel}しました`);
+        action_type === "move"
+          ? t.ruleExecution.actionMove
+          : action_type === "copy"
+            ? t.ruleExecution.actionCopy
+            : t.ruleExecution.actionDelete;
+      toast.success(
+        t.ruleExecution.executed
+          .replace("{rule}", rule_name)
+          .replace("{file}", file_name)
+          .replace("{action}", actionLabel),
+      );
       useExplorerStore.getState().refreshDirectory();
     });
 

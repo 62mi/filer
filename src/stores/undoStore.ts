@@ -221,7 +221,7 @@ export const useUndoStore = create<UndoStore>((set, get) => ({
         redoStack: [...s.redoStack, action],
       }));
       return action;
-    } catch (e) {
+    } catch (e: unknown) {
       // 削除のUndoは失敗しても履歴からは消さない
       if (action.type === "delete") {
         throw e;
@@ -242,7 +242,7 @@ export const useUndoStore = create<UndoStore>((set, get) => ({
         undoStack: [...s.undoStack, action],
       }));
       return action;
-    } catch (_e) {
+    } catch (_e: unknown) {
       return null;
     }
   },

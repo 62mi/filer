@@ -383,6 +383,20 @@ export const ja = {
     } as Record<string, string>,
   },
 
+  // ── ルール実行通知 ──
+  ruleExecution: {
+    executed: "{rule}: {file} を{action}しました",
+    actionMove: "移動",
+    actionCopy: "コピー",
+    actionDelete: "削除",
+    watcherUpdateFailed: "ウォッチャー更新失敗",
+  },
+
+  // ── ナビゲーションバー ──
+  navigationBar: {
+    terminalFailed: "ターミナルの起動に失敗しました",
+  },
+
   // ── フォーマット ──
   format: {
     bytes: "バイト",

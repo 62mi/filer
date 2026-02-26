@@ -365,6 +365,18 @@ export const en: Translations = {
     },
   },
 
+  ruleExecution: {
+    executed: "{rule}: {action} {file}",
+    actionMove: "Moved",
+    actionCopy: "Copied",
+    actionDelete: "Deleted",
+    watcherUpdateFailed: "Watcher update failed",
+  },
+
+  navigationBar: {
+    terminalFailed: "Failed to open terminal",
+  },
+
   format: {
     bytes: "bytes",
   },

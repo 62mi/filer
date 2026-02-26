@@ -372,8 +372,10 @@ export function Panel() {
           .then(() => schedulePatternRecheck())
           .catch((_err) => {});
         await loadDirectory(tab.path, false);
-      } catch (err) {
-        toast.error(`${t.panel.fileOperationFailed}: ${err}`);
+      } catch (err: unknown) {
+        toast.error(
+          `${t.panel.fileOperationFailed}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     },
     [
@@ -653,7 +655,11 @@ export function Panel() {
               clipboardPaste();
             } else {
               // システムクリップボードからファイル生成を試みる
-              handleClipboardToFile(activeTab.path).catch(() => {});
+              handleClipboardToFile(activeTab.path).catch((err: unknown) => {
+                toast.error(
+                  `${t.panel.fileOperationFailed}: ${err instanceof Error ? err.message : String(err)}`,
+                );
+              });
             }
           }
           break;
@@ -804,6 +810,7 @@ export function Panel() {
     addToStack,
     pasteFromStack,
     handleClipboardToFile,
+    t.panel.fileOperationFailed,
   ]);
 
   // マウスサイドボタンで戻る/進む

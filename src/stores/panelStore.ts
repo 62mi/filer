@@ -298,11 +298,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           })
           .catch(() => {});
       }, 300);
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({
           loading: false,
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }
@@ -483,10 +483,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         fileCount: clipboard.paths.length,
       }).catch((_err) => {});
       await get().loadDirectory(tab.path, false);
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }
@@ -507,10 +507,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         entries: paths.map((p) => ({ sourcePath: p, destPath: "" })),
       });
       await get().loadDirectory(tab.path, false);
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }
@@ -533,10 +533,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         })),
       }));
       await get().loadDirectory(tab.path, false);
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }
@@ -559,10 +559,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         })),
       }));
       await get().loadDirectory(tab.path, false);
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }
@@ -601,10 +601,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         })),
       }));
       await get().loadDirectory(tab.path, false);
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
           renamingIndex: null,
         })),
       }));
@@ -625,10 +625,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           type: "rename",
           entries: [{ sourcePath: entry.path, destPath: newPath }],
         });
-      } catch (e) {
+      } catch (e: unknown) {
         set((s) => ({
           tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-            error: String(e),
+            error: e instanceof Error ? e.message : String(e),
             renamingIndex: null,
           })),
         }));
@@ -706,11 +706,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           searching: false,
         })),
       }));
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({
           searching: false,
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }
@@ -762,10 +762,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         fileCount: stackItems.length,
       }).catch((_err) => {});
       await get().loadDirectory(tab.path, false);
-    } catch (e) {
+    } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: String(e),
+          error: e instanceof Error ? e.message : String(e),
         })),
       }));
     }

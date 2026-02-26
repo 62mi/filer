@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Check,
@@ -244,8 +245,17 @@ function InputPhase() {
       icon: FolderOpen,
       instruction: t.aiOrganizer.presetClutterInstruction,
       description: t.aiOrganizer.presetClutterDesc,
+      color: "bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100",
+      featured: false,
+    },
+    {
+      label: t.aiOrganizer.presetUnwanted,
+      icon: Trash2,
+      instruction: t.aiOrganizer.presetUnwantedInstruction,
+      description: t.aiOrganizer.presetUnwantedDesc,
       color: "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100",
       featured: false,
+      danger: true,
     },
   ];
 
@@ -509,6 +519,12 @@ function PreviewPhase() {
   const [selected, setSelected] = useState<Set<number>>(
     () => new Set(suggestedActions.map((_, i) => i)),
   );
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const deleteCount = suggestedActions.filter((a) => a.action_type === "delete").length;
+  const selectedDeleteCount = suggestedActions.filter(
+    (a, i) => a.action_type === "delete" && selected.has(i),
+  ).length;
 
   const toggleSelect = (index: number) => {
     setSelected((prev) => {
@@ -540,6 +556,15 @@ function PreviewPhase() {
   };
 
   const handleExecute = () => {
+    if (selectedDeleteCount > 0) {
+      setShowDeleteConfirm(true);
+      return;
+    }
+    executeActions(Array.from(selected));
+  };
+
+  const handleConfirmDelete = () => {
+    setShowDeleteConfirm(false);
     executeActions(Array.from(selected));
   };
 
@@ -568,9 +593,17 @@ function PreviewPhase() {
       <div className="flex-1 overflow-auto">
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#f0f0f0]">
-          <span className="text-[11px] text-[#666]">
-            {suggestedActions.length} {t.aiOrganizer.actionSuggestions}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-[#666]">
+              {suggestedActions.length} {t.aiOrganizer.actionSuggestions}
+            </span>
+            {deleteCount > 0 && (
+              <span className="flex items-center gap-1 text-[11px] text-red-600">
+                <AlertTriangle className="w-3 h-3" />
+                {deleteCount}件の削除を含む
+              </span>
+            )}
+          </div>
           <button
             className="text-[11px] text-[#0078d4] hover:text-[#005a9e] transition-colors"
             onClick={toggleAll}
@@ -593,6 +626,31 @@ function PreviewPhase() {
             />
           ))}
         </div>
+
+        {showDeleteConfirm && (
+          <div className="mx-3 my-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+              <span className="font-medium">
+                {selectedDeleteCount}件のファイルをゴミ箱に送ります。よろしいですか？
+              </span>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                className="px-2 py-0.5 text-xs bg-white hover:bg-gray-50 rounded border border-[#d0d0d0] text-[#1a1a1a] transition-colors"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                キャンセル
+              </button>
+              <button
+                className="px-2 py-0.5 text-xs bg-red-600 hover:bg-red-700 rounded text-white transition-colors"
+                onClick={handleConfirmDelete}
+              >
+                削除を実行
+              </button>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="mx-3 my-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
@@ -661,13 +719,14 @@ function ActionItem({
         ? "bg-green-100 text-green-700"
         : "bg-blue-100 text-blue-700";
 
+  const isDelete = action.action_type === "delete";
   const destName = action.action_dest ? action.action_dest.split("\\").filter(Boolean).pop() : null;
 
   return (
     <div
       className={`flex items-start gap-2 px-3 py-2 group hover:bg-white transition-colors ${
-        !checked ? "opacity-50" : ""
-      }`}
+        isDelete ? "bg-red-50/50" : ""
+      } ${!checked ? "opacity-50" : ""}`}
     >
       <input
         type="checkbox"

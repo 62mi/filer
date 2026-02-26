@@ -131,8 +131,8 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
         );
       }
       onBack();
-    } catch (e) {
-      setError(String(e));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -236,6 +236,11 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
               </option>
             ))}
           </select>
+          {actionType === "delete" && (
+            <div className="mt-1.5 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+              削除アクションはファイルをゴミ箱に送ります
+            </div>
+          )}
         </div>
 
         {/* 移動先/コピー先 */}
@@ -275,6 +280,11 @@ export function RuleEditor({ folderPath, rule, onBack }: RuleEditorProps) {
             <span className="text-sm text-[#1a1a1a]">{t.ruleEditor.autoExecute}</span>
           </label>
           <p className="text-[10px] text-[#999] mt-1 ml-6">{t.ruleEditor.autoExecuteDescription}</p>
+          {actionType === "delete" && autoExecute && (
+            <p className="text-[10px] text-red-500 mt-1 ml-6">
+              削除の自動実行はファイルが確認なしでゴミ箱に送られます
+            </p>
+          )}
         </div>
 
         {/* エラー */}
