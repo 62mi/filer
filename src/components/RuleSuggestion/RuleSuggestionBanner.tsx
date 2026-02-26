@@ -92,7 +92,7 @@ export function RuleSuggestionBanner() {
           className={`p-0.5 rounded transition-colors ${
             hasDelete ? "hover:bg-red-200/50 text-red-400" : "hover:bg-amber-200/50 text-amber-400"
           }`}
-          onClick={() => folderSuggestions.forEach((s) => dismissSuggestion(s.filePath))}
+          onClick={() => { for (const s of folderSuggestions) dismissSuggestion(s.filePath); }}
           title={t.common.hideAll}
         >
           <X className="w-3.5 h-3.5" />

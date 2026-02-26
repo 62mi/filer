@@ -345,7 +345,7 @@ export function Panel() {
           } else {
             await invoke("move_files", { sources: paths, dest: targetEntry.path });
             useUndoStore.getState().pushAction({ type: "move", entries: undoEntries });
-            paths.forEach((p) => removeFromStack(p));
+            for (const p of paths) removeFromStack(p);
           }
         } else if (e.ctrlKey) {
           await useCopyQueueStore.getState().enqueue(paths, targetEntry.path, "copy");
@@ -453,7 +453,7 @@ export function Panel() {
           } else {
             await invoke("move_files", { sources: paths, dest: tab.path });
             useUndoStore.getState().pushAction({ type: "move", entries: undoEntries });
-            paths.forEach((p) => removeFromStack(p));
+            for (const p of paths) removeFromStack(p);
             recordMove(paths[0]?.substring(0, paths[0].lastIndexOf("\\")) || "", "move");
           }
           await loadDirectory(tab.path, false);
