@@ -24,6 +24,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "../../i18n";
 import { type AiExecutionResult, type AiSuggestedAction, useAiStore } from "../../stores/aiStore";
 import { useExplorerStore } from "../../stores/panelStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { useUndoStore } from "../../stores/undoStore";
 
 interface AiOrganizerProps {
@@ -203,7 +204,7 @@ function InputPhase() {
   const loading = useAiStore((s) => s.loading);
   const error = useAiStore((s) => s.error);
   const hasApiKey = useAiStore((s) => s.hasApiKey);
-  const openSettings = useAiStore((s) => s.openSettings);
+  const openSettings = useSettingsStore((s) => s.openSettings);
   const closeDialog = useAiStore((s) => s.closeDialog);
   const [showCustom, setShowCustom] = useState(false);
 
@@ -374,7 +375,7 @@ function InputPhase() {
       <div className="flex justify-between px-3 py-2 border-t border-[#e5e5e5] shrink-0">
         <button
           className="flex items-center gap-1 px-2 py-1 text-xs text-[#666] hover:bg-[#f0f0f0] rounded transition-colors"
-          onClick={openSettings}
+          onClick={() => openSettings("ai")}
         >
           <Settings className="w-3 h-3" />
           {t.common.settings}

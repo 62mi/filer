@@ -25,3 +25,9 @@ dist-ssr
 
 # Windows special files
 NUL
+
+# Claude Code
+.claude/
+
+# Dev assets
+image/

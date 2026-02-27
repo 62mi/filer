@@ -1,3 +1,13 @@
+import type { PathStyle } from "../stores/settingsStore";
+
+/** パス表示形式を変換（内部は常にWindows形式、表示のみ切り替え） */
+export function formatPath(path: string, style: PathStyle): string {
+  if (style === "linux") {
+    return path.replace(/\\/g, "/");
+  }
+  return path;
+}
+
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return "0 KB";
   const units = ["B", "KB", "MB", "GB", "TB"];

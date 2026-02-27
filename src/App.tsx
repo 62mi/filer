@@ -1,6 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
-import { AiSettings } from "./components/AiSettings";
 import { BookmarkBar } from "./components/BookmarkBar";
 import { CommandPalette } from "./components/CommandPalette";
 import { CopyQueuePanel } from "./components/CopyQueue";
@@ -14,11 +13,13 @@ import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { TabBar } from "./components/TabBar";
 import { TemplateManager } from "./components/TemplateManager";
+import { useNativeDrop } from "./hooks/useNativeDrop";
 import { getTranslation } from "./i18n";
 import { useAiStore } from "./stores/aiStore";
 import { useCopyQueueStore } from "./stores/copyQueueStore";
 import { useExplorerStore } from "./stores/panelStore";
 import { useRuleSuggestionStore } from "./stores/ruleSuggestionStore";
+import { useThemeStore } from "./stores/themeStore";
 import { toast, useToastStore } from "./stores/toastStore";
 
 function App() {
@@ -32,6 +33,41 @@ function App() {
   const tab = useExplorerStore((s) => s.tabs.find((t) => t.id === s.activeTabId) || s.tabs[0]);
   const cursorEntry = (tab.searchResults ?? tab.entries)[tab.cursorIndex] ?? null;
 
+  // 起動時にテーマ初期化
+  useEffect(() => {
+    useThemeStore.getState().init();
+  }, []);
+
+  // ネイティブドロップハンドラ（外部ファイルドロップ一元管理）
+  useNativeDrop();
+
+  // 中クリック（ホイールクリック）: オートスクロール無効化 + 新しいタブで開く
+  // data-mid-click-path 属性を持つ要素上で中クリック → そのパスで新タブ作成
+  // WebView2では mouseup/auxclick が中クリックで発火しないため、
+  // mousedown 一本で処理する
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 1) return;
+      e.preventDefault();
+      // WebView2は中クリックのe.targetをスクロールコンテナに設定するため、
+      // elementsFromPoint で全レイヤーの要素を探索する
+      const elements = document.elementsFromPoint(e.clientX, e.clientY);
+      let path: string | undefined;
+      for (const elem of elements) {
+        const hit = (elem as HTMLElement).closest?.("[data-mid-click-path]") as HTMLElement | null;
+        if (hit?.dataset.midClickPath) {
+          path = hit.dataset.midClickPath;
+          break;
+        }
+      }
+      if (path) {
+        useExplorerStore.getState().addTab(path);
+      }
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, []);
+
   // 起動時にAPIキーの存在チェック + 使用量ロード
   useEffect(() => {
     useAiStore.getState().checkApiKey();
@@ -43,6 +79,21 @@ function App() {
     const unlistenPromise = useCopyQueueStore.getState().initListener();
     return () => {
       unlistenPromise.then((fn) => fn()).catch(() => {});
+    };
+  }, []);
+
+  // クリップボード変更イベント（OS側のクリップボード監視）
+  useEffect(() => {
+    const unlisten = listen<{ paths: string[]; operation: string }>(
+      "clipboard-changed",
+      (event) => {
+        useExplorerStore
+          .getState()
+          .syncExternalClipboard(event.payload.paths, event.payload.operation);
+      },
+    );
+    return () => {
+      unlisten.then((f) => f()).catch(() => {});
     };
   }, []);
 
@@ -146,16 +197,20 @@ function App() {
       <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
         <div
-          className="shrink-0 bg-[#f9f9f9] border-r border-[#e5e5e5] overflow-hidden"
-          style={{ width: sidebarWidth }}
+          className="shrink-0 border-r border-[var(--chrome-border)] overflow-hidden"
+          style={{
+            width: sidebarWidth,
+            background: "var(--chrome-bg)",
+            color: "var(--chrome-text)",
+          }}
         >
           <Sidebar />
         </div>
 
         {/* Sidebar resize handle */}
         <div
-          className={`w-1 cursor-col-resize hover:bg-[#0078d4] transition-colors shrink-0 ${
-            dragging ? "bg-[#0078d4]" : "bg-[#e5e5e5]"
+          className={`w-1 cursor-col-resize hover:bg-[var(--accent)] transition-colors shrink-0 ${
+            dragging ? "bg-[var(--accent)]" : "bg-[var(--chrome-border)]"
           }`}
           onMouseDown={handleMouseDown}
         />
@@ -169,8 +224,8 @@ function App() {
         {previewOpen && (
           <>
             <div
-              className={`w-1 cursor-col-resize hover:bg-[#0078d4] transition-colors shrink-0 ${
-                previewDragging ? "bg-[#0078d4]" : "bg-[#e5e5e5]"
+              className={`w-1 cursor-col-resize hover:bg-[var(--accent)] transition-colors shrink-0 ${
+                previewDragging ? "bg-[var(--accent)]" : "bg-[#e5e5e5]"
               }`}
               onMouseDown={handlePreviewMouseDown}
             />
@@ -190,10 +245,7 @@ function App() {
       {/* AI Rule Wizard Dialog */}
       <RuleWizard />
 
-      {/* AI Settings Dialog (global) */}
-      <AiSettings />
-
-      {/* UI Settings Dialog */}
+      {/* Settings Dialog */}
       <SettingsDialog />
 
       {/* Command Palette */}
@@ -216,7 +268,7 @@ function App() {
                   ? "bg-red-500 text-white"
                   : t.type === "info"
                     ? "bg-gray-700 text-white"
-                    : "bg-[#0078d4] text-white"
+                    : "bg-[var(--accent)] text-white"
               }`}
             >
               {t.message}

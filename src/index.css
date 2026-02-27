@@ -6,6 +6,23 @@
   line-height: 1.5;
   color: #1a1a1a;
   background-color: #ffffff;
+
+  /* アクセントカラー（themeStoreが上書き） */
+  --accent: #0078d4;
+  --accent-rgb: 0, 120, 212;
+
+  /* テーマ変数（themeStoreが上書き） */
+  --tab-bg: #e0e0e0;
+  --tab-text: #666;
+  --tab-hover: #dedede;
+  --chrome-bg: #f3f3f3;
+  --chrome-text: #1a1a1a;
+  --chrome-text-dim: #666;
+  --chrome-hover: rgba(var(--accent-rgb), 0.1);
+  --chrome-active: rgba(var(--accent-rgb), 0.15);
+  --chrome-border: #e5e5e5;
+  --folder-color: #e8a520;
+  --folder-fill: #f2c55c;
 }
 
 body {
@@ -198,8 +215,28 @@ body {
 }
 
 .folderize-target .folderize-icon {
-  color: #0078d4;
-  filter: drop-shadow(0 0 3px rgba(0, 120, 212, 0.3));
+  color: var(--accent);
+  filter: drop-shadow(0 0 3px rgba(var(--accent-rgb), 0.3));
+}
+
+/* === Native Drop Hover Highlight === */
+/* 基本ハイライトはuseNativeDrop.tsのインラインスタイルで適用 */
+/* file-row(ファイルonファイル)のフォルダ化アニメーションのみCSS */
+
+[data-native-drop-hover="true"][data-drop-zone="file-row"][data-is-dir="false"] {
+  background: linear-gradient(
+    90deg,
+    #e8f0fe 0%,
+    #d4e4fc 25%,
+    #e8f0fe 50%,
+    #d4e4fc 75%,
+    #e8f0fe 100%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: folderizeShimmer 2s ease-in-out infinite;
+  outline: 1.5px solid rgba(0, 120, 212, 0.4);
+  outline-offset: -1px;
+  border-radius: 5px;
 }
 
 /* === Mac-style QuickLook Animations === */
@@ -280,4 +317,92 @@ body {
   animation: quickLookBackdropOut 150ms ease-in forwards;
   backdrop-filter: blur(0px);
   will-change: background-color;
+}
+
+/* === StatusBar Loading Progress Bar === */
+
+@keyframes statusbarProgress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.statusbar-progress-bar {
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent 0%, var(--accent) 50%, transparent 100%);
+  opacity: 0.6;
+  animation: statusbarProgress 1.2s ease-in-out infinite;
+}
+
+/* === Bookmark D&D Drop Indicators === */
+
+[data-bdd-drop] {
+  position: relative;
+}
+
+/* バー上: 縦線インジケータ */
+[data-bdd-drop="before"]::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--accent);
+  border-radius: 999px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+[data-bdd-drop="after"]::after {
+  content: "";
+  position: absolute;
+  right: -2px;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--accent);
+  border-radius: 999px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+[data-bdd-drop="inside"] {
+  background: rgba(var(--accent-rgb), 0.2) !important;
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* ドロップダウン内: 横線インジケータ */
+[data-bdd-ctx="dropdown"][data-bdd-drop="before"]::before {
+  left: 8px;
+  right: 8px;
+  top: -1px;
+  bottom: auto;
+  height: 2px;
+  width: auto;
+}
+
+[data-bdd-ctx="dropdown"][data-bdd-drop="after"]::after {
+  left: 8px;
+  right: 8px;
+  bottom: -1px;
+  top: auto;
+  height: 2px;
+  width: auto;
+}
+
+/* ドラッグ中のカーソル */
+body.bdd-dragging,
+body.bdd-dragging * {
+  cursor: grabbing !important;
+}
+
+body.file-dragging,
+body.file-dragging * {
+  cursor: grabbing !important;
 }

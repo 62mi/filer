@@ -156,6 +156,17 @@ export const en: Translations = {
     languageJa: "日本語",
     languageEn: "English",
     general: "General",
+    colorTheme: "Color Theme",
+    colorThemeAuto: "Auto (Windows)",
+    pathStyle: "Path Style",
+    pathStyleWindows: "Windows (C:\\Users\\...)",
+    pathStyleLinux: "Linux (C:/Users/...)",
+    about: "About",
+    aboutAppName: "Application",
+    aboutVersion: "Version",
+    aboutCopyright: "Copyright",
+    aboutWebsite: "Website",
+    aboutContact: "Contact",
   },
 
   aiOrganizer: {

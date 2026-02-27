@@ -24,6 +24,17 @@ export async function showNativeContextMenu(
   const clipboard = state.clipboard;
   const stackItems = state.stackItems;
 
+  // OSクリップボードにファイルがあるか事前チェック
+  let osHasFiles = false;
+  try {
+    const osResult = await invoke<{ paths: string[]; operation: string } | null>(
+      "clipboard_read_files",
+    );
+    osHasFiles = !!osResult && osResult.paths.length > 0;
+  } catch {
+    // 読み取り失敗時は内部クリップボードだけで判定
+  }
+
   const items: (MenuItem | PredefinedMenuItem | Submenu)[] = [];
 
   // Open
@@ -62,7 +73,7 @@ export async function showNativeContextMenu(
   items.push(
     await MenuItem.new({
       text: `${t.contextMenu.paste}\tCtrl+V`,
-      enabled: !!clipboard,
+      enabled: !!clipboard || osHasFiles,
       action: () => useExplorerStore.getState().clipboardPaste(),
     }),
   );

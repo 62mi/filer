@@ -110,7 +110,7 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
   const isText = TEXT_EXTENSIONS.has(entry.extension);
 
   return (
-    <div className="flex flex-col h-full bg-white border-l border-[#e5e5e5]">
+    <div className="flex flex-col h-full bg-white border-l border-[rgba(var(--accent-rgb),0.2)]">
       {/* Header */}
       <div className="flex items-center h-8 px-3 bg-[#fafafa] border-b border-[#e5e5e5] shrink-0">
         <span className="text-xs font-semibold text-[#666] flex-1">Preview</span>
@@ -142,7 +142,8 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
               <img
                 src={imageDataUrl}
                 alt={entry.name}
-                className="max-w-full max-h-[400px] object-contain rounded border border-[#e5e5e5]"
+                className="max-w-full max-h-[400px] object-contain rounded"
+                style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))" }}
               />
             ) : (
               <div className="flex items-center justify-center h-32 text-xs text-[#999]">

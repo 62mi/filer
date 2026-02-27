@@ -51,7 +51,6 @@ export interface AiUsageInfo {
 interface AiStore {
   // APIキー
   hasApiKey: boolean;
-  settingsOpen: boolean;
 
   // AI使用量
   usageInfo: AiUsageInfo | null;
@@ -74,8 +73,6 @@ interface AiStore {
   checkApiKey: () => Promise<void>;
   saveApiKey: (key: string) => Promise<void>;
   deleteApiKey: () => Promise<void>;
-  openSettings: () => void;
-  closeSettings: () => void;
 
   // AI使用量
   loadUsage: () => Promise<void>;
@@ -95,7 +92,6 @@ interface AiStore {
 
 export const useAiStore = create<AiStore>((set, get) => ({
   hasApiKey: false,
-  settingsOpen: false,
   usageInfo: null,
   dialogOpen: false,
   dialogFolderPath: null,
@@ -128,9 +124,6 @@ export const useAiStore = create<AiStore>((set, get) => ({
     await invoke("delete_api_key");
     set({ hasApiKey: false });
   },
-
-  openSettings: () => set({ settingsOpen: true }),
-  closeSettings: () => set({ settingsOpen: false }),
 
   // AI使用量
   loadUsage: async () => {

@@ -20,16 +20,20 @@ export function TabBar() {
 
   return (
     <div
-      className="flex items-end bg-[#e8e8e8] select-none shrink-0 relative"
-      style={{ height: tabBarHeight, fontSize: uiFontSize }}
+      className="flex items-end select-none shrink-0 relative"
+      style={{
+        height: tabBarHeight,
+        fontSize: uiFontSize,
+        background: `linear-gradient(180deg, rgba(var(--accent-rgb), 0.18) 0%, rgba(var(--accent-rgb), 0.10) 100%), var(--tab-bg)`,
+      }}
     >
       {/* タブバー下端のセパレータライン（アクティブタブが覆う） */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-[#e0e0e0] z-0" />
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-[var(--tab-bg)] z-0" />
 
       <div className="flex items-end h-full overflow-x-auto pl-3 gap-px pt-1.5">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
-          const label = tab.path.split("\\").filter(Boolean).pop() || tab.path;
+          const label = tab.path.split(/[\\/]/).filter(Boolean).pop() || tab.path;
           const hasAi = aiDialogOpen && aiDialogTabId === tab.id;
           return (
             <div
@@ -39,7 +43,7 @@ export function TabBar() {
                 "transition-[background-color,color] duration-100 ease-out",
                 isActive
                   ? "bg-white text-[#1a1a1a] relative z-10 h-full"
-                  : "bg-transparent text-[#666] hover:bg-[#dedede] h-[calc(100%-2px)]",
+                  : "bg-transparent text-[var(--tab-text)] hover:bg-[var(--tab-hover)] h-[calc(100%-2px)]",
               )}
               onClick={() => setActiveTab(tab.id)}
               onMouseDown={(e) => {
@@ -51,7 +55,7 @@ export function TabBar() {
               }}
               title={tab.path}
             >
-              <Folder className="w-3.5 h-3.5 text-[#e8a520] shrink-0 fill-[#f2c55c]" />
+              <Folder className="w-3.5 h-3.5 text-[var(--folder-color)] shrink-0 fill-[var(--folder-fill)]" />
               {hasAi && (
                 <Sparkles
                   className={cn("w-3 h-3 text-purple-500 shrink-0", aiLoading && "animate-pulse")}
@@ -61,7 +65,7 @@ export function TabBar() {
               {tabs.length > 1 && (
                 <button
                   className={cn(
-                    "p-0.5 rounded hover:bg-[#d0d0d0] shrink-0 transition-opacity",
+                    "p-0.5 rounded hover:bg-[var(--tab-hover)] shrink-0 transition-opacity",
                     isActive ? "opacity-60 hover:opacity-100" : "opacity-0 group-hover:opacity-100",
                   )}
                   onClick={(e) => {
@@ -78,7 +82,7 @@ export function TabBar() {
         })}
       </div>
       <button
-        className="p-1 mx-0.5 mb-1 rounded hover:bg-[#d8d8d8] text-[#666] transition-colors shrink-0"
+        className="p-1 mx-0.5 mb-1 rounded hover:bg-[var(--tab-hover)] text-[var(--tab-text)] transition-colors shrink-0"
         onClick={() => addTab()}
         title="New tab (Ctrl+T)"
       >

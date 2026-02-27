@@ -15,94 +15,142 @@ pub struct ThumbnailCache {
 }
 
 #[tauri::command]
-pub fn get_file_icons(
+pub async fn get_file_icons(
     extensions: Vec<String>,
     icon_cache: State<'_, IconCache>,
 ) -> Result<HashMap<String, String>, String> {
-    let mut cache = icon_cache.cache.lock().map_err(|e| e.to_string())?;
     let mut result = HashMap::new();
-    let mut missing = Vec::new();
-
-    for ext in &extensions {
-        if let Some(cached) = cache.get(ext) {
-            result.insert(ext.clone(), cached.clone());
-        } else {
-            missing.push(ext.clone());
-        }
-    }
-
-    for ext in missing {
-        match get_shell_icon(&ext) {
-            Ok(data_url) => {
-                cache.insert(ext.clone(), data_url.clone());
-                result.insert(ext, data_url);
+    let missing = {
+        let cache = icon_cache.cache.lock().unwrap_or_else(|e| e.into_inner());
+        let mut missing = Vec::new();
+        for ext in &extensions {
+            if let Some(cached) = cache.get(ext) {
+                result.insert(ext.clone(), cached.clone());
+            } else {
+                missing.push(ext.clone());
             }
-            Err(_) => {}
+        }
+        missing
+    };
+
+    if missing.is_empty() {
+        return Ok(result);
+    }
+
+    let generated = tauri::async_runtime::spawn_blocking(move || {
+        let mut gen = HashMap::new();
+        for ext in missing {
+            if let Ok(data_url) = get_shell_icon(&ext) {
+                gen.insert(ext, data_url);
+            }
+        }
+        gen
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    {
+        let mut cache = icon_cache.cache.lock().unwrap_or_else(|e| e.into_inner());
+        for (ext, data_url) in &generated {
+            cache.insert(ext.clone(), data_url.clone());
         }
     }
 
+    result.extend(generated);
     Ok(result)
 }
 
 #[tauri::command]
-pub fn get_file_icons_large(
+pub async fn get_file_icons_large(
     extensions: Vec<String>,
     icon_cache_large: State<'_, IconCacheLarge>,
 ) -> Result<HashMap<String, String>, String> {
-    let mut cache = icon_cache_large.cache.lock().map_err(|e| e.to_string())?;
     let mut result = HashMap::new();
-    let mut missing = Vec::new();
-
-    for ext in &extensions {
-        if let Some(cached) = cache.get(ext) {
-            result.insert(ext.clone(), cached.clone());
-        } else {
-            missing.push(ext.clone());
-        }
-    }
-
-    for ext in missing {
-        match get_shell_icon_large(&ext) {
-            Ok(data_url) => {
-                cache.insert(ext.clone(), data_url.clone());
-                result.insert(ext, data_url);
+    let missing = {
+        let cache = icon_cache_large.cache.lock().unwrap_or_else(|e| e.into_inner());
+        let mut missing = Vec::new();
+        for ext in &extensions {
+            if let Some(cached) = cache.get(ext) {
+                result.insert(ext.clone(), cached.clone());
+            } else {
+                missing.push(ext.clone());
             }
-            Err(_) => {}
+        }
+        missing
+    };
+
+    if missing.is_empty() {
+        return Ok(result);
+    }
+
+    let generated = tauri::async_runtime::spawn_blocking(move || {
+        let mut gen = HashMap::new();
+        for ext in missing {
+            if let Ok(data_url) = get_shell_icon_large(&ext) {
+                gen.insert(ext, data_url);
+            }
+        }
+        gen
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    {
+        let mut cache = icon_cache_large.cache.lock().unwrap_or_else(|e| e.into_inner());
+        for (ext, data_url) in &generated {
+            cache.insert(ext.clone(), data_url.clone());
         }
     }
 
+    result.extend(generated);
     Ok(result)
 }
 
 #[tauri::command]
-pub fn get_thumbnails(
+pub async fn get_thumbnails(
     paths: Vec<String>,
     size: u32,
     thumbnail_cache: State<'_, ThumbnailCache>,
 ) -> Result<HashMap<String, String>, String> {
-    let mut cache = thumbnail_cache.cache.lock().map_err(|e| e.to_string())?;
     let mut result = HashMap::new();
-    let mut missing = Vec::new();
-
-    for path in &paths {
-        let key = (path.clone(), size);
-        if let Some(cached) = cache.get(&key) {
-            result.insert(path.clone(), cached.clone());
-        } else {
-            missing.push(path.clone());
-        }
-    }
-
-    for path in missing {
-        match generate_thumbnail(&path, size) {
-            Ok(data_url) => {
-                cache.insert((path.clone(), size), data_url.clone());
-                result.insert(path, data_url);
+    let missing = {
+        let cache = thumbnail_cache.cache.lock().unwrap_or_else(|e| e.into_inner());
+        let mut missing = Vec::new();
+        for path in &paths {
+            let key = (path.clone(), size);
+            if let Some(cached) = cache.get(&key) {
+                result.insert(path.clone(), cached.clone());
+            } else {
+                missing.push(path.clone());
             }
-            Err(_) => {}
+        }
+        missing
+    };
+
+    if missing.is_empty() {
+        return Ok(result);
+    }
+
+    let generated = tauri::async_runtime::spawn_blocking(move || {
+        let mut gen = HashMap::new();
+        for path in missing {
+            if let Ok(data_url) = generate_thumbnail(&path, size) {
+                gen.insert(path, data_url);
+            }
+        }
+        gen
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    {
+        let mut cache = thumbnail_cache.cache.lock().unwrap_or_else(|e| e.into_inner());
+        for (path, data_url) in &generated {
+            cache.insert((path.clone(), size), data_url.clone());
         }
     }
 
+    result.extend(generated);
     Ok(result)
 }
 

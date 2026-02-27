@@ -106,7 +106,7 @@ export function createDragGhost(items: DragItem[]): HTMLElement {
       top: -6px;
       right: 10px;
       font-size: 11px;
-      background: #0078d4;
+      background: var(--accent);
       color: white;
       border-radius: 9999px;
       padding: 1px 7px;

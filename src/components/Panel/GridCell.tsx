@@ -15,8 +15,6 @@ export interface GridCellProps {
   isSelected: boolean;
   isRenaming: boolean;
   isCut: boolean;
-  isDropTarget: boolean;
-  isFolderizeTarget: boolean;
   onNavigate: (entry: FileEntry) => void;
   onSelect: (index: number) => void;
   onSelectRange: (toIndex: number) => void;
@@ -25,11 +23,7 @@ export interface GridCellProps {
   onCommitRename: (newName: string) => void;
   onCommitRenameAndNext: (newName: string, direction: 1 | -1) => void;
   onCancelRename: () => void;
-  onDragStart: (e: React.DragEvent, index: number) => void;
-  onDragOver: (e: React.DragEvent, index: number) => void;
-  onDragLeave: () => void;
-  onDrop: (e: React.DragEvent, index: number) => void;
-  onDragEnd: () => void;
+  onFileMouseDown: (e: React.MouseEvent, index: number) => void;
   onClearSelection: () => void;
   selectedCount: number;
   onStartRename: (index: number) => void;
@@ -42,8 +36,6 @@ export const GridCell = memo(function GridCell({
   isSelected,
   isRenaming,
   isCut,
-  isDropTarget,
-  isFolderizeTarget,
   onNavigate,
   onSelect,
   onSelectRange,
@@ -52,11 +44,7 @@ export const GridCell = memo(function GridCell({
   onCommitRename,
   onCommitRenameAndNext,
   onCancelRename,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
+  onFileMouseDown,
   onClearSelection,
   selectedCount,
   onStartRename,
@@ -145,15 +133,16 @@ export const GridCell = memo(function GridCell({
         "flex flex-col items-center justify-center p-1 rounded cursor-default select-none",
         "transition-[background-color,opacity] duration-100 ease-out",
         isCursor && !isSelected && "bg-[#e8e8e8]",
-        isSelected && !isCursor && "bg-[#cce8ff]",
-        isCursor && isSelected && "bg-[#b4d8f0]",
+        isSelected && !isCursor && "bg-[rgba(var(--accent-rgb),0.15)]",
+        isCursor && isSelected && "bg-[rgba(var(--accent-rgb),0.25)]",
         !isCursor && !isSelected && "hover:bg-[#f5f5f5]",
         isCut && "opacity-50",
-        isDropTarget && !isFolderizeTarget && "bg-[#cce8ff] outline outline-1 outline-[#0078d4]",
-        isFolderizeTarget && "folderize-target",
       )}
+      data-mid-click-path={entry.is_dir ? entry.path : undefined}
+      data-drop-zone="file-row"
+      data-file-path={entry.path}
+      data-is-dir={entry.is_dir ? "true" : "false"}
       style={{ width: cellWidth, height: cellHeight }}
-      draggable={!isRenaming}
       onMouseDown={(e) => {
         didDragRef.current = false;
         wasSelectedOnMouseDownRef.current =
@@ -164,6 +153,8 @@ export const GridCell = memo(function GridCell({
           isSelected &&
           isCursor &&
           selectedCount <= 1;
+        // ネイティブドラッグ用
+        onFileMouseDown(e, index);
       }}
       onClick={(e) => {
         if (isRenaming) return;
@@ -203,34 +194,23 @@ export const GridCell = memo(function GridCell({
         }
         onContextMenu(e, index);
       }}
-      onDragStart={(e) => {
-        didDragRef.current = true;
-        if (slowClickTimerRef.current) {
-          clearTimeout(slowClickTimerRef.current);
-          slowClickTimerRef.current = null;
-        }
-        onDragStart(e, index);
-      }}
-      onDragOver={(e) => onDragOver(e, index)}
-      onDragLeave={onDragLeave}
-      onDrop={(e) => onDrop(e, index)}
-      onDragEnd={onDragEnd}
     >
       {/* Icon / Thumbnail area */}
       <div
         className="flex items-center justify-center shrink-0"
         style={{ width: gridIconSize, height: gridIconSize }}
       >
-        {isFolderizeTarget ? (
-          <Folder
-            className="folderize-icon text-[#0078d4]"
-            style={{ width: iconDisplaySize, height: iconDisplaySize }}
-          />
-        ) : isImage && thumbnail ? (
+        {isImage && thumbnail ? (
           <img
             src={thumbnail}
             alt=""
-            style={{ maxWidth: gridIconSize, maxHeight: gridIconSize, objectFit: "contain" }}
+            className="rounded-sm"
+            style={{
+              maxWidth: gridIconSize,
+              maxHeight: gridIconSize,
+              objectFit: "contain",
+              filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.2))",
+            }}
             draggable={false}
           />
         ) : largeIcon ? (
@@ -257,7 +237,7 @@ export const GridCell = memo(function GridCell({
       {isRenaming ? (
         <input
           ref={inputRef}
-          className="w-full h-5 px-1 bg-white border border-[#0078d4] rounded outline-none text-center"
+          className="w-full h-5 px-1 bg-white border border-[var(--accent)] rounded outline-none text-center"
           style={{ fontSize: gridFontSize }}
           value={renameValue}
           onChange={(e) => setRenameValue(e.target.value)}

@@ -1,3 +1,4 @@
+mod clipboard_watcher;
 mod commands;
 mod db;
 mod watcher;
@@ -42,7 +43,7 @@ pub fn run() {
         Err(e) => {
             let msg = format!("データベースの初期化に失敗しました:\n{}", e);
             eprintln!("{}", msg);
-            show_error_dialog("Filer - 起動エラー", &msg);
+            show_error_dialog("TomaFiler - 起動エラー", &msg);
             return;
         }
     };
@@ -51,6 +52,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_drag::init())
         .manage(database)
         .manage(IconCache { cache: std::sync::Mutex::new(std::collections::HashMap::new()) })
         .manage(IconCacheLarge { cache: std::sync::Mutex::new(std::collections::HashMap::new()) })
@@ -58,9 +60,17 @@ pub fn run() {
         .manage(CopyQueueManager::new())
         .setup(|app| {
             let handle = app.handle().clone();
-            let watcher_manager = watcher::WatcherManager::new(handle);
+            let watcher_manager = watcher::WatcherManager::new(handle.clone());
             watcher_manager.start()?;
             app.manage(watcher_manager);
+
+            // クリップボード監視を開始
+            #[cfg(windows)]
+            {
+                let clip_watcher = clipboard_watcher::ClipboardWatcher::start(handle);
+                app.manage(clip_watcher);
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -107,6 +117,8 @@ pub fn run() {
             get_file_icons_large,
             get_thumbnails,
             write_clipboard_file,
+            clipboard_write_files,
+            clipboard_read_files,
             create_from_template,
             calculate_tidiness_score,
             calculate_directory_sizes,
@@ -116,11 +128,12 @@ pub fn run() {
             cancel_copy,
             get_copy_queue,
             clear_completed_copies,
+            get_accent_color,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {
             let msg = format!("アプリケーションの実行中にエラーが発生しました:\n{}", e);
             eprintln!("{}", msg);
-            show_error_dialog("Filer - 実行エラー", &msg);
+            show_error_dialog("TomaFiler - 実行エラー", &msg);
         });
 }
