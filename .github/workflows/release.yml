@@ -80,7 +80,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           ENDPOINT="https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
-          aws s3 cp "src-tauri/target/release/bundle/nsis/Filer_${VERSION}_x64-setup.exe" \
-            "s3://filer/Filer_${VERSION}_x64-setup.exe" --endpoint-url "$ENDPOINT"
-          aws s3 cp "src-tauri/target/release/bundle/msi/Filer_${VERSION}_x64_en-US.msi" \
-            "s3://filer/Filer_${VERSION}_x64_en-US.msi" --endpoint-url "$ENDPOINT"
+          aws s3 cp "src-tauri/target/release/bundle/nsis/TomaFiler_${VERSION}_x64-setup.exe" \
+            "s3://filer/TomaFiler_${VERSION}_x64-setup.exe" --endpoint-url "$ENDPOINT"
+          aws s3 cp "src-tauri/target/release/bundle/msi/TomaFiler_${VERSION}_x64_en-US.msi" \
+            "s3://filer/TomaFiler_${VERSION}_x64_en-US.msi" --endpoint-url "$ENDPOINT"
