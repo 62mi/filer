@@ -118,23 +118,24 @@ pub fn open_terminal(terminal: String, cwd: String) -> Result<(), String> {
     {
         use std::os::windows::process::CommandExt;
         use std::process::Command;
+        const CREATE_NEW_CONSOLE: u32 = 0x00000010;
         const DETACHED_PROCESS: u32 = 0x00000008;
 
         let result = match terminal.as_str() {
             "cmd" => Command::new("cmd")
                 .arg("/K")
                 .current_dir(&cwd)
-                .creation_flags(DETACHED_PROCESS)
+                .creation_flags(CREATE_NEW_CONSOLE)
                 .spawn(),
             "powershell" => Command::new("powershell")
                 .arg("-NoExit")
                 .current_dir(&cwd)
-                .creation_flags(DETACHED_PROCESS)
+                .creation_flags(CREATE_NEW_CONSOLE)
                 .spawn(),
             "pwsh" => Command::new("pwsh")
                 .arg("-NoExit")
                 .current_dir(&cwd)
-                .creation_flags(DETACHED_PROCESS)
+                .creation_flags(CREATE_NEW_CONSOLE)
                 .spawn(),
             "wt" => Command::new("wt")
                 .arg("-d")
