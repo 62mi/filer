@@ -23,6 +23,7 @@ function getExtension(filePath: string): string {
 }
 
 function sortEntries(entries: FileEntry[], key: SortKey, order: SortOrder): FileEntry[] {
+  const dirSizes = useDirSizeStore.getState().sizes;
   return [...entries].sort((a, b) => {
     if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
     let cmp = 0;
@@ -30,9 +31,12 @@ function sortEntries(entries: FileEntry[], key: SortKey, order: SortOrder): File
       case "name":
         cmp = a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
         break;
-      case "size":
-        cmp = a.size - b.size;
+      case "size": {
+        const aSize = a.is_dir ? (dirSizes[a.path] ?? 0) : a.size;
+        const bSize = b.is_dir ? (dirSizes[b.path] ?? 0) : b.size;
+        cmp = aSize - bSize;
         break;
+      }
       case "modified":
         cmp = a.modified - b.modified;
         break;
@@ -117,6 +121,8 @@ interface ExplorerStore {
   // Directory navigation
   loadDirectory: (path: string, addToHistory?: boolean, smooth?: boolean) => Promise<void>;
   refreshDirectory: () => Promise<void>;
+  /** 現在のソートキー/順序でエントリを再ソート（dirSizes更新時などに使用） */
+  resortEntries: () => void;
   navigateUp: () => Promise<void>;
   navigateBack: () => Promise<void>;
   navigateForward: () => Promise<void>;
@@ -316,6 +322,16 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   refreshDirectory: async () => {
     const tab = get().getActiveTab();
     await get().loadDirectory(tab.path, false);
+  },
+
+  resortEntries: () => {
+    const tab = get().getActiveTab();
+    const sorted = sortEntries(tab.entries, tab.sortKey, tab.sortOrder);
+    set((s) => ({
+      tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
+        entries: sorted,
+      })),
+    }));
   },
 
   navigateUp: async () => {

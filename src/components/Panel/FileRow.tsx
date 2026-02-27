@@ -233,19 +233,16 @@ export function FileRow({
 /** サイズ列: ファイルはそのまま、フォルダは非同期計算サイズを表示 */
 function DirSizeCell({ entry, maxFileSize }: { entry: FileEntry; maxFileSize: number }) {
   const dirSize = useDirSizeStore((s) => (entry.is_dir ? s.sizes[entry.path] : undefined));
+  // リクエスト済み && sizes未着 = 計算中
   const isCalculating = useDirSizeStore((s) =>
-    entry.is_dir ? s.calculatingPaths.has(entry.path) : false,
+    entry.is_dir ? s.requestedPaths.has(entry.path) && !(entry.path in s.sizes) : false,
   );
 
   const displaySize = entry.is_dir ? dirSize : entry.size;
-  const hasSize = displaySize !== undefined && displaySize > 0;
+  const hasSize = displaySize !== undefined && (entry.is_dir || displaySize > 0);
 
   return (
     <span className="w-20 text-right text-[#666] shrink-0 ml-2 relative overflow-hidden">
-      {/* 計算中シマーアニメーション */}
-      {entry.is_dir && isCalculating && (
-        <span className="absolute inset-y-1 right-0 left-0 dir-size-calculating rounded-sm" />
-      )}
       {/* サイズバー */}
       {hasSize && maxFileSize > 0 && !isCalculating && (
         <span
@@ -257,7 +254,7 @@ function DirSizeCell({ entry, maxFileSize }: { entry: FileEntry; maxFileSize: nu
         />
       )}
       <span className="relative z-10">
-        {isCalculating ? "" : hasSize ? formatFileSize(displaySize) : ""}
+        {isCalculating ? "計算中…" : hasSize ? formatFileSize(displaySize) : ""}
       </span>
     </span>
   );

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
+import { useExplorerStore } from "./panelStore";
 
 interface DirSizeEntry {
   path: string;
@@ -10,8 +11,8 @@ interface DirSizeEntry {
 interface DirSizeStore {
   /** パス → サイズ のマッピング */
   sizes: Record<string, number>;
-  /** 現在計算中のパス一覧 */
-  calculatingPaths: Set<string>;
+  /** サイズ計算をリクエスト済みのパス一覧（sizes に未登録なら計算中と判定） */
+  requestedPaths: Set<string>;
   /** リクエストのバージョン（stale結果を破棄するため） */
   _version: number;
   /** 指定パスのフォルダサイズ計算をリクエスト */
@@ -23,7 +24,7 @@ let currentUnlisten: (() => void) | null = null;
 
 export const useDirSizeStore = create<DirSizeStore>((set, get) => ({
   sizes: {},
-  calculatingPaths: new Set(),
+  requestedPaths: new Set(),
   _version: 0,
 
   requestSizes: (dirPaths) => {
@@ -36,47 +37,57 @@ export const useDirSizeStore = create<DirSizeStore>((set, get) => ({
     }
 
     if (dirPaths.length === 0) {
-      set({ sizes: {}, calculatingPaths: new Set(), _version: version });
+      set({ sizes: {}, requestedPaths: new Set(), _version: version });
       return;
     }
 
+    // sizes をクリア + リクエスト済みパスを記録
+    // → sizes[path] が undefined && requestedPaths.has(path) なら「計算中」
     set({
       sizes: {},
-      calculatingPaths: new Set(dirPaths),
+      requestedPaths: new Set(dirPaths),
       _version: version,
     });
 
-    // イベントリスナーを設定（結果が1件ずつ届く）
-    listen<DirSizeEntry>("dir-size-calculated", (event) => {
+    // invoke を1フレーム遅延させ、React が「計算中」状態を描画する時間を確保
+    requestAnimationFrame(() => {
       if (get()._version !== version) return;
-      const { path, size } = event.payload;
-      set((s) => {
-        const newCalculating = new Set(s.calculatingPaths);
-        newCalculating.delete(path);
-        return {
-          sizes: { ...s.sizes, [path]: size },
-          calculatingPaths: newCalculating,
-        };
-      });
-    }).then((unlisten) => {
-      if (get()._version !== version) {
-        unlisten();
-        return;
-      }
-      currentUnlisten = unlisten;
-    });
 
-    // 計算をトリガー（結果はイベントで届く）
-    invoke("calculate_directory_sizes", { paths: dirPaths })
-      .catch(() => {})
-      .finally(() => {
-        if (get()._version !== version) return;
-        // 全計算完了後にリスナー解除
-        if (currentUnlisten) {
-          currentUnlisten();
-          currentUnlisten = null;
+      (async () => {
+        // リスナー登録を待ってからinvoke（登録前にイベントが届くレースを防止）
+        const unlisten = await listen<DirSizeEntry>("dir-size-calculated", (event) => {
+          if (get()._version !== version) return;
+          const { path, size } = event.payload;
+          set((s) => ({
+            sizes: { ...s.sizes, [path]: size },
+          }));
+        });
+
+        if (get()._version !== version) {
+          unlisten();
+          return;
         }
-        set({ calculatingPaths: new Set() });
-      });
+        currentUnlisten = unlisten;
+
+        try {
+          await invoke("calculate_directory_sizes", { paths: dirPaths });
+        } catch {
+          // ignore
+        }
+
+        // イベント到着を待ってからリスナー解除 + サイズソート中なら再ソート
+        setTimeout(() => {
+          if (get()._version !== version) return;
+          if (currentUnlisten) {
+            currentUnlisten();
+            currentUnlisten = null;
+          }
+          const tab = useExplorerStore.getState().getActiveTab();
+          if (tab.sortKey === "size") {
+            useExplorerStore.getState().resortEntries();
+          }
+        }, 100);
+      })();
+    });
   },
 }));

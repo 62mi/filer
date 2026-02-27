@@ -1,9 +1,6 @@
-import { getTranslation } from "../i18n";
-
 export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return "";
-  const byteLabel = getTranslation().format.bytes;
-  const units = [byteLabel, "KB", "MB", "GB", "TB"];
+  if (bytes === 0) return "0 KB";
+  const units = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   const size = bytes / 1024 ** i;
   if (i === 0) return `${bytes} ${units[0]}`;

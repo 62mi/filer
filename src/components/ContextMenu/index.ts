@@ -1,1 +1,1 @@
-export { ContextMenu } from "./ContextMenu";
+export { showNativeContextMenu } from "./nativeMenu";

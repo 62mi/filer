@@ -15,7 +15,7 @@ import { toast } from "../../stores/toastStore";
 import { useUndoStore } from "../../stores/undoStore";
 import type { FileEntry } from "../../types";
 import { AiOrganizer } from "../AiOrganizer";
-import { ContextMenu } from "../ContextMenu";
+import { showNativeContextMenu } from "../ContextMenu";
 import { DragSuggestion } from "../DragSuggestion/DragSuggestion";
 import { PropertiesDialog } from "../PropertiesDialog";
 import { QuickLook } from "../QuickLook";
@@ -84,11 +84,6 @@ export function Panel() {
     }, 2000);
   }, [tab.path, checkForPatterns]);
 
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    targetIndex: number | null;
-  } | null>(null);
   const [propertiesEntry, setPropertiesEntry] = useState<FileEntry | null>(null);
   const [quickLookOpen, setQuickLookOpen] = useState(false);
 
@@ -186,20 +181,27 @@ export function Panel() {
     [loadDirectory],
   );
 
+  const onProperties = useCallback((entry: FileEntry) => {
+    setPropertiesEntry(entry);
+  }, []);
+
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, index: number) => {
       e.preventDefault();
       e.stopPropagation();
       setCursor(index);
-      setContextMenu({ x: e.clientX, y: e.clientY, targetIndex: index });
+      showNativeContextMenu(index, onProperties);
     },
-    [setCursor],
+    [setCursor, onProperties],
   );
 
-  const handleBgContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, targetIndex: null });
-  }, []);
+  const handleBgContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      showNativeContextMenu(null, onProperties);
+    },
+    [onProperties],
+  );
 
   // Drag & drop state
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -1031,20 +1033,6 @@ export function Panel() {
             />
           ))}
       </div>
-
-      {/* Context menu */}
-      {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          targetIndex={contextMenu.targetIndex}
-          onClose={() => setContextMenu(null)}
-          onProperties={(entry) => {
-            setContextMenu(null);
-            setPropertiesEntry(entry);
-          }}
-        />
-      )}
 
       {/* Properties dialog */}
       {propertiesEntry && (

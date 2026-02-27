@@ -4,7 +4,7 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use walkdir::WalkDir;
 
 const DEFAULT_SEARCH_MAX_RESULTS: usize = 200;
@@ -541,75 +541,80 @@ const DIR_SIZE_PER_DIR_TIMEOUT: u64 = 5;
 const DIR_SIZE_TOTAL_TIMEOUT: u64 = 60;
 
 /// 複数フォルダのサイズを計算（キャッシュ付き、イベントで逐次通知）
+/// バックグラウンドスレッドで実行し、メインスレッドをブロックしない
 #[tauri::command]
-pub fn calculate_directory_sizes(
+pub async fn calculate_directory_sizes(
     paths: Vec<String>,
-    state: tauri::State<'_, Database>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
-    let total_start = Instant::now();
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<Database>();
+        let total_start = Instant::now();
 
-    for dir_path in &paths {
-        // 全体タイムアウトチェック
-        if total_start.elapsed().as_secs() >= DIR_SIZE_TOTAL_TIMEOUT {
-            break;
-        }
-
-        // キャッシュ確認
-        if let Some(cached_size) = state.get_cached_dir_size(dir_path, DIR_SIZE_CACHE_TTL) {
-            app.emit(
-                "dir-size-calculated",
-                DirSizeEntry {
-                    path: dir_path.clone(),
-                    size: cached_size,
-                },
-            )
-            .ok();
-            continue;
-        }
-
-        // フォルダでなければスキップ
-        let p = Path::new(dir_path);
-        if !p.is_dir() {
-            app.emit(
-                "dir-size-calculated",
-                DirSizeEntry {
-                    path: dir_path.clone(),
-                    size: 0,
-                },
-            )
-            .ok();
-            continue;
-        }
-
-        // WalkDirで再帰計算
-        let start = Instant::now();
-        let mut size = 0u64;
-        for entry in WalkDir::new(p).into_iter().filter_map(|e| e.ok()) {
-            if start.elapsed().as_secs() >= DIR_SIZE_PER_DIR_TIMEOUT {
+        for dir_path in &paths {
+            // 全体タイムアウトチェック
+            if total_start.elapsed().as_secs() >= DIR_SIZE_TOTAL_TIMEOUT {
                 break;
             }
-            if entry.path() == p {
+
+            // キャッシュ確認
+            if let Some(cached_size) = state.get_cached_dir_size(dir_path, DIR_SIZE_CACHE_TTL) {
+                app.emit(
+                    "dir-size-calculated",
+                    DirSizeEntry {
+                        path: dir_path.clone(),
+                        size: cached_size,
+                    },
+                )
+                .ok();
                 continue;
             }
-            if let Ok(m) = entry.metadata() {
-                if !m.is_dir() {
-                    size += m.len();
+
+            // フォルダでなければスキップ
+            let p = Path::new(dir_path);
+            if !p.is_dir() {
+                app.emit(
+                    "dir-size-calculated",
+                    DirSizeEntry {
+                        path: dir_path.clone(),
+                        size: 0,
+                    },
+                )
+                .ok();
+                continue;
+            }
+
+            // WalkDirで再帰計算
+            let start = Instant::now();
+            let mut size = 0u64;
+            for entry in WalkDir::new(p).into_iter().filter_map(|e| e.ok()) {
+                if start.elapsed().as_secs() >= DIR_SIZE_PER_DIR_TIMEOUT {
+                    break;
+                }
+                if entry.path() == p {
+                    continue;
+                }
+                if let Ok(m) = entry.metadata() {
+                    if !m.is_dir() {
+                        size += m.len();
+                    }
                 }
             }
-        }
 
-        // キャッシュに保存
-        state.save_dir_size(dir_path, size).ok();
-        app.emit(
-            "dir-size-calculated",
-            DirSizeEntry {
-                path: dir_path.clone(),
-                size,
-            },
-        )
-        .ok();
-    }
+            // キャッシュに保存
+            state.save_dir_size(dir_path, size).ok();
+            app.emit(
+                "dir-size-calculated",
+                DirSizeEntry {
+                    path: dir_path.clone(),
+                    size,
+                },
+            )
+            .ok();
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     Ok(())
 }
