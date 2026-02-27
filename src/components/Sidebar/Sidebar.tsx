@@ -62,6 +62,7 @@ export function Sidebar() {
     path: string | null; // null = background context menu
   } | null>(null);
   const stackContextMenuRef = useRef<HTMLDivElement>(null);
+  const [stackMenuPos, setStackMenuPos] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     invoke<DriveInfo[]>("get_drives").then(setDrives);
@@ -157,13 +158,13 @@ export function Sidebar() {
     };
   }, [stackContextMenu]);
 
-  // スタックコンテキストメニューをビューポート内にクランプ
+  // スタックコンテキストメニューをビューポート内にクランプ（state管理）
   useEffect(() => {
     if (!stackContextMenu || !stackContextMenuRef.current) return;
     const rect = stackContextMenuRef.current.getBoundingClientRect();
     const clamped = clampMenuPosition(stackContextMenu.x, stackContextMenu.y, rect.width, rect.height);
-    stackContextMenuRef.current.style.left = `${clamped.x}px`;
-    stackContextMenuRef.current.style.top = `${clamped.y}px`;
+    setStackMenuPos(clamped);
+    return () => setStackMenuPos(null);
   }, [stackContextMenu]);
 
   // Get file name from path
@@ -350,7 +351,11 @@ export function Sidebar() {
         <div
           ref={stackContextMenuRef}
           className="fixed z-50 min-w-40 bg-white border border-[#e0e0e0] rounded-lg shadow-lg py-1 animate-fade-scale-in origin-top-left"
-          style={{ left: stackContextMenu.x, top: stackContextMenu.y }}
+          style={{
+            left: stackMenuPos ? stackMenuPos.x : stackContextMenu.x,
+            top: stackMenuPos ? stackMenuPos.y : stackContextMenu.y,
+            visibility: stackMenuPos ? "visible" : "hidden",
+          }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           {stackContextMenu.path && (

@@ -17,7 +17,7 @@ import {
   Wand2,
   Zap,
 } from "lucide-react";
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { type RefObject, forwardRef, useEffect, useRef, useState } from "react";
 import { useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { useExplorerStore } from "../../stores/panelStore";
@@ -97,13 +97,12 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     };
   }, [onClose]);
 
-  // メニュー位置をビューポート内にクランプ
+  // メニュー位置をビューポート内にクランプ（state管理で再レンダーに強い）
+  const [adjustedPos, setAdjustedPos] = useState<{ x: number; y: number } | null>(null);
   useEffect(() => {
     if (!menuRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
-    const clamped = clampMenuPosition(x, y, rect.width, rect.height);
-    menuRef.current.style.left = `${clamped.x}px`;
-    menuRef.current.style.top = `${clamped.y}px`;
+    setAdjustedPos(clampMenuPosition(x, y, rect.width, rect.height));
   }, [x, y]);
 
   const items: MenuEntry[] = [
@@ -332,7 +331,11 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     <div
       ref={menuRef}
       className="fixed z-50 min-w-48 bg-white border border-[#e0e0e0] rounded-lg shadow-lg py-1 animate-fade-scale-in origin-top-left"
-      style={{ left: x, top: y }}
+      style={{
+        left: adjustedPos ? adjustedPos.x : x,
+        top: adjustedPos ? adjustedPos.y : y,
+        visibility: adjustedPos ? "visible" : "hidden",
+      }}
     >
       {items.map((item, i) => {
         if ("separator" in item && item.separator) {
@@ -394,7 +397,8 @@ const SubmenuPopup = forwardRef<
   }
 >(function SubmenuPopup({ items, parentMenuRef, onMouseEnter, onMouseLeave }, ref) {
   const localRef = useRef<HTMLDivElement>(null);
-  const resolvedRef = (ref as React.RefObject<HTMLDivElement | null>) || localRef;
+  const resolvedRef = (ref as RefObject<HTMLDivElement | null>) || localRef;
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const el = resolvedRef.current;
@@ -418,15 +422,18 @@ const SubmenuPopup = forwardRef<
 
     // 上下クランプ
     const clamped = clampMenuPosition(left, subRect.top, subRect.width, subRect.height);
-    el.style.position = "fixed";
-    el.style.left = `${clamped.x}px`;
-    el.style.top = `${clamped.y}px`;
+    setPos(clamped);
   }, [parentMenuRef, resolvedRef]);
 
   return (
     <div
       ref={resolvedRef}
       className="fixed min-w-44 bg-white border border-[#e0e0e0] rounded-lg shadow-lg py-1 z-50"
+      style={{
+        left: pos?.x,
+        top: pos?.y,
+        visibility: pos ? "visible" : "hidden",
+      }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
