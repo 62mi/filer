@@ -1,7 +1,6 @@
-import { Folder } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDirSizeStore } from "../../stores/dirSizeStore";
-import { useSettingsStore } from "../../stores/settingsStore";
+import { getTotalColumnWidth, useSettingsStore } from "../../stores/settingsStore";
 import type { FileEntry } from "../../types";
 import { cn } from "../../utils/cn";
 import { getFileType } from "../../utils/fileType";
@@ -15,9 +14,6 @@ interface FileRowProps {
   isSelected: boolean;
   isRenaming: boolean;
   isCut: boolean;
-  isDropTarget: boolean;
-  /** ファイル on ファイルのドロップターゲット（iOS風フォルダ化） */
-  isFolderizeTarget: boolean;
   onNavigate: (entry: FileEntry) => void;
   onSelect: (index: number) => void;
   onSelectRange: (toIndex: number) => void;
@@ -26,11 +22,7 @@ interface FileRowProps {
   onCommitRename: (newName: string) => void;
   onCommitRenameAndNext: (newName: string, direction: 1 | -1) => void;
   onCancelRename: () => void;
-  onDragStart: (e: React.DragEvent, index: number) => void;
-  onDragOver: (e: React.DragEvent, index: number) => void;
-  onDragLeave: () => void;
-  onDrop: (e: React.DragEvent, index: number) => void;
-  onDragEnd: () => void;
+  onFileMouseDown: (e: React.MouseEvent, index: number) => void;
   onClearSelection: () => void;
   selectedCount: number;
   onStartRename: (index: number) => void;
@@ -44,8 +36,6 @@ export function FileRow({
   isSelected,
   isRenaming,
   isCut,
-  isDropTarget,
-  isFolderizeTarget,
   onNavigate,
   onSelect,
   onSelectRange,
@@ -54,11 +44,7 @@ export function FileRow({
   onCommitRename,
   onCommitRenameAndNext,
   onCancelRename,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
+  onFileMouseDown,
   onClearSelection,
   selectedCount,
   onStartRename,
@@ -106,6 +92,7 @@ export function FileRow({
 
   const rowHeight = useSettingsStore((s) => s.detailRowHeight);
   const fontSize = useSettingsStore((s) => s.fontSize);
+  const columnWidths = useSettingsStore((s) => s.columnWidths);
 
   return (
     <div
@@ -113,17 +100,16 @@ export function FileRow({
         "flex items-center px-2 cursor-default select-none",
         "transition-[background-color,opacity,transform,box-shadow] duration-100 ease-out",
         isCursor && !isSelected && "bg-[#e8e8e8]",
-        isSelected && !isCursor && "bg-[#cce8ff]",
-        isCursor && isSelected && "bg-[#b4d8f0]",
+        isSelected && !isCursor && "bg-[rgba(var(--accent-rgb),0.15)]",
+        isCursor && isSelected && "bg-[rgba(var(--accent-rgb),0.25)]",
         !isCursor && !isSelected && "hover:bg-[#f5f5f5]",
         isCut && "opacity-50",
-        // 通常のフォルダへのドロップ
-        isDropTarget && !isFolderizeTarget && "bg-[#cce8ff] outline outline-1 outline-[#0078d4]",
-        // iOS風フォルダ化ターゲット（ファイル on ファイル）
-        isFolderizeTarget && "folderize-target",
       )}
-      style={{ height: rowHeight, fontSize }}
-      draggable={!isRenaming}
+      data-mid-click-path={entry.is_dir ? entry.path : undefined}
+      data-drop-zone="file-row"
+      data-file-path={entry.path}
+      data-is-dir={entry.is_dir ? "true" : "false"}
+      style={{ height: rowHeight, fontSize, minWidth: getTotalColumnWidth(columnWidths) }}
       onMouseDown={(e) => {
         didDragRef.current = false;
         // 修飾キーなし・左クリック・単一選択済み・カーソル一致 の場合に記録
@@ -135,6 +121,8 @@ export function FileRow({
           isSelected &&
           isCursor &&
           selectedCount <= 1;
+        // ネイティブドラッグ用
+        onFileMouseDown(e, index);
       }}
       onClick={(e) => {
         if (isRenaming) return;
@@ -177,32 +165,17 @@ export function FileRow({
         }
         onContextMenu(e, index);
       }}
-      onDragStart={(e) => {
-        didDragRef.current = true;
-        if (slowClickTimerRef.current) {
-          clearTimeout(slowClickTimerRef.current);
-          slowClickTimerRef.current = null;
-        }
-        onDragStart(e, index);
-      }}
-      onDragOver={(e) => onDragOver(e, index)}
-      onDragLeave={onDragLeave}
-      onDrop={(e) => onDrop(e, index)}
-      onDragEnd={onDragEnd}
     >
-      {isFolderizeTarget ? (
-        <Folder className="w-4 h-4 mr-2 shrink-0 folderize-icon text-[#0078d4]" />
-      ) : (
-        <FileIcon
-          isDir={entry.is_dir}
-          extension={entry.extension}
-          className={cn("w-4 h-4 mr-2 shrink-0", entry.is_dir ? "text-amber-500" : "text-[#666]")}
-        />
-      )}
+      <FileIcon
+        isDir={entry.is_dir}
+        extension={entry.extension}
+        className={cn("w-4 h-4 mr-2 shrink-0", entry.is_dir ? "text-amber-500" : "text-[#666]")}
+      />
       {isRenaming ? (
         <input
           ref={inputRef}
-          className="flex-1 h-5 px-1 text-sm bg-white border border-[#0078d4] rounded outline-none min-w-0"
+          className="h-5 px-1 text-sm bg-white border border-[var(--accent)] rounded outline-none"
+          style={{ width: columnWidths.name - 8 }}
           value={renameValue}
           onChange={(e) => setRenameValue(e.target.value)}
           onBlur={handleRenameSubmit}
@@ -219,19 +192,37 @@ export function FileRow({
           }}
         />
       ) : (
-        <span className="flex-1 truncate">{entry.name}</span>
+        <span className="shrink-0 truncate" style={{ width: columnWidths.name }}>
+          {entry.name}
+        </span>
       )}
-      <span className="w-36 text-right text-[#888] shrink-0 ml-4 truncate">
+      <span
+        className="shrink-0 px-2 truncate"
+        style={{ width: columnWidths.modified, color: "#888", textAlign: "left" }}
+      >
         {formatDate(entry.modified)}
       </span>
-      <span className="w-36 text-[#666] shrink-0 ml-4 truncate">{getFileType(entry)}</span>
-      <DirSizeCell entry={entry} maxFileSize={maxFileSize} />
+      <span
+        className="shrink-0 px-2 truncate"
+        style={{ width: columnWidths.extension, color: "#666", textAlign: "left" }}
+      >
+        {getFileType(entry)}
+      </span>
+      <DirSizeCell entry={entry} maxFileSize={maxFileSize} width={columnWidths.size} />
     </div>
   );
 }
 
 /** サイズ列: ファイルはそのまま、フォルダは非同期計算サイズを表示 */
-function DirSizeCell({ entry, maxFileSize }: { entry: FileEntry; maxFileSize: number }) {
+function DirSizeCell({
+  entry,
+  maxFileSize,
+  width,
+}: {
+  entry: FileEntry;
+  maxFileSize: number;
+  width: number;
+}) {
   const dirSize = useDirSizeStore((s) => (entry.is_dir ? s.sizes[entry.path] : undefined));
   // リクエスト済み && sizes未着 = 計算中
   const isCalculating = useDirSizeStore((s) =>
@@ -242,7 +233,10 @@ function DirSizeCell({ entry, maxFileSize }: { entry: FileEntry; maxFileSize: nu
   const hasSize = displaySize !== undefined && (entry.is_dir || displaySize > 0);
 
   return (
-    <span className="w-20 text-right text-[#666] shrink-0 ml-2 relative overflow-hidden">
+    <span
+      className="shrink-0 px-2 truncate relative overflow-hidden"
+      style={{ width, color: "#666", textAlign: "left" }}
+    >
       {/* サイズバー */}
       {hasSize && maxFileSize > 0 && !isCalculating && (
         <span

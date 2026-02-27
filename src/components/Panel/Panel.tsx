@@ -1,19 +1,23 @@
+import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { invoke } from "@tauri-apps/api/core";
+import { resolveResource } from "@tauri-apps/api/path";
 import { Loader } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getTranslation, useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
-import { useCopyQueueStore } from "../../stores/copyQueueStore";
 import { useDirSizeStore } from "../../stores/dirSizeStore";
 import { useIconStore } from "../../stores/iconStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useRuleStore } from "../../stores/ruleStore";
+import type { ColumnWidths } from "../../stores/settingsStore";
 import { getGridCellHeight, getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
 import { useSuggestionStore } from "../../stores/suggestionStore";
 import { toast } from "../../stores/toastStore";
 import { useUndoStore } from "../../stores/undoStore";
 import type { FileEntry } from "../../types";
+import { getFileType } from "../../utils/fileType";
+import { formatDate, formatFileSize } from "../../utils/format";
 import { AiOrganizer } from "../AiOrganizer";
 import { showNativeContextMenu } from "../ContextMenu";
 import { DragSuggestion } from "../DragSuggestion/DragSuggestion";
@@ -21,7 +25,6 @@ import { PropertiesDialog } from "../PropertiesDialog";
 import { QuickLook } from "../QuickLook";
 import { PatternSuggestionBanner, RuleSuggestionBanner } from "../RuleSuggestion";
 import { ColumnHeader } from "./ColumnHeader";
-import { createDragGhost, removeDragGhost } from "./DragGhost";
 import { FileRow } from "./FileRow";
 import { GridView } from "./GridView";
 import { Toolbar } from "./Toolbar";
@@ -61,7 +64,6 @@ export function Panel() {
 
   const listRef = useRef<HTMLDivElement>(null);
   const suggestionTimerRef = useRef<number | null>(null);
-  const suggestionKeyRef = useRef<((e: KeyboardEvent) => void) | null>(null);
 
   const aiDialogOpen = useAiStore((s) => s.dialogOpen);
   const aiDialogTabId = useAiStore((s) => s.dialogTabId);
@@ -100,6 +102,60 @@ export function Panel() {
     }
     return max;
   }, [displayEntries, dirSizes]);
+
+  // ダブルクリックで列幅を内容に自動フィット
+  const handleAutoFit = useCallback(
+    (key: keyof ColumnWidths) => {
+      if (displayEntries.length === 0) return;
+      const settings = useSettingsStore.getState();
+      const font = `${settings.fontSize}px system-ui, -apple-system, sans-serif`;
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.font = font;
+
+      const padding = 16; // px-2 左右合計
+      let maxW = 0;
+
+      for (const entry of displayEntries) {
+        let text: string;
+        switch (key) {
+          case "name":
+            text = entry.name;
+            break;
+          case "modified":
+            text = formatDate(entry.modified);
+            break;
+          case "extension":
+            text = getFileType(entry);
+            break;
+          case "size": {
+            const size = entry.is_dir ? (dirSizes[entry.path] ?? 0) : entry.size;
+            text = size > 0 ? formatFileSize(size) : "";
+            break;
+          }
+        }
+        const w = ctx.measureText(text).width;
+        if (w > maxW) maxW = w;
+      }
+
+      // ヘッダーテキスト幅も考慮
+      ctx.font = `${settings.uiFontSize}px system-ui, -apple-system, sans-serif`;
+      const headerLabels: Record<keyof ColumnWidths, string> = {
+        name: getTranslation().columnHeader.name,
+        modified: getTranslation().columnHeader.modified,
+        extension: getTranslation().columnHeader.type,
+        size: getTranslation().columnHeader.size,
+      };
+      const headerW = ctx.measureText(headerLabels[key]).width + 16; // ソートアイコン分
+      maxW = Math.max(maxW, headerW);
+
+      const newWidth = Math.ceil(maxW + padding + 4); // 余裕4px
+      const { setSetting, columnWidths } = useSettingsStore.getState();
+      setSetting("columnWidths", { ...columnWidths, [key]: Math.max(newWidth, 60) });
+    },
+    [displayEntries, dirSizes],
+  );
 
   // Initial load
   useEffect(() => {
@@ -159,11 +215,13 @@ export function Panel() {
       }
     } else {
       const rowHeight = settings.detailRowHeight;
-      const cursorTop = tab.cursorIndex * rowHeight;
+      // ColumnHeader がスクロールコンテナ内に sticky 配置されているためオフセット加算
+      const headerOffset = settings.columnHeaderHeight;
+      const cursorTop = headerOffset + tab.cursorIndex * rowHeight;
       const cursorBottom = cursorTop + rowHeight;
 
-      if (cursorTop < container.scrollTop) {
-        container.scrollTop = cursorTop;
+      if (cursorTop < container.scrollTop + headerOffset) {
+        container.scrollTop = cursorTop - headerOffset;
       } else if (cursorBottom > container.scrollTop + container.clientHeight) {
         container.scrollTop = cursorBottom - container.clientHeight;
       }
@@ -203,290 +261,100 @@ export function Panel() {
     [onProperties],
   );
 
-  // Drag & drop state
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [dropTarget, setDropTarget] = useState<number | null>(null);
+  // ネイティブドラッグ: mousedown + mousemove閾値でstartDrag
+  const dragStartRef = useRef<{ x: number; y: number; index: number } | null>(null);
+  const draggingRef = useRef(false);
+  const dragIconRef = useRef<string>("");
 
-  const handleDragStart = useCallback(
-    (e: React.DragEvent, index: number) => {
-      setCursor(index);
-      setDragIndex(index);
-      const entry = displayEntries[index];
-      if (entry) {
-        e.dataTransfer.effectAllowed = "all";
-        e.dataTransfer.setData("text/plain", entry.path);
-        // Collect all dragged paths (selected or just the one)
-        const indices =
-          tab.selectedIndices.size > 0 && tab.selectedIndices.has(index)
-            ? Array.from(tab.selectedIndices)
-            : [index];
-        const dragEntries = indices.map((i) => displayEntries[i]).filter(Boolean);
-        const paths = dragEntries.map((de) => de.path);
-        e.dataTransfer.setData("application/x-filer-paths", JSON.stringify(paths));
-
-        // カスタムゴーストイメージ（同期的にDOM作成→setDragImage）
-        const ghostCard = createDragGhost(
-          dragEntries.map((de) => ({ name: de.name, is_dir: de.is_dir })),
-        );
-        e.dataTransfer.setDragImage(ghostCard, 20, 16);
-
-        // 移動先サジェスト: 300ms後にポップアップ
-        const extensions = dragEntries
-          .filter((de) => !de.is_dir)
-          .map((de) => de.extension)
-          .filter((ext, i, arr) => ext && arr.indexOf(ext) === i);
-
-        const clientX = e.clientX;
-        const clientY = e.clientY;
-
-        suggestionTimerRef.current = window.setTimeout(() => {
-          useSuggestionStore
-            .getState()
-            .fetchSuggestions(extensions, tab.path, paths)
-            .then(() => {
-              useSuggestionStore.getState().show(clientX, clientY);
-            });
-        }, 300);
-
-        // ドラッグ中のキーボード操作（サジェストナビ）
-        const keyHandler = (ke: KeyboardEvent) => {
-          const store = useSuggestionStore.getState();
-          if (!store.visible) return;
-          if (ke.key === "ArrowDown") {
-            ke.preventDefault();
-            ke.stopPropagation();
-            store.selectNext();
-          } else if (ke.key === "ArrowUp") {
-            ke.preventDefault();
-            ke.stopPropagation();
-            store.selectPrev();
-          } else if (ke.key === "Escape") {
-            ke.preventDefault();
-            ke.stopPropagation();
-            store.hide();
-          }
-        };
-        suggestionKeyRef.current = keyHandler;
-        document.addEventListener("keydown", keyHandler, true);
-      }
-    },
-    [displayEntries, tab.selectedIndices, tab.path, setCursor],
-  );
-
-  const handleDragOver = useCallback(
-    (e: React.DragEvent, index: number) => {
-      const entry = displayEntries[index];
-      if (!entry || index === dragIndex) return;
-      // ドラッグ中の選択アイテムにターゲットが含まれていたら無視
-      if (dragIndex !== null && tab.selectedIndices.size > 0 && tab.selectedIndices.has(index))
-        return;
-      // フォルダへのドロップ、またはファイル同士のグループ化
-      e.preventDefault();
-      e.dataTransfer.dropEffect = entry.is_dir ? (e.ctrlKey ? "copy" : "move") : "move";
-      setDropTarget(index);
-    },
-    [displayEntries, dragIndex, tab.selectedIndices],
-  );
-
-  const handleDragLeave = useCallback(() => {
-    setDropTarget(null);
+  // 起動時にドラッグアイコンのパスを解決
+  useEffect(() => {
+    resolveResource("icons/32x32.png")
+      .then((p) => {
+        dragIconRef.current = p;
+      })
+      .catch(() => {});
   }, []);
 
-  const removeFromStack = useExplorerStore((s) => s.removeFromStack);
+  const handleFileMouseDown = useCallback((e: React.MouseEvent, index: number) => {
+    if (e.button !== 0) return; // 左クリックのみ
+    dragStartRef.current = { x: e.clientX, y: e.clientY, index };
+    draggingRef.current = false;
+  }, []);
 
-  const handleDrop = useCallback(
-    async (e: React.DragEvent, index: number) => {
-      e.preventDefault();
-      setDropTarget(null);
-      setDragIndex(null);
+  useEffect(() => {
+    const DRAG_THRESHOLD = 5;
 
-      const targetEntry = displayEntries[index];
-      if (!targetEntry) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const start = dragStartRef.current;
+      if (!start || draggingRef.current) return;
 
-      const pathsJson = e.dataTransfer.getData("application/x-filer-paths");
-      if (!pathsJson) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
 
-      const fromStack = e.dataTransfer.getData("application/x-filer-from-stack") === "true";
+      // 閾値超過 → ネイティブドラッグ開始
+      draggingRef.current = true;
+      dragStartRef.current = null;
 
-      try {
-        const paths: string[] = JSON.parse(pathsJson);
+      const state = useExplorerStore.getState();
+      const activeTab = state.tabs.find((t) => t.id === state.activeTabId) || state.tabs[0];
+      const entries = activeTab.searchResults ?? activeTab.entries;
+      const index = start.index;
 
-        // ドラッグ元にターゲット自身が含まれる場合は何もしない
-        const targetPathLower = targetEntry.path.toLowerCase();
-        if (paths.some((p) => p.toLowerCase() === targetPathLower)) return;
+      // ドラッグ対象の選択ロジック
+      const indices =
+        activeTab.selectedIndices.size > 0 && activeTab.selectedIndices.has(index)
+          ? Array.from(activeTab.selectedIndices)
+          : [index];
+      const dragEntries = indices.map((i) => entries[i]).filter(Boolean);
+      const paths = dragEntries.map((de) => de.path);
+      if (paths.length === 0) return;
 
-        // ファイル on ファイル → 自動フォルダ化
-        if (!targetEntry.is_dir) {
-          // ターゲットがファイルの場合、グループ化
-          const folderPath: string = await invoke("group_files_into_folder", {
-            dragPaths: paths,
-            targetPath: targetEntry.path,
+      // サジェスト表示（300ms後）
+      const extensions = dragEntries
+        .filter((de) => !de.is_dir)
+        .map((de) => de.extension)
+        .filter((ext, i, arr) => ext && arr.indexOf(ext) === i);
+
+      suggestionTimerRef.current = window.setTimeout(() => {
+        useSuggestionStore
+          .getState()
+          .fetchSuggestions(extensions, activeTab.path, paths)
+          .then(() => {
+            useSuggestionStore.getState().show(e.clientX, e.clientY);
           });
-          // Undo: folderizeとして記録（ファイル戻し+フォルダ削除）
-          const allPaths = [targetEntry.path, ...paths];
-          useUndoStore.getState().pushAction({
-            type: "folderize",
-            entries: allPaths.map((p) => {
-              const fileName = p.substring(p.lastIndexOf("\\") + 1);
-              return { sourcePath: p, destPath: `${folderPath}\\${fileName}` };
-            }),
-            createdFolder: folderPath,
-          });
-          await loadDirectory(tab.path, false);
-          return;
+      }, 300);
+
+      // ネイティブドラッグ開始
+      startDrag({ item: paths, icon: dragIconRef.current || "" }, (payload) => {
+        // ドラッグ完了コールバック
+        if (payload.result === "Dropped") {
+          // 外部アプリへのドロップ後はリフレッシュ
+          useExplorerStore.getState().refreshDirectory();
         }
-
-        // フォルダへのドロップ（従来動作）
-        const undoEntries = paths.map((p) => {
-          const fileName = p.substring(p.lastIndexOf("\\") + 1);
-          return { sourcePath: p, destPath: `${targetEntry.path}\\${fileName}` };
-        });
-
-        const operation = e.ctrlKey ? "copy" : "move";
-        if (fromStack) {
-          if (e.ctrlKey) {
-            await useCopyQueueStore.getState().enqueue(paths, targetEntry.path, "copy");
-            useUndoStore.getState().pushAction({ type: "copy", entries: undoEntries });
-          } else {
-            await invoke("move_files", { sources: paths, dest: targetEntry.path });
-            useUndoStore.getState().pushAction({ type: "move", entries: undoEntries });
-            for (const p of paths) removeFromStack(p);
-          }
-        } else if (e.ctrlKey) {
-          await useCopyQueueStore.getState().enqueue(paths, targetEntry.path, "copy");
-          useUndoStore.getState().pushAction({ type: "copy", entries: undoEntries });
-        } else {
-          await invoke("move_files", { sources: paths, dest: targetEntry.path });
-          useUndoStore.getState().pushAction({ type: "move", entries: undoEntries });
+        // サジェストクリーンアップ
+        if (suggestionTimerRef.current) {
+          clearTimeout(suggestionTimerRef.current);
+          suggestionTimerRef.current = null;
         }
-        // 移動履歴を記録
-        const exts = paths
-          .map((p) => {
-            const dot = p.lastIndexOf(".");
-            const sep = p.lastIndexOf("\\");
-            return dot > sep ? p.substring(dot + 1).toLowerCase() : "";
-          })
-          .filter((v, i, a) => a.indexOf(v) === i);
-        invoke("record_move_operation", {
-          sourceDir: tab.path,
-          destDir: targetEntry.path,
-          extensions: exts,
-          operation,
-          fileCount: paths.length,
-        })
-          .then(() => schedulePatternRecheck())
-          .catch((_err) => {});
-        await loadDirectory(tab.path, false);
-      } catch (err: unknown) {
-        toast.error(
-          `${t.panel.fileOperationFailed}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-    },
-    [
-      displayEntries,
-      tab.path,
-      loadDirectory,
-      removeFromStack,
-      schedulePatternRecheck,
-      t.panel.fileOperationFailed,
-    ],
-  );
+        useSuggestionStore.getState().hide();
+        draggingRef.current = false;
+      }).catch(() => {
+        draggingRef.current = false;
+      });
+    };
 
-  const handleDragEnd = useCallback(() => {
-    setDragIndex(null);
-    setDropTarget(null);
-    removeDragGhost();
-    // サジェストクリーンアップ
-    if (suggestionTimerRef.current) {
-      clearTimeout(suggestionTimerRef.current);
-      suggestionTimerRef.current = null;
-    }
-    if (suggestionKeyRef.current) {
-      document.removeEventListener("keydown", suggestionKeyRef.current, true);
-      suggestionKeyRef.current = null;
-    }
-    useSuggestionStore.getState().hide();
+    const handleMouseUp = () => {
+      dragStartRef.current = null;
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
   }, []);
-
-  // Background drop (drop onto current directory from external or stack)
-  const handleBgDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = e.ctrlKey ? "copy" : "move";
-  }, []);
-
-  const handleBgDrop = useCallback(
-    async (e: React.DragEvent) => {
-      e.preventDefault();
-      const pathsJson = e.dataTransfer.getData("application/x-filer-paths");
-      if (!pathsJson) return;
-
-      const fromStack = e.dataTransfer.getData("application/x-filer-from-stack") === "true";
-
-      try {
-        const paths: string[] = JSON.parse(pathsJson);
-        const undoEntries = paths.map((p) => {
-          const fileName = p.substring(p.lastIndexOf("\\") + 1);
-          return { sourcePath: p, destPath: `${tab.path}\\${fileName}` };
-        });
-
-        // 拡張子抽出ヘルパー
-        const exts = paths
-          .map((p) => {
-            const dot = p.lastIndexOf(".");
-            const sep = p.lastIndexOf("\\");
-            return dot > sep ? p.substring(dot + 1).toLowerCase() : "";
-          })
-          .filter((v, i, a) => a.indexOf(v) === i);
-        const recordMove = (sourceDir: string, op: string) => {
-          invoke("record_move_operation", {
-            sourceDir,
-            destDir: tab.path,
-            extensions: exts,
-            operation: op,
-            fileCount: paths.length,
-          })
-            .then(() => schedulePatternRecheck())
-            .catch((_err) => {});
-        };
-
-        if (fromStack) {
-          if (e.ctrlKey) {
-            await useCopyQueueStore.getState().enqueue(paths, tab.path, "copy");
-            useUndoStore.getState().pushAction({ type: "copy", entries: undoEntries });
-            recordMove(paths[0]?.substring(0, paths[0].lastIndexOf("\\")) || "", "copy");
-          } else {
-            await invoke("move_files", { sources: paths, dest: tab.path });
-            useUndoStore.getState().pushAction({ type: "move", entries: undoEntries });
-            for (const p of paths) removeFromStack(p);
-            recordMove(paths[0]?.substring(0, paths[0].lastIndexOf("\\")) || "", "move");
-          }
-          await loadDirectory(tab.path, false);
-          return;
-        }
-
-        // 通常のドラッグ: 同一ディレクトリからは無視
-        const sourceDir = paths[0]?.substring(0, paths[0].lastIndexOf("\\")) || "";
-        const isFromHere = paths.every((p) => {
-          const parent = p.substring(0, p.lastIndexOf("\\"));
-          return parent.toLowerCase() === tab.path.toLowerCase();
-        });
-        if (isFromHere) return;
-
-        if (e.ctrlKey) {
-          await useCopyQueueStore.getState().enqueue(paths, tab.path, "copy");
-          useUndoStore.getState().pushAction({ type: "copy", entries: undoEntries });
-          recordMove(sourceDir, "copy");
-        } else {
-          await invoke("move_files", { sources: paths, dest: tab.path });
-          useUndoStore.getState().pushAction({ type: "move", entries: undoEntries });
-          recordMove(sourceDir, "move");
-        }
-        await loadDirectory(tab.path, false);
-      } catch (_err) {}
-    },
-    [tab.path, loadDirectory, removeFromStack, schedulePatternRecheck],
-  );
 
   // クリップボードからファイル生成
   const handleClipboardToFile = useCallback(
@@ -929,11 +797,6 @@ export function Panel() {
       {/* Toolbar */}
       <Toolbar />
 
-      {/* Column headers (details mode only) */}
-      {viewMode === "details" && (
-        <ColumnHeader sortKey={tab.sortKey} sortOrder={tab.sortOrder} onSort={setSort} />
-      )}
-
       {/* AI Organizer inline panel */}
       {showAiPanel && <AiOrganizer tabId={tab.id} />}
 
@@ -946,7 +809,9 @@ export function Panel() {
       {/* File list */}
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden"
+        className="flex-1 overflow-y-auto overflow-x-auto"
+        data-drop-zone="panel-bg"
+        data-panel-path={tab.path}
         onClick={(e) => {
           // 背景（ファイル行以外）をクリックしたら選択解除
           if (e.target === e.currentTarget) {
@@ -954,9 +819,16 @@ export function Panel() {
           }
         }}
         onContextMenu={handleBgContextMenu}
-        onDragOver={handleBgDragOver}
-        onDrop={handleBgDrop}
       >
+        {/* Column headers (details mode only, sticky) */}
+        {viewMode === "details" && (
+          <ColumnHeader
+            sortKey={tab.sortKey}
+            sortOrder={tab.sortOrder}
+            onSort={setSort}
+            onAutoFit={handleAutoFit}
+          />
+        )}
         {(tab.loading || tab.searching) && (
           <div className="flex items-center justify-center h-full text-[#999] gap-2">
             <Loader className="w-4 h-4 animate-spin" />
@@ -986,8 +858,6 @@ export function Panel() {
                 isSelected={tab.selectedIndices.has(index)}
                 isRenaming={index === tab.renamingIndex}
                 isCut={cutPaths.has(entry.path)}
-                isDropTarget={index === dropTarget}
-                isFolderizeTarget={index === dropTarget && !entry.is_dir}
                 onNavigate={handleNavigate}
                 onSelect={() => toggleSelection(index)}
                 onSelectRange={(toIndex) => selectRange(tab.cursorIndex, toIndex)}
@@ -996,11 +866,7 @@ export function Panel() {
                 onCommitRename={commitRename}
                 onCommitRenameAndNext={commitRenameAndNext}
                 onCancelRename={cancelRename}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onDragEnd={handleDragEnd}
+                onFileMouseDown={handleFileMouseDown}
                 onClearSelection={clearSelection}
                 selectedCount={tab.selectedIndices.size}
                 onStartRename={startRename}
@@ -1014,7 +880,6 @@ export function Panel() {
               selectedIndices={tab.selectedIndices}
               renamingIndex={tab.renamingIndex}
               cutPaths={cutPaths}
-              dropTarget={dropTarget}
               onNavigate={handleNavigate}
               onSelect={toggleSelection}
               onSelectRange={selectRange}
@@ -1023,11 +888,7 @@ export function Panel() {
               onCommitRename={commitRename}
               onCommitRenameAndNext={commitRenameAndNext}
               onCancelRename={cancelRename}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onDragEnd={handleDragEnd}
+              onFileMouseDown={handleFileMouseDown}
               onClearSelection={clearSelection}
               onStartRename={startRename}
             />

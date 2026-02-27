@@ -6,6 +6,10 @@
   line-height: 1.5;
   color: #1a1a1a;
   background-color: #ffffff;
+
+  /* アクセントカラー（themeStoreが上書き） */
+  --accent: #0078d4;
+  --accent-rgb: 0, 120, 212;
 }
 
 body {
@@ -198,8 +202,51 @@ body {
 }
 
 .folderize-target .folderize-icon {
-  color: #0078d4;
-  filter: drop-shadow(0 0 3px rgba(0, 120, 212, 0.3));
+  color: var(--accent);
+  filter: drop-shadow(0 0 3px rgba(var(--accent-rgb), 0.3));
+}
+
+/* === Native Drop Hover Highlight === */
+
+[data-native-drop-hover="true"][data-drop-zone="file-row"][data-is-dir="true"] {
+  background: rgba(var(--accent-rgb), 0.15);
+  outline: 1px solid var(--accent);
+}
+
+[data-native-drop-hover="true"][data-drop-zone="file-row"][data-is-dir="false"] {
+  background: linear-gradient(
+    90deg,
+    #e8f0fe 0%,
+    #d4e4fc 25%,
+    #e8f0fe 50%,
+    #d4e4fc 75%,
+    #e8f0fe 100%
+  );
+  background-size: 200% 100%;
+  animation: folderizeShimmer 2s ease-in-out infinite;
+  outline: 1.5px solid rgba(0, 120, 212, 0.4);
+  outline-offset: -1px;
+  border-radius: 5px;
+}
+
+[data-native-drop-hover="true"][data-drop-zone="panel-bg"] {
+  background: rgba(var(--accent-rgb), 0.08);
+}
+
+[data-native-drop-hover="true"][data-drop-zone="sidebar-stack"] {
+  background: rgba(var(--accent-rgb), 0.15);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+[data-native-drop-hover="true"][data-drop-zone="bookmark-bar"],
+[data-native-drop-hover="true"][data-drop-zone="bookmark-folder"] {
+  background: rgba(var(--accent-rgb), 0.2);
+  border-color: var(--accent);
+}
+
+[data-native-drop-hover="true"][data-drop-zone="suggestion"] {
+  background: #cce8ff;
 }
 
 /* === Mac-style QuickLook Animations === */
@@ -280,4 +327,23 @@ body {
   animation: quickLookBackdropOut 150ms ease-in forwards;
   backdrop-filter: blur(0px);
   will-change: background-color;
+}
+
+/* === StatusBar Loading Progress Bar === */
+
+@keyframes statusbarProgress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.statusbar-progress-bar {
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent 0%, var(--accent) 50%, transparent 100%);
+  opacity: 0.6;
+  animation: statusbarProgress 1.2s ease-in-out infinite;
 }

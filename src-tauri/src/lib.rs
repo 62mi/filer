@@ -42,7 +42,7 @@ pub fn run() {
         Err(e) => {
             let msg = format!("データベースの初期化に失敗しました:\n{}", e);
             eprintln!("{}", msg);
-            show_error_dialog("Filer - 起動エラー", &msg);
+            show_error_dialog("TomaFiler - 起動エラー", &msg);
             return;
         }
     };
@@ -51,6 +51,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_drag::init())
         .manage(database)
         .manage(IconCache { cache: std::sync::Mutex::new(std::collections::HashMap::new()) })
         .manage(IconCacheLarge { cache: std::sync::Mutex::new(std::collections::HashMap::new()) })
@@ -116,11 +117,12 @@ pub fn run() {
             cancel_copy,
             get_copy_queue,
             clear_completed_copies,
+            get_accent_color,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {
             let msg = format!("アプリケーションの実行中にエラーが発生しました:\n{}", e);
             eprintln!("{}", msg);
-            show_error_dialog("Filer - 実行エラー", &msg);
+            show_error_dialog("TomaFiler - 実行エラー", &msg);
         });
 }

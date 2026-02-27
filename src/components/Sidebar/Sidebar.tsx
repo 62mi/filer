@@ -1,4 +1,6 @@
+import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { invoke } from "@tauri-apps/api/core";
+import { resolveResource } from "@tauri-apps/api/path";
 import {
   ChevronRight,
   Download,
@@ -21,7 +23,6 @@ import { useExplorerStore } from "../../stores/panelStore";
 import type { DriveInfo } from "../../types";
 import { cn } from "../../utils/cn";
 import { clampMenuPosition } from "../../utils/menuPosition";
-import { createDragGhost, removeDragGhost } from "../Panel/DragGhost";
 
 interface QuickAccessItem {
   label: string;
@@ -45,7 +46,6 @@ export function Sidebar() {
   });
   const loadDirectory = useExplorerStore((s) => s.loadDirectory);
   const stackItems = useExplorerStore((s) => s.stackItems);
-  const addToStack = useExplorerStore((s) => s.addToStack);
   const removeFromStack = useExplorerStore((s) => s.removeFromStack);
   const clearStack = useExplorerStore((s) => s.clearStack);
   const fetchIcons = useIconStore((s) => s.fetchIcons);
@@ -55,7 +55,8 @@ export function Sidebar() {
   const [quickAccessOpen, setQuickAccessOpen] = useState(true);
   const [pcOpen, setPcOpen] = useState(true);
   const [stackOpen, setStackOpen] = useState(true);
-  const [stackDragOver, setStackDragOver] = useState(false);
+  const [stackSelected, setStackSelected] = useState<Set<string>>(new Set());
+  const [stackLastClicked, setStackLastClicked] = useState<string | null>(null);
   const [stackContextMenu, setStackContextMenu] = useState<{
     x: number;
     y: number;
@@ -63,6 +64,45 @@ export function Sidebar() {
   } | null>(null);
   const stackContextMenuRef = useRef<HTMLDivElement>(null);
   const [stackMenuPos, setStackMenuPos] = useState<{ x: number; y: number } | null>(null);
+
+  // スタックアイテムが変わったら無効な選択を除去
+  useEffect(() => {
+    setStackSelected((prev) => {
+      const valid = new Set([...prev].filter((p) => stackItems.includes(p)));
+      return valid.size === prev.size ? prev : valid;
+    });
+  }, [stackItems]);
+
+  // スタックアイテムクリック（Shift/Ctrl対応）
+  const handleStackItemClick = useCallback(
+    (e: React.MouseEvent, path: string) => {
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl: トグル選択
+        setStackSelected((prev) => {
+          const next = new Set(prev);
+          if (next.has(path)) next.delete(path);
+          else next.add(path);
+          return next;
+        });
+        setStackLastClicked(path);
+      } else if (e.shiftKey && stackLastClicked) {
+        // Shift: 範囲選択
+        const from = stackItems.indexOf(stackLastClicked);
+        const to = stackItems.indexOf(path);
+        if (from >= 0 && to >= 0) {
+          const start = Math.min(from, to);
+          const end = Math.max(from, to);
+          const range = stackItems.slice(start, end + 1);
+          setStackSelected(new Set(range));
+        }
+      } else {
+        // 通常クリック: 単一選択
+        setStackSelected(new Set([path]));
+        setStackLastClicked(path);
+      }
+    },
+    [stackItems, stackLastClicked],
+  );
 
   useEffect(() => {
     invoke<DriveInfo[]>("get_drives").then(setDrives);
@@ -109,32 +149,15 @@ export function Sidebar() {
     currentPath.toLowerCase() === path.toLowerCase() ||
     currentPath.toLowerCase().startsWith(`${path.toLowerCase()}\\`);
 
-  // Stack D&D handlers
-  const handleStackDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
-    setStackDragOver(true);
+  // ドラッグアイコンパス
+  const dragIconRef = useRef<string>("");
+  useEffect(() => {
+    resolveResource("icons/32x32.png")
+      .then((p) => {
+        dragIconRef.current = p;
+      })
+      .catch(() => {});
   }, []);
-
-  const handleStackDragLeave = useCallback(() => {
-    setStackDragOver(false);
-  }, []);
-
-  const handleStackDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setStackDragOver(false);
-      const pathsJson = e.dataTransfer.getData("application/x-filer-paths");
-      if (!pathsJson) return;
-      try {
-        const paths: string[] = JSON.parse(pathsJson);
-        addToStack(paths);
-      } catch {
-        // ignore
-      }
-    },
-    [addToStack],
-  );
 
   // Stack item context menu
   const handleStackItemContextMenu = useCallback((e: React.MouseEvent, path: string | null) => {
@@ -162,7 +185,12 @@ export function Sidebar() {
   useEffect(() => {
     if (!stackContextMenu || !stackContextMenuRef.current) return;
     const rect = stackContextMenuRef.current.getBoundingClientRect();
-    const clamped = clampMenuPosition(stackContextMenu.x, stackContextMenu.y, rect.width, rect.height);
+    const clamped = clampMenuPosition(
+      stackContextMenu.x,
+      stackContextMenu.y,
+      rect.width,
+      rect.height,
+    );
     setStackMenuPos(clamped);
     return () => setStackMenuPos(null);
   }, [stackContextMenu]);
@@ -190,7 +218,7 @@ export function Sidebar() {
     <div className="flex flex-col h-full w-full overflow-y-auto overflow-x-hidden py-1 text-[13px]">
       {/* クイックアクセス */}
       <button
-        className="flex items-center gap-1 px-2 py-1 hover:bg-[#e8e8e8] text-left w-full font-semibold text-[#1a1a1a] transition-colors duration-100"
+        className="flex items-center gap-1 px-2 py-1 hover:bg-[rgba(var(--accent-rgb),0.10)] text-left w-full font-semibold text-[#1a1a1a] transition-colors duration-100"
         onClick={() => setQuickAccessOpen(!quickAccessOpen)}
       >
         <ChevronRight
@@ -206,10 +234,11 @@ export function Sidebar() {
           <button
             key={item.path}
             className={cn(
-              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[#e8e8e8] text-left w-full truncate transition-colors duration-100",
-              isActive(item.path) && "bg-[#e8e8e8]",
+              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[rgba(var(--accent-rgb),0.10)] text-left w-full truncate transition-colors duration-100",
+              isActive(item.path) && "bg-[rgba(var(--accent-rgb),0.15)]",
             )}
             onClick={() => loadDirectory(item.path)}
+            data-mid-click-path={item.path}
             title={item.path}
           >
             <span className="text-[#666] shrink-0">
@@ -221,7 +250,7 @@ export function Sidebar() {
 
       {/* PC */}
       <button
-        className="flex items-center gap-1 px-2 py-1 mt-2 hover:bg-[#e8e8e8] text-left w-full font-semibold text-[#1a1a1a] transition-colors duration-100"
+        className="flex items-center gap-1 px-2 py-1 mt-2 hover:bg-[rgba(var(--accent-rgb),0.10)] text-left w-full font-semibold text-[#1a1a1a] transition-colors duration-100"
         onClick={() => setPcOpen(!pcOpen)}
       >
         <ChevronRight
@@ -234,10 +263,11 @@ export function Sidebar() {
           <button
             key={drive.path}
             className={cn(
-              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[#e8e8e8] text-left w-full transition-colors duration-100",
-              isActive(drive.path) && "bg-[#e8e8e8]",
+              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[rgba(var(--accent-rgb),0.10)] text-left w-full transition-colors duration-100",
+              isActive(drive.path) && "bg-[rgba(var(--accent-rgb),0.15)]",
             )}
             onClick={() => loadDirectory(drive.path)}
+            data-mid-click-path={drive.path}
             title={drive.path}
           >
             {drive.icon ? (
@@ -251,7 +281,7 @@ export function Sidebar() {
 
       {/* Stack */}
       <button
-        className="flex items-center gap-1 px-2 py-1 mt-2 hover:bg-[#e8e8e8] text-left w-full font-semibold text-[#1a1a1a] transition-colors duration-100"
+        className="flex items-center gap-1 px-2 py-1 mt-2 hover:bg-[rgba(var(--accent-rgb),0.10)] text-left w-full font-semibold text-[#1a1a1a] transition-colors duration-100"
         onClick={() => setStackOpen(!stackOpen)}
       >
         <ChevronRight
@@ -261,7 +291,7 @@ export function Sidebar() {
         {t.sidebar.stack}
         {stackItems.length > 0 && (
           <span
-            className="ml-auto text-[10px] bg-[#0078d4] text-white rounded-full px-1.5 min-w-[18px] text-center hover:bg-[#c42b1c] cursor-pointer transition-colors"
+            className="ml-auto text-[10px] bg-[var(--accent)] text-white rounded-full px-1.5 min-w-[18px] text-center hover:bg-[#c42b1c] cursor-pointer transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               clearStack();
@@ -274,14 +304,12 @@ export function Sidebar() {
       </button>
       {stackOpen && (
         <div
-          className={cn(
-            "min-h-[40px] transition-colors",
-            stackDragOver &&
-              "bg-[#cce8ff] outline outline-1 outline-[#0078d4] outline-offset-[-1px]",
-          )}
-          onDragOver={handleStackDragOver}
-          onDragLeave={handleStackDragLeave}
-          onDrop={handleStackDrop}
+          className="min-h-[40px] transition-colors border-b border-[#e5e5e5]"
+          data-drop-zone="sidebar-stack"
+          onClick={(e) => {
+            // 背景クリックで選択解除（アイテムクリックはstopPropagation不要、e.targetで判定）
+            if (e.target === e.currentTarget) setStackSelected(new Set());
+          }}
           onContextMenu={(e) => handleStackItemContextMenu(e, null)}
         >
           {stackItems.length === 0 ? (
@@ -292,26 +320,48 @@ export function Sidebar() {
             stackItems.map((path) => {
               const isDir = isLikelyDir(path);
               const ext = isDir ? "__directory__" : getExtension(path);
+              const isItemSelected = stackSelected.has(path);
               return (
                 <div
                   key={path}
-                  className="flex items-center gap-2 pl-6 pr-1 py-[3px] hover:bg-[#e8e8e8] text-left w-full group cursor-grab active:cursor-grabbing transition-colors duration-100"
+                  className={cn(
+                    "flex items-center gap-2 pl-6 pr-1 py-[3px] text-left w-full group cursor-grab active:cursor-grabbing transition-colors duration-100",
+                    isItemSelected
+                      ? "bg-[rgba(var(--accent-rgb),0.18)]"
+                      : "hover:bg-[rgba(var(--accent-rgb),0.10)]",
+                  )}
                   title={path}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.effectAllowed = "copyMove";
-                    e.dataTransfer.setData("application/x-filer-paths", JSON.stringify([path]));
-                    e.dataTransfer.setData("application/x-filer-from-stack", "true");
-                    const ghostItems = [
-                      {
-                        name: getFileName(path),
-                        is_dir: isDir,
-                      },
-                    ];
-                    const ghostCard = createDragGhost(ghostItems);
-                    e.dataTransfer.setDragImage(ghostCard, 20, 16);
+                  onClick={(e) => handleStackItemClick(e, path)}
+                  onMouseDown={(e) => {
+                    if (e.button !== 0) return;
+                    const startX = e.clientX;
+                    const startY = e.clientY;
+                    let started = false;
+                    const onMove = (me: MouseEvent) => {
+                      if (started) return;
+                      if (Math.abs(me.clientX - startX) < 5 && Math.abs(me.clientY - startY) < 5)
+                        return;
+                      started = true;
+                      window.removeEventListener("mousemove", onMove);
+                      window.removeEventListener("mouseup", onUp);
+                      // ネイティブドラッグ開始
+                      const dragPaths =
+                        isItemSelected && stackSelected.size > 1
+                          ? stackItems.filter((p) => stackSelected.has(p))
+                          : [path];
+                      startDrag({ item: dragPaths, icon: dragIconRef.current || "" }, (payload) => {
+                        if (payload.result === "Dropped") {
+                          useExplorerStore.getState().refreshDirectory();
+                        }
+                      }).catch(() => {});
+                    };
+                    const onUp = () => {
+                      window.removeEventListener("mousemove", onMove);
+                      window.removeEventListener("mouseup", onUp);
+                    };
+                    window.addEventListener("mousemove", onMove);
+                    window.addEventListener("mouseup", onUp);
                   }}
-                  onDragEnd={() => removeDragGhost()}
                   onDoubleClick={() => {
                     const parent = path.substring(0, path.lastIndexOf("\\"));
                     if (parent) loadDirectory(parent);
@@ -333,7 +383,13 @@ export function Sidebar() {
                     className="p-0.5 rounded hover:bg-[#d0d0d0] opacity-0 group-hover:opacity-100 shrink-0 transition-opacity"
                     onClick={(e) => {
                       e.stopPropagation();
-                      removeFromStack(path);
+                      // 選択中なら選択アイテム全部削除、そうでなければ単体削除
+                      if (isItemSelected && stackSelected.size > 1) {
+                        removeFromStack([...stackSelected]);
+                        setStackSelected(new Set());
+                      } else {
+                        removeFromStack(path);
+                      }
                     }}
                     title={t.sidebar.remove}
                   >
@@ -360,19 +416,27 @@ export function Sidebar() {
         >
           {stackContextMenu.path && (
             <button
-              className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[#e8e8e8] transition-colors"
+              className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[rgba(var(--accent-rgb),0.10)] transition-colors"
               onClick={() => {
-                removeFromStack(stackContextMenu.path!);
+                const target = stackContextMenu.path!;
+                if (stackSelected.has(target) && stackSelected.size > 1) {
+                  removeFromStack([...stackSelected]);
+                  setStackSelected(new Set());
+                } else {
+                  removeFromStack(target);
+                }
                 setStackContextMenu(null);
               }}
             >
               <Trash2 className="w-4 h-4 text-[#666]" />
-              {t.sidebar.remove}
+              {stackSelected.has(stackContextMenu.path) && stackSelected.size > 1
+                ? `${t.sidebar.remove} (${stackSelected.size})`
+                : t.sidebar.remove}
             </button>
           )}
           {stackContextMenu.path && <div className="h-px bg-[#e5e5e5] my-1" />}
           <button
-            className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[#e8e8e8] transition-colors"
+            className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[rgba(var(--accent-rgb),0.10)] transition-colors"
             onClick={() => {
               clearStack();
               setStackContextMenu(null);

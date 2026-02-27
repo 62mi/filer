@@ -11,7 +11,6 @@ interface GridViewProps {
   selectedIndices: Set<number>;
   renamingIndex: number | null;
   cutPaths: Set<string>;
-  dropTarget: number | null;
   onNavigate: (entry: FileEntry) => void;
   onSelect: (index: number) => void;
   onSelectRange: (fromIndex: number, toIndex: number) => void;
@@ -20,11 +19,7 @@ interface GridViewProps {
   onCommitRename: (newName: string) => void;
   onCommitRenameAndNext: (newName: string, direction: 1 | -1) => void;
   onCancelRename: () => void;
-  onDragStart: (e: React.DragEvent, index: number) => void;
-  onDragOver: (e: React.DragEvent, index: number) => void;
-  onDragLeave: () => void;
-  onDrop: (e: React.DragEvent, index: number) => void;
-  onDragEnd: () => void;
+  onFileMouseDown: (e: React.MouseEvent, index: number) => void;
   onClearSelection: () => void;
   onStartRename: (index: number) => void;
 }
@@ -35,7 +30,6 @@ export function GridView({
   selectedIndices,
   renamingIndex,
   cutPaths,
-  dropTarget,
   onNavigate,
   onSelect,
   onSelectRange,
@@ -44,11 +38,7 @@ export function GridView({
   onCommitRename,
   onCommitRenameAndNext,
   onCancelRename,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
+  onFileMouseDown,
   onClearSelection,
   onStartRename,
 }: GridViewProps) {
@@ -105,8 +95,6 @@ export function GridView({
           isSelected={selectedIndices.has(index)}
           isRenaming={index === renamingIndex}
           isCut={cutPaths.has(entry.path)}
-          isDropTarget={index === dropTarget}
-          isFolderizeTarget={index === dropTarget && !entry.is_dir}
           onNavigate={onNavigate}
           onSelect={onSelect}
           onSelectRange={handleSelectRange}
@@ -115,11 +103,7 @@ export function GridView({
           onCommitRename={onCommitRename}
           onCommitRenameAndNext={onCommitRenameAndNext}
           onCancelRename={onCancelRename}
-          onDragStart={onDragStart}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-          onDragEnd={onDragEnd}
+          onFileMouseDown={onFileMouseDown}
           onClearSelection={onClearSelection}
           selectedCount={selectedIndices.size}
           onStartRename={onStartRename}
