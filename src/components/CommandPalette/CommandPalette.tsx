@@ -214,7 +214,9 @@ export function CommandPalette() {
               <button
                 key={item.id}
                 className={`flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors ${
-                  i === selectedIndex ? "bg-[#0078d4] text-white" : "text-[#333] hover:bg-[#f0f0f0]"
+                  i === selectedIndex
+                    ? "bg-[var(--accent)] text-white"
+                    : "text-[#333] hover:bg-[#f0f0f0]"
                 }`}
                 onClick={item.action}
                 onMouseEnter={() => setSelectedIndex(i)}

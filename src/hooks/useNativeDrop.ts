@@ -18,7 +18,7 @@ import { useUndoStore } from "../stores/undoStore";
 let highlightedEl: HTMLElement | null = null;
 
 /** drop-zone要素をポインタ座標から探す */
-function findDropZone(x: number, y: number): HTMLElement | null {
+export function findDropZone(x: number, y: number): HTMLElement | null {
   const elements = document.elementsFromPoint(x, y);
   for (const el of elements) {
     const zone = (el as HTMLElement).closest("[data-drop-zone]") as HTMLElement | null;
@@ -27,19 +27,40 @@ function findDropZone(x: number, y: number): HTMLElement | null {
   return null;
 }
 
-/** ハイライト付与 / 解除 */
-function setHighlight(el: HTMLElement | null) {
+/** ゾーン別のハイライトスタイル */
+const ZONE_STYLES: Record<string, { bg: string; shadow: string }> = {
+  "file-row": { bg: "rgba(0,120,212,0.15)", shadow: "inset 0 0 0 1px #0078d4" },
+  "panel-bg": { bg: "rgba(0,120,212,0.08)", shadow: "" },
+  "sidebar-stack": { bg: "rgba(0,120,212,0.18)", shadow: "inset 0 0 0 1.5px #0078d4" },
+  "bookmark-bar": { bg: "rgba(0,120,212,0.20)", shadow: "" },
+  "bookmark-folder": { bg: "rgba(0,120,212,0.20)", shadow: "" },
+  suggestion: { bg: "#cce8ff", shadow: "" },
+};
+
+/** ハイライト付与 / 解除（インラインスタイルで確実に適用） */
+export function setHighlight(el: HTMLElement | null) {
   if (highlightedEl && highlightedEl !== el) {
+    highlightedEl.style.background = "";
+    highlightedEl.style.boxShadow = "";
     highlightedEl.removeAttribute("data-native-drop-hover");
   }
   if (el) {
+    const zone = el.getAttribute("data-drop-zone") || "";
+    const style = ZONE_STYLES[zone];
+    if (style) {
+      el.style.background = style.bg;
+      el.style.boxShadow = style.shadow;
+    }
+    // file-rowのフォルダ化アニメーションはCSS側で処理（data属性必要）
     el.setAttribute("data-native-drop-hover", "true");
   }
   highlightedEl = el;
 }
 
-function clearHighlight() {
+export function clearHighlight() {
   if (highlightedEl) {
+    highlightedEl.style.background = "";
+    highlightedEl.style.boxShadow = "";
     highlightedEl.removeAttribute("data-native-drop-hover");
     highlightedEl = null;
   }
@@ -66,7 +87,7 @@ function getExtension(path: string): string {
 }
 
 /** ドロップ処理の実行 */
-async function handleNativeDrop(paths: string[], x: number, y: number) {
+export async function handleNativeDrop(paths: string[], x: number, y: number) {
   const zone = findDropZone(x, y);
   clearHighlight();
 

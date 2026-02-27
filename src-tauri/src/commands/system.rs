@@ -108,6 +108,32 @@ pub fn open_in_default_app(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn get_accent_color() -> String {
+    #[cfg(windows)]
+    {
+        use winreg::enums::HKEY_CURRENT_USER;
+        use winreg::RegKey;
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        if let Ok(dwm) = hkcu.open_subkey("SOFTWARE\\Microsoft\\Windows\\DWM") {
+            if let Ok(abgr) = dwm.get_value::<u32, _>("AccentColor") {
+                // ABGR → RGB
+                let r = abgr & 0xFF;
+                let g = (abgr >> 8) & 0xFF;
+                let b = (abgr >> 16) & 0xFF;
+                return format!("#{:02x}{:02x}{:02x}", r, g, b);
+            }
+        }
+        "#0078d4".to_string()
+    }
+
+    #[cfg(not(windows))]
+    {
+        "#0078d4".to_string()
+    }
+}
+
+#[tauri::command]
 pub fn open_terminal(terminal: String, cwd: String) -> Result<(), String> {
     let cwd_path = std::path::Path::new(&cwd);
     if !cwd_path.exists() {

@@ -17,6 +17,12 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  clearHighlight,
+  findDropZone,
+  handleNativeDrop,
+  setHighlight,
+} from "../../hooks/useNativeDrop";
 import { useTranslation } from "../../i18n";
 import { useIconStore } from "../../stores/iconStore";
 import { useExplorerStore } from "../../stores/panelStore";
@@ -218,7 +224,7 @@ export function Sidebar() {
     <div className="flex flex-col h-full w-full overflow-y-auto overflow-x-hidden py-1 text-[13px]">
       {/* クイックアクセス */}
       <button
-        className="flex items-center gap-1 px-2 py-1 hover:bg-[rgba(var(--accent-rgb),0.10)] text-left w-full font-semibold text-[#1a1a1a] transition-colors duration-100"
+        className="flex items-center gap-1 px-2 py-1 hover:bg-[var(--chrome-hover)] text-left w-full font-semibold transition-colors duration-100"
         onClick={() => setQuickAccessOpen(!quickAccessOpen)}
       >
         <ChevronRight
@@ -234,14 +240,14 @@ export function Sidebar() {
           <button
             key={item.path}
             className={cn(
-              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[rgba(var(--accent-rgb),0.10)] text-left w-full truncate transition-colors duration-100",
-              isActive(item.path) && "bg-[rgba(var(--accent-rgb),0.15)]",
+              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[var(--chrome-hover)] text-left w-full truncate transition-colors duration-100",
+              isActive(item.path) && "bg-[var(--chrome-active)]",
             )}
             onClick={() => loadDirectory(item.path)}
             data-mid-click-path={item.path}
             title={item.path}
           >
-            <span className="text-[#666] shrink-0">
+            <span className="text-[var(--chrome-text-dim)] shrink-0">
               <SidebarIcon ext="__directory__" fallback={item.icon} />
             </span>
             <span className="truncate">{item.label}</span>
@@ -250,7 +256,7 @@ export function Sidebar() {
 
       {/* PC */}
       <button
-        className="flex items-center gap-1 px-2 py-1 mt-2 hover:bg-[rgba(var(--accent-rgb),0.10)] text-left w-full font-semibold text-[#1a1a1a] transition-colors duration-100"
+        className="flex items-center gap-1 px-2 py-1 mt-2 hover:bg-[var(--chrome-hover)] text-left w-full font-semibold transition-colors duration-100"
         onClick={() => setPcOpen(!pcOpen)}
       >
         <ChevronRight
@@ -263,8 +269,8 @@ export function Sidebar() {
           <button
             key={drive.path}
             className={cn(
-              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[rgba(var(--accent-rgb),0.10)] text-left w-full transition-colors duration-100",
-              isActive(drive.path) && "bg-[rgba(var(--accent-rgb),0.15)]",
+              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[var(--chrome-hover)] text-left w-full transition-colors duration-100",
+              isActive(drive.path) && "bg-[var(--chrome-active)]",
             )}
             onClick={() => loadDirectory(drive.path)}
             data-mid-click-path={drive.path}
@@ -273,7 +279,7 @@ export function Sidebar() {
             {drive.icon ? (
               <img src={drive.icon} alt="" className="w-4 h-4 shrink-0" draggable={false} />
             ) : (
-              <HardDrive className="w-4 h-4 text-[#666] shrink-0" />
+              <HardDrive className="w-4 h-4 text-[var(--chrome-text-dim)] shrink-0" />
             )}
             <span className="truncate">{drive.display_name}</span>
           </button>
@@ -281,7 +287,7 @@ export function Sidebar() {
 
       {/* Stack */}
       <button
-        className="flex items-center gap-1 px-2 py-1 mt-2 hover:bg-[rgba(var(--accent-rgb),0.10)] text-left w-full font-semibold text-[#1a1a1a] transition-colors duration-100"
+        className="flex items-center gap-1 px-2 py-1 mt-2 hover:bg-[var(--chrome-hover)] text-left w-full font-semibold transition-colors duration-100"
         onClick={() => setStackOpen(!stackOpen)}
       >
         <ChevronRight
@@ -304,7 +310,7 @@ export function Sidebar() {
       </button>
       {stackOpen && (
         <div
-          className="min-h-[40px] transition-colors border-b border-[#e5e5e5]"
+          className="min-h-[40px] transition-colors border-b border-[var(--chrome-border)]"
           data-drop-zone="sidebar-stack"
           onClick={(e) => {
             // 背景クリックで選択解除（アイテムクリックはstopPropagation不要、e.targetで判定）
@@ -313,7 +319,7 @@ export function Sidebar() {
           onContextMenu={(e) => handleStackItemContextMenu(e, null)}
         >
           {stackItems.length === 0 ? (
-            <div className="flex items-center justify-center h-10 text-[11px] text-[#999] italic">
+            <div className="flex items-center justify-center h-10 text-[11px] text-[var(--chrome-text-dim)] italic">
               {t.sidebar.dragFilesHere}
             </div>
           ) : (
@@ -326,9 +332,7 @@ export function Sidebar() {
                   key={path}
                   className={cn(
                     "flex items-center gap-2 pl-6 pr-1 py-[3px] text-left w-full group cursor-grab active:cursor-grabbing transition-colors duration-100",
-                    isItemSelected
-                      ? "bg-[rgba(var(--accent-rgb),0.18)]"
-                      : "hover:bg-[rgba(var(--accent-rgb),0.10)]",
+                    isItemSelected ? "bg-[var(--chrome-active)]" : "hover:bg-[var(--chrome-hover)]",
                   )}
                   title={path}
                   onClick={(e) => handleStackItemClick(e, path)}
@@ -336,31 +340,78 @@ export function Sidebar() {
                     if (e.button !== 0) return;
                     const startX = e.clientX;
                     const startY = e.clientY;
-                    let started = false;
+                    let mode: "idle" | "custom" | "native" = "idle";
+                    const dragPaths =
+                      isItemSelected && stackSelected.size > 1
+                        ? stackItems.filter((p) => stackSelected.has(p))
+                        : [path];
+
+                    let ghostEl: HTMLDivElement | null = null;
+
+                    const cleanupCustom = () => {
+                      mode = "idle";
+                      clearHighlight();
+                      document.body.classList.remove("file-dragging");
+                      if (ghostEl) {
+                        ghostEl.remove();
+                        ghostEl = null;
+                      }
+                    };
+
                     const onMove = (me: MouseEvent) => {
-                      if (started) return;
-                      if (Math.abs(me.clientX - startX) < 5 && Math.abs(me.clientY - startY) < 5)
+                      if (mode === "native") return;
+                      if (mode === "idle") {
+                        if (Math.abs(me.clientX - startX) < 5 && Math.abs(me.clientY - startY) < 5)
+                          return;
+                        // カスタムドラッグモード開始
+                        mode = "custom";
+                        document.body.classList.add("file-dragging");
+                        // ゴースト作成
+                        ghostEl = document.createElement("div");
+                        ghostEl.className = "fixed z-[9999] pointer-events-none";
+                        ghostEl.style.left = `${me.clientX + 12}px`;
+                        ghostEl.style.top = `${me.clientY + 12}px`;
+                        const name = dragPaths[0].substring(dragPaths[0].lastIndexOf("\\") + 1);
+                        ghostEl.innerHTML = `<div class="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#d0d0d0] rounded-md shadow-md max-w-[180px] text-xs"><span class="truncate">${name}</span></div>${dragPaths.length > 1 ? `<span class="absolute -top-2 right-0 text-[11px] bg-[var(--accent)] text-white rounded-full px-1.5 min-w-[20px] text-center font-semibold leading-[18px] shadow-sm">+${dragPaths.length}</span>` : ""}`;
+                        document.body.appendChild(ghostEl);
                         return;
-                      started = true;
+                      }
+                      // カスタムドラッグ中: ゴースト追従 + ハイライト
+                      if (ghostEl) {
+                        ghostEl.style.left = `${me.clientX + 12}px`;
+                        ghostEl.style.top = `${me.clientY + 12}px`;
+                      }
+                      const zone = findDropZone(me.clientX, me.clientY);
+                      setHighlight(zone);
+                    };
+
+                    const onUp = (me: MouseEvent) => {
                       window.removeEventListener("mousemove", onMove);
                       window.removeEventListener("mouseup", onUp);
-                      // ネイティブドラッグ開始
-                      const dragPaths =
-                        isItemSelected && stackSelected.size > 1
-                          ? stackItems.filter((p) => stackSelected.has(p))
-                          : [path];
+                      document.documentElement.removeEventListener("mouseleave", onLeave);
+                      if (mode === "custom") {
+                        handleNativeDrop(dragPaths, me.clientX, me.clientY);
+                        cleanupCustom();
+                      }
+                    };
+
+                    const onLeave = () => {
+                      if (mode !== "custom") return;
+                      cleanupCustom();
+                      mode = "native";
+                      window.removeEventListener("mousemove", onMove);
+                      window.removeEventListener("mouseup", onUp);
+                      document.documentElement.removeEventListener("mouseleave", onLeave);
                       startDrag({ item: dragPaths, icon: dragIconRef.current || "" }, (payload) => {
                         if (payload.result === "Dropped") {
                           useExplorerStore.getState().refreshDirectory();
                         }
                       }).catch(() => {});
                     };
-                    const onUp = () => {
-                      window.removeEventListener("mousemove", onMove);
-                      window.removeEventListener("mouseup", onUp);
-                    };
+
                     window.addEventListener("mousemove", onMove);
                     window.addEventListener("mouseup", onUp);
+                    document.documentElement.addEventListener("mouseleave", onLeave);
                   }}
                   onDoubleClick={() => {
                     const parent = path.substring(0, path.lastIndexOf("\\"));
@@ -380,7 +431,7 @@ export function Sidebar() {
                   />
                   <span className="truncate flex-1">{getFileName(path)}</span>
                   <button
-                    className="p-0.5 rounded hover:bg-[#d0d0d0] opacity-0 group-hover:opacity-100 shrink-0 transition-opacity"
+                    className="p-0.5 rounded hover:bg-[var(--chrome-hover)] opacity-0 group-hover:opacity-100 shrink-0 transition-opacity"
                     onClick={(e) => {
                       e.stopPropagation();
                       // 選択中なら選択アイテム全部削除、そうでなければ単体削除
@@ -393,7 +444,7 @@ export function Sidebar() {
                     }}
                     title={t.sidebar.remove}
                   >
-                    <X className="w-3 h-3 text-[#999]" />
+                    <X className="w-3 h-3 text-[var(--chrome-text-dim)]" />
                   </button>
                 </div>
               );
@@ -416,7 +467,7 @@ export function Sidebar() {
         >
           {stackContextMenu.path && (
             <button
-              className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[rgba(var(--accent-rgb),0.10)] transition-colors"
+              className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[var(--chrome-hover)] transition-colors"
               onClick={() => {
                 const target = stackContextMenu.path!;
                 if (stackSelected.has(target) && stackSelected.size > 1) {
@@ -428,22 +479,22 @@ export function Sidebar() {
                 setStackContextMenu(null);
               }}
             >
-              <Trash2 className="w-4 h-4 text-[#666]" />
+              <Trash2 className="w-4 h-4 text-[var(--chrome-text-dim)]" />
               {stackSelected.has(stackContextMenu.path) && stackSelected.size > 1
                 ? `${t.sidebar.remove} (${stackSelected.size})`
                 : t.sidebar.remove}
             </button>
           )}
-          {stackContextMenu.path && <div className="h-px bg-[#e5e5e5] my-1" />}
+          {stackContextMenu.path && <div className="h-px bg-[var(--chrome-border)] my-1" />}
           <button
-            className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[rgba(var(--accent-rgb),0.10)] transition-colors"
+            className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[var(--chrome-hover)] transition-colors"
             onClick={() => {
               clearStack();
               setStackContextMenu(null);
             }}
             disabled={stackItems.length === 0}
           >
-            <Trash2 className="w-4 h-4 text-[#666]" />
+            <Trash2 className="w-4 h-4 text-[var(--chrome-text-dim)]" />
             {t.sidebar.clearAll}
           </button>
         </div>

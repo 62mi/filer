@@ -23,24 +23,24 @@ import { useSettingsStore } from "../../stores/settingsStore";
 import { cn } from "../../utils/cn";
 import { clampMenuPosition } from "../../utils/menuPosition";
 
-// === D&Dデータ ===
+// === Custom Bookmark D&D ===
 
-const DRAG_TYPE = "application/x-bookmark-item";
-
-function setItemDragData(e: React.DragEvent, type: "bookmark" | "folder", id: string) {
-  e.dataTransfer.effectAllowed = "move";
-  e.dataTransfer.setData(DRAG_TYPE, JSON.stringify({ type, id }));
+interface BookmarkDragSource {
+  type: "bookmark" | "folder";
+  id: string;
+  name: string;
 }
 
-function getItemDragData(e: React.DragEvent): { type: "bookmark" | "folder"; id: string } | null {
-  const data = e.dataTransfer.getData(DRAG_TYPE);
-  if (!data) return null;
-  try {
-    return JSON.parse(data);
-  } catch {
-    return null;
-  }
+interface BookmarkDropTarget {
+  type: "bookmark" | "folder";
+  id: string;
+  pos: DropPos;
+  ctx: "bar" | "dropdown";
+  index: number;
+  parentId?: string;
 }
+
+type DropPos = "before" | "after" | "inside" | null;
 
 /** afterIndex の次のアイテムを返す（ドラッグ中アイテムをスキップ） */
 function findNextItem(
@@ -56,7 +56,106 @@ function findNextItem(
   return null;
 }
 
-type DropPos = "before" | "after" | "inside" | null;
+/** ドラッグ位置からドロップターゲットを解決 */
+function resolveDropTarget(
+  x: number,
+  y: number,
+  source: BookmarkDragSource,
+): BookmarkDropTarget | null {
+  const els = document.elementsFromPoint(x, y);
+  for (const el of els) {
+    const item = (el as HTMLElement).closest("[data-bdd-type]") as HTMLElement | null;
+    if (!item) continue;
+    const type = item.dataset.bddType as "bookmark" | "folder";
+    const id = item.dataset.bddId!;
+    // 自分自身はスキップ
+    if (type === source.type && id === source.id) continue;
+    const ctx = (item.dataset.bddCtx || "bar") as "bar" | "dropdown";
+    const index = Number(item.dataset.bddIndex ?? -1);
+    const parentId = item.dataset.bddParent;
+    const rect = item.getBoundingClientRect();
+    let pos: DropPos;
+    if (ctx === "bar") {
+      if (type === "folder") {
+        // 3ゾーン: 左25%=before, 中央50%=inside, 右25%=after
+        const relX = (x - rect.left) / rect.width;
+        pos = relX < 0.25 ? "before" : relX > 0.75 ? "after" : "inside";
+      } else {
+        const relX = (x - rect.left) / rect.width;
+        pos = relX < 0.5 ? "before" : "after";
+      }
+    } else {
+      // ドロップダウン内
+      if (type === "folder") {
+        pos = "inside";
+      } else {
+        const relY = (y - rect.top) / rect.height;
+        pos = relY < 0.5 ? "before" : "after";
+      }
+    }
+    return { type, id, pos, ctx, index, parentId };
+  }
+  // バー背景にフォールバック（末尾追加）
+  for (const el of els) {
+    if ((el as HTMLElement).closest("[data-bdd-bar]")) {
+      return { type: "bookmark", id: "__bar_end__", pos: "after", ctx: "bar", index: -1 };
+    }
+  }
+  return null;
+}
+
+/** ドロップ実行（Zustandストアを直接使用） */
+function executeBddDrop(source: BookmarkDragSource, target: BookmarkDropTarget) {
+  const { reorderItem } = useBookmarkStore.getState();
+  if (target.id === "__bar_end__") {
+    reorderItem(source.type, source.id, null, null, undefined);
+    return;
+  }
+  if (target.ctx === "dropdown") {
+    if (target.type === "folder") {
+      reorderItem(source.type, source.id, null, null, target.id);
+    } else {
+      reorderItem(source.type, source.id, target.id, "bookmark", target.parentId);
+    }
+    return;
+  }
+  // バー上のドロップ
+  if (target.pos === "inside" && target.type === "folder") {
+    reorderItem(source.type, source.id, null, null, target.id);
+  } else if (target.pos === "before") {
+    reorderItem(source.type, source.id, target.id, target.type, undefined);
+  } else {
+    // "after" → 次のアイテムの前に挿入
+    const { bookmarks, folders } = useBookmarkStore.getState();
+    const rootItems = getChildItems(bookmarks, folders);
+    const next = findNextItem(rootItems, target.index, source.type, source.id);
+    if (next) {
+      reorderItem(source.type, source.id, next.data.id, next.type, undefined);
+    } else {
+      reorderItem(source.type, source.id, null, null, undefined);
+    }
+  }
+}
+
+/** ハイライト管理（直接DOM操作） */
+let highlightedBddEl: HTMLElement | null = null;
+
+function setBddHighlight(el: HTMLElement | null, pos: DropPos) {
+  if (highlightedBddEl && highlightedBddEl !== el) {
+    highlightedBddEl.removeAttribute("data-bdd-drop");
+  }
+  if (el && pos) {
+    el.setAttribute("data-bdd-drop", pos);
+  }
+  highlightedBddEl = el;
+}
+
+function clearBddHighlight() {
+  if (highlightedBddEl) {
+    highlightedBddEl.removeAttribute("data-bdd-drop");
+    highlightedBddEl = null;
+  }
+}
 
 // === コンテキスト ===
 
@@ -91,14 +190,15 @@ interface BarContext {
   commitRename: () => void;
   cancelRename: () => void;
   itemHeight: number;
+  handleItemMouseDown: (
+    e: React.MouseEvent,
+    type: "bookmark" | "folder",
+    id: string,
+    name: string,
+  ) => void;
 }
 
 const BarCtx = createContext<BarContext>(null!);
-
-// === ドロップインジケータ（縦棒） ===
-
-const DROP_BAR_STYLE =
-  "w-[2px] self-stretch my-0.5 rounded-full shrink-0 bg-[var(--accent)] pointer-events-none";
 
 // === メインコンポーネント ===
 
@@ -130,12 +230,24 @@ export function BookmarkBar() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const [openFolderId, setOpenFolderId] = useState<string | null>(null);
-  const [externalDragOver, setExternalDragOver] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const [ctxMenuPos, setCtxMenuPos] = useState<{ x: number; y: number } | null>(null);
   const barHeight = useSettingsStore((s) => s.bookmarkBarHeight);
   const itemHeight = useSettingsStore((s) => s.bookmarkItemHeight);
   const uiFontSize = useSettingsStore((s) => s.uiFontSize);
+
+  // カスタムD&D状態
+  const [dragSource, setDragSource] = useState<BookmarkDragSource | null>(null);
+  const dragStartRef = useRef<{
+    x: number;
+    y: number;
+    type: "bookmark" | "folder";
+    id: string;
+    name: string;
+  } | null>(null);
+  const dragSourceRef = useRef<BookmarkDragSource | null>(null);
+  const dropTargetRef = useRef<BookmarkDropTarget | null>(null);
+  const ghostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!loaded) useBookmarkStore.getState().loadBookmarks();
@@ -170,6 +282,8 @@ export function BookmarkBar() {
       const target = e.target as HTMLElement;
       if (target.closest("[data-bookmark-ctx]") || target.closest("[data-bookmark-dropdown]"))
         return;
+      // ドラッグ中はドロップダウンを閉じない
+      if (dragSourceRef.current) return;
       // リネーム中は入力を確定してからドロップダウンも閉じる
       if (renamingId) {
         commitRename();
@@ -192,43 +306,93 @@ export function BookmarkBar() {
 
   const rootItems = useMemo(() => getChildItems(bookmarks, folders), [bookmarks, folders]);
 
-  // バー空白部分へのD&D（ブックマーク内部D&Dのみ処理。外部ファイルはuseNativeDropが処理）
-  const handleBarDragOver = useCallback((e: React.DragEvent) => {
-    const types = Array.from(e.dataTransfer.types);
-    if (types.includes(DRAG_TYPE)) {
-      e.preventDefault();
-      e.stopPropagation();
-      e.dataTransfer.dropEffect = "move";
-      setExternalDragOver(true);
-    }
-  }, []);
-
-  const handleBarDragLeave = useCallback((e: React.DragEvent) => {
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    if (
-      e.clientX < rect.left ||
-      e.clientX > rect.right ||
-      e.clientY < rect.top ||
-      e.clientY > rect.bottom
-    ) {
-      setExternalDragOver(false);
-    }
-  }, []);
-
-  const handleBarDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setExternalDragOver(false);
-
-      // ブックマーク内部D&Dの並べ替えのみ処理
-      const itemData = getItemDragData(e);
-      if (itemData) {
-        reorderItem(itemData.type, itemData.id, null, null, undefined);
-      }
+  // カスタムD&D: ドラッグ開始ハンドラ
+  const handleItemMouseDown = useCallback(
+    (e: React.MouseEvent, type: "bookmark" | "folder", id: string, name: string) => {
+      if (e.button !== 0) return;
+      dragStartRef.current = { x: e.clientX, y: e.clientY, type, id, name };
     },
-    [reorderItem],
+    [],
   );
+
+  // カスタムD&D: グローバルmousemove/mouseupリスナー
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      // Phase 1: 閾値チェック → ドラッグ開始
+      if (dragStartRef.current && !dragSourceRef.current) {
+        const dx = e.clientX - dragStartRef.current.x;
+        const dy = e.clientY - dragStartRef.current.y;
+        if (Math.abs(dx) + Math.abs(dy) < 5) return;
+        const { type, id, name } = dragStartRef.current;
+        const source = { type, id, name };
+        dragSourceRef.current = source;
+        setDragSource(source);
+        document.body.classList.add("bdd-dragging");
+        return;
+      }
+
+      // Phase 2: ドラッグ中
+      if (!dragSourceRef.current) return;
+
+      // ゴースト位置更新
+      if (ghostRef.current) {
+        ghostRef.current.style.left = `${e.clientX + 12}px`;
+        ghostRef.current.style.top = `${e.clientY - 8}px`;
+      }
+
+      // ドロップターゲット解決
+      const target = resolveDropTarget(e.clientX, e.clientY, dragSourceRef.current);
+      dropTargetRef.current = target;
+
+      if (target && target.id !== "__bar_end__") {
+        const targetEl = document.querySelector(
+          `[data-bdd-id="${target.id}"][data-bdd-type="${target.type}"]`,
+        ) as HTMLElement | null;
+        setBddHighlight(targetEl, target.pos);
+      } else {
+        clearBddHighlight();
+      }
+    };
+
+    const onMouseUp = () => {
+      const source = dragSourceRef.current;
+      const target = dropTargetRef.current;
+
+      // 常にクリーンアップ
+      dragStartRef.current = null;
+
+      if (!source) return;
+
+      // ドラッグ中だった場合
+      clearBddHighlight();
+      dragSourceRef.current = null;
+      dropTargetRef.current = null;
+      setDragSource(null);
+      document.body.classList.remove("bdd-dragging");
+
+      if (target) {
+        executeBddDrop(source, target);
+      }
+
+      // ドラッグ後のclick発火を抑制
+      const suppress = (ev: MouseEvent) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+        window.removeEventListener("click", suppress, true);
+      };
+      window.addEventListener("click", suppress, true);
+      setTimeout(() => window.removeEventListener("click", suppress, true), 100);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      clearBddHighlight();
+      document.body.classList.remove("bdd-dragging");
+    };
+  }, []);
 
   const ctx: BarContext = useMemo(
     () => ({
@@ -248,6 +412,7 @@ export function BookmarkBar() {
       commitRename,
       cancelRename: () => setRenamingId(null),
       itemHeight,
+      handleItemMouseDown,
     }),
     [
       bookmarks,
@@ -262,6 +427,7 @@ export function BookmarkBar() {
       startRename,
       commitRename,
       itemHeight,
+      handleItemMouseDown,
     ],
   );
 
@@ -269,18 +435,14 @@ export function BookmarkBar() {
     <BarCtx.Provider value={ctx}>
       <div
         data-drop-zone="bookmark-bar"
-        className="flex items-center px-2 border-b border-[#e5e5e5] shrink-0 gap-0.5 overflow-x-auto scrollbar-none transition-colors duration-150"
+        data-bdd-bar
+        className="flex items-center px-2 border-b border-[var(--chrome-border)] shrink-0 gap-0.5 overflow-x-auto scrollbar-none transition-colors duration-150"
         style={{
           height: barHeight,
           fontSize: uiFontSize,
-          background: externalDragOver
-            ? "linear-gradient(rgba(var(--accent-rgb), 0.20), rgba(var(--accent-rgb), 0.20)), #f5f5f5"
-            : "linear-gradient(rgba(var(--accent-rgb), 0.08), rgba(var(--accent-rgb), 0.08)), #f5f5f5",
-          borderColor: externalDragOver ? "var(--accent)" : undefined,
+          background: "var(--chrome-bg)",
+          color: "var(--chrome-text-dim)",
         }}
-        onDragOver={handleBarDragOver}
-        onDragLeave={handleBarDragLeave}
-        onDrop={handleBarDrop}
         onContextMenu={(e) => {
           e.preventDefault();
           setContextMenu({ x: e.clientX, y: e.clientY, type: "bar" });
@@ -312,9 +474,25 @@ export function BookmarkBar() {
         )}
 
         {bookmarks.length === 0 && folders.length === 0 && (
-          <span className="text-[10px] text-[#bbb] select-none">
+          <span className="text-[10px] text-[var(--chrome-text-dim)] select-none opacity-60">
             ★ to bookmark · Drag folders here
           </span>
+        )}
+
+        {/* ドラッグゴースト */}
+        {dragSource && (
+          <div
+            ref={ghostRef}
+            className="fixed pointer-events-none z-[100] px-2 py-1 bg-white/90 border border-[#d0d0d0] rounded shadow text-xs flex items-center gap-1"
+            style={{ left: -9999, top: -9999 }}
+          >
+            {dragSource.type === "folder" ? (
+              <Folder className="w-3 h-3 text-amber-500 shrink-0" />
+            ) : (
+              <BookmarkIcon className="w-3 h-3 text-[var(--accent)] shrink-0" />
+            )}
+            <span className="truncate max-w-[120px]">{dragSource.name}</span>
+          </div>
         )}
 
         {/* コンテキストメニュー */}
@@ -483,37 +661,10 @@ export function BookmarkBar() {
   );
 }
 
-// === ドロップ位置からreorderItem呼び出し ===
-
-function executeReorder(
-  ctx: BarContext,
-  itemData: { type: "bookmark" | "folder"; id: string },
-  dropPos: DropPos,
-  targetItem: BookmarkItem,
-  itemIndex: number,
-) {
-  if (dropPos === "inside" && targetItem.type === "folder") {
-    // フォルダ内に移動
-    ctx.reorderItem(itemData.type, itemData.id, null, null, targetItem.data.id);
-  } else if (dropPos === "before") {
-    // この要素の前に挿入
-    ctx.reorderItem(itemData.type, itemData.id, targetItem.data.id, targetItem.type, undefined);
-  } else {
-    // この要素の後に挿入 → 次のアイテムの前に挿入
-    const next = findNextItem(ctx.rootItems, itemIndex, itemData.type, itemData.id);
-    if (next) {
-      ctx.reorderItem(itemData.type, itemData.id, next.data.id, next.type, undefined);
-    } else {
-      ctx.reorderItem(itemData.type, itemData.id, null, null, undefined);
-    }
-  }
-}
-
 // === バー上のブックマークボタン ===
 
 function BarBookmarkButton({ bookmark, itemIndex }: { bookmark: Bookmark; itemIndex: number }) {
   const ctx = useContext(BarCtx);
-  const [dropPos, setDropPos] = useState<DropPos>(null);
 
   if (ctx.renamingId === bookmark.id) {
     return (
@@ -533,57 +684,34 @@ function BarBookmarkButton({ bookmark, itemIndex }: { bookmark: Bookmark; itemIn
   }
 
   return (
-    <>
-      {dropPos === "before" && <div className={DROP_BAR_STYLE} />}
-      <button
-        draggable
-        className={cn(
-          "flex items-center gap-1 px-2.5 rounded text-[#555] hover:bg-[#e8e8e8] shrink-0 cursor-pointer transition-colors max-w-[160px]",
-          bookmark.path.toLowerCase() === ctx.currentPath.toLowerCase() &&
-            "bg-[#e8e8e8] text-[#1a1a1a] font-medium",
-        )}
-        style={{ height: ctx.itemHeight }}
-        onClick={() => ctx.navigate(bookmark.path)}
-        data-mid-click-path={bookmark.path}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-          ctx.startRename(bookmark.id, "bookmark", bookmark.name);
-        }}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          ctx.setContextMenu({ x: e.clientX, y: e.clientY, type: "bookmark", id: bookmark.id });
-        }}
-        onDragStart={(e) => setItemDragData(e, "bookmark", bookmark.id)}
-        onDragOver={(e) => {
-          const types = Array.from(e.dataTransfer.types);
-          if (types.includes(DRAG_TYPE)) {
-            e.preventDefault();
-            e.stopPropagation();
-            const rect = e.currentTarget.getBoundingClientRect();
-            const relX = (e.clientX - rect.left) / rect.width;
-            setDropPos(relX < 0.5 ? "before" : "after");
-          }
-        }}
-        onDragLeave={() => setDropPos(null)}
-        onDrop={(e) => {
-          const pos = dropPos;
-          setDropPos(null);
-          const itemData = getItemDragData(e);
-          if (itemData && itemData.id !== bookmark.id) {
-            e.preventDefault();
-            e.stopPropagation();
-            executeReorder(ctx, itemData, pos, { type: "bookmark", data: bookmark }, itemIndex);
-          }
-        }}
-        onDragEnd={() => setDropPos(null)}
-        title={bookmark.path}
-      >
-        <BookmarkIcon className="w-3 h-3 text-[var(--accent)] shrink-0" />
-        <span className="truncate">{bookmark.name}</span>
-      </button>
-      {dropPos === "after" && <div className={DROP_BAR_STYLE} />}
-    </>
+    <button
+      data-bdd-type="bookmark"
+      data-bdd-id={bookmark.id}
+      data-bdd-ctx="bar"
+      data-bdd-index={itemIndex}
+      className={cn(
+        "flex items-center gap-1 px-2.5 rounded text-[var(--chrome-text-dim)] hover:bg-[var(--chrome-hover)] shrink-0 cursor-pointer transition-colors max-w-[160px]",
+        bookmark.path.toLowerCase() === ctx.currentPath.toLowerCase() &&
+          "bg-[var(--chrome-active)] text-[var(--chrome-text)] font-medium",
+      )}
+      style={{ height: ctx.itemHeight }}
+      onClick={() => ctx.navigate(bookmark.path)}
+      onMouseDown={(e) => ctx.handleItemMouseDown(e, "bookmark", bookmark.id, bookmark.name)}
+      data-mid-click-path={bookmark.path}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        ctx.startRename(bookmark.id, "bookmark", bookmark.name);
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        ctx.setContextMenu({ x: e.clientX, y: e.clientY, type: "bookmark", id: bookmark.id });
+      }}
+      title={bookmark.path}
+    >
+      <BookmarkIcon className="w-3 h-3 text-[var(--chrome-text-dim)] shrink-0" />
+      <span className="truncate">{bookmark.name}</span>
+    </button>
   );
 }
 
@@ -604,7 +732,6 @@ function BarFolderButton({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [dropdownPos, setDropdownPos] = useState<{ left: number; top: number } | null>(null);
-  const [dropPos, setDropPos] = useState<DropPos>(null);
 
   const childItems = useMemo(
     () => getChildItems(ctx.bookmarks, ctx.folders, folder.id),
@@ -649,96 +776,68 @@ function BarFolderButton({
   }
 
   return (
-    <>
-      {dropPos === "before" && <div className={DROP_BAR_STYLE} />}
-      <div className="relative shrink-0">
-        <button
-          ref={buttonRef}
-          draggable
-          data-drop-zone="bookmark-folder"
-          data-folder-id={folder.id}
+    <div className="relative shrink-0">
+      <button
+        ref={buttonRef}
+        data-bdd-type="folder"
+        data-bdd-id={folder.id}
+        data-bdd-ctx="bar"
+        data-bdd-index={itemIndex}
+        data-drop-zone="bookmark-folder"
+        data-folder-id={folder.id}
+        className={cn(
+          "flex items-center gap-1 px-2.5 rounded text-[var(--chrome-text-dim)] hover:bg-[var(--chrome-hover)] cursor-pointer transition-colors",
+          isOpen && "bg-[var(--chrome-active)]",
+        )}
+        style={{ height: ctx.itemHeight }}
+        onClick={onToggle}
+        onMouseDown={(e) => ctx.handleItemMouseDown(e, "folder", folder.id, folder.name)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          ctx.setContextMenu({ x: e.clientX, y: e.clientY, type: "folder", id: folder.id });
+        }}
+      >
+        <Folder className="w-3 h-3 text-amber-500 shrink-0" />
+        <span className="truncate max-w-[100px]">{folder.name}</span>
+        <ChevronDown
           className={cn(
-            "flex items-center gap-1 px-2.5 rounded text-[#555] hover:bg-[#e8e8e8] cursor-pointer transition-colors",
-            isOpen && "bg-[#e8e8e8]",
-            dropPos === "inside" &&
-              "bg-[rgba(var(--accent-rgb),0.2)] outline outline-1 outline-[var(--accent)]",
+            "w-2.5 h-2.5 text-[var(--chrome-text-dim)] transition-transform",
+            isOpen && "rotate-180",
           )}
-          style={{ height: ctx.itemHeight }}
-          onClick={onToggle}
+        />
+        {childItems.length > 0 && (
+          <span className="text-[9px] text-[var(--chrome-text-dim)] ml-0.5">
+            ({childItems.length})
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div
+          ref={dropdownRef}
+          data-bookmark-dropdown
+          className="fixed bg-white border border-[#d0d0d0] rounded-md shadow-lg py-1 z-50 min-w-[160px] max-w-[240px] animate-fade-scale-in"
+          style={{
+            left: dropdownPos?.left ?? 0,
+            top: dropdownPos?.top ?? 0,
+            visibility: dropdownPos ? "visible" : "hidden",
+          }}
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            ctx.setContextMenu({ x: e.clientX, y: e.clientY, type: "folder", id: folder.id });
+            ctx.setContextMenu({
+              x: e.clientX,
+              y: e.clientY,
+              type: "bar",
+              parentFolderId: folder.id,
+            });
           }}
-          onDragStart={(e) => {
-            e.stopPropagation();
-            setItemDragData(e, "folder", folder.id);
-          }}
-          onDragOver={(e) => {
-            const types = Array.from(e.dataTransfer.types);
-            if (types.includes(DRAG_TYPE)) {
-              e.preventDefault();
-              e.stopPropagation();
-              // 3ゾーン: 左25%=before, 中央50%=inside, 右25%=after
-              const rect = e.currentTarget.getBoundingClientRect();
-              const relX = (e.clientX - rect.left) / rect.width;
-              if (relX < 0.25) setDropPos("before");
-              else if (relX > 0.75) setDropPos("after");
-              else setDropPos("inside");
-            }
-          }}
-          onDragLeave={() => setDropPos(null)}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const pos = dropPos;
-            setDropPos(null);
-
-            // ブックマーク内部D&Dの並べ替えのみ処理
-            const itemData = getItemDragData(e);
-            if (itemData && itemData.id !== folder.id) {
-              executeReorder(ctx, itemData, pos, { type: "folder", data: folder }, itemIndex);
-            }
-          }}
-          onDragEnd={() => setDropPos(null)}
         >
-          <Folder className="w-3 h-3 text-amber-500 shrink-0" />
-          <span className="truncate max-w-[100px]">{folder.name}</span>
-          <ChevronDown
-            className={cn("w-2.5 h-2.5 text-[#999] transition-transform", isOpen && "rotate-180")}
-          />
-          {childItems.length > 0 && (
-            <span className="text-[9px] text-[#999] ml-0.5">({childItems.length})</span>
-          )}
-        </button>
-
-        {isOpen && (
-          <div
-            ref={dropdownRef}
-            data-bookmark-dropdown
-            className="fixed bg-white border border-[#d0d0d0] rounded-md shadow-lg py-1 z-50 min-w-[160px] max-w-[240px] animate-fade-scale-in"
-            style={{
-              left: dropdownPos?.left ?? 0,
-              top: dropdownPos?.top ?? 0,
-              visibility: dropdownPos ? "visible" : "hidden",
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              ctx.setContextMenu({
-                x: e.clientX,
-                y: e.clientY,
-                type: "bar",
-                parentFolderId: folder.id,
-              });
-            }}
-          >
-            <DropdownContent parentId={folder.id} items={childItems} />
-          </div>
-        )}
-      </div>
-      {dropPos === "after" && <div className={DROP_BAR_STYLE} />}
-    </>
+          <DropdownContent parentId={folder.id} items={childItems} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -776,7 +875,6 @@ function DropdownContent({
 
 function DropdownBookmarkRow({ bookmark, parentId }: { bookmark: Bookmark; parentId: string }) {
   const ctx = useContext(BarCtx);
-  const [isDropTarget, setIsDropTarget] = useState(false);
 
   if (ctx.renamingId === bookmark.id) {
     return (
@@ -799,40 +897,21 @@ function DropdownBookmarkRow({ bookmark, parentId }: { bookmark: Bookmark; paren
 
   return (
     <button
-      draggable
+      data-bdd-type="bookmark"
+      data-bdd-id={bookmark.id}
+      data-bdd-ctx="dropdown"
+      data-bdd-parent={parentId}
       className={cn(
         "flex items-center gap-2 w-full px-3 py-1.5 text-xs text-left hover:bg-[#f0f0f0] transition-colors",
         bookmark.path.toLowerCase() === ctx.currentPath.toLowerCase() && "bg-[#e8f0fe] font-medium",
-        isDropTarget && "bg-[#d8d8d8]",
       )}
       onClick={() => ctx.navigate(bookmark.path)}
+      onMouseDown={(e) => ctx.handleItemMouseDown(e, "bookmark", bookmark.id, bookmark.name)}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
         ctx.setContextMenu({ x: e.clientX, y: e.clientY, type: "bookmark", id: bookmark.id });
       }}
-      onDragStart={(e) => {
-        e.stopPropagation();
-        setItemDragData(e, "bookmark", bookmark.id);
-      }}
-      onDragOver={(e) => {
-        if (Array.from(e.dataTransfer.types).includes(DRAG_TYPE)) {
-          e.preventDefault();
-          e.stopPropagation();
-          setIsDropTarget(true);
-        }
-      }}
-      onDragLeave={() => setIsDropTarget(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDropTarget(false);
-        const itemData = getItemDragData(e);
-        if (itemData && itemData.id !== bookmark.id) {
-          ctx.reorderItem(itemData.type, itemData.id, bookmark.id, "bookmark", parentId);
-        }
-      }}
-      onDragEnd={() => setIsDropTarget(false)}
       data-mid-click-path={bookmark.path}
       title={bookmark.path}
     >
@@ -847,7 +926,6 @@ function DropdownBookmarkRow({ bookmark, parentId }: { bookmark: Bookmark; paren
 function DropdownSubfolder({ folder }: { folder: BookmarkFolder }) {
   const ctx = useContext(BarCtx);
   const [isHovered, setIsHovered] = useState(false);
-  const [isDropTarget, setIsDropTarget] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
   const submenuRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -927,36 +1005,18 @@ function DropdownSubfolder({ folder }: { folder: BookmarkFolder }) {
       onMouseLeave={handleMouseLeave}
     >
       <button
-        draggable
+        data-bdd-type="folder"
+        data-bdd-id={folder.id}
+        data-bdd-ctx="dropdown"
         className={cn(
           "flex items-center gap-2 w-full px-3 py-1.5 text-xs text-left hover:bg-[#f0f0f0] transition-colors",
-          (isHovered || isDropTarget) && "bg-[#f0f0f0]",
+          isHovered && "bg-[#f0f0f0]",
         )}
+        onMouseDown={(e) => ctx.handleItemMouseDown(e, "folder", folder.id, folder.name)}
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
           ctx.setContextMenu({ x: e.clientX, y: e.clientY, type: "folder", id: folder.id });
-        }}
-        onDragStart={(e) => {
-          e.stopPropagation();
-          setItemDragData(e, "folder", folder.id);
-        }}
-        onDragOver={(e) => {
-          if (Array.from(e.dataTransfer.types).includes(DRAG_TYPE)) {
-            e.preventDefault();
-            e.stopPropagation();
-            setIsDropTarget(true);
-          }
-        }}
-        onDragLeave={() => setIsDropTarget(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setIsDropTarget(false);
-          const itemData = getItemDragData(e);
-          if (itemData && itemData.id !== folder.id) {
-            ctx.reorderItem(itemData.type, itemData.id, null, null, folder.id);
-          }
         }}
       >
         <Folder className="w-3 h-3 text-amber-500 shrink-0" />

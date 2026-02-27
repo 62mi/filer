@@ -3,6 +3,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { resolveResource } from "@tauri-apps/api/path";
 import { Loader } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  clearHighlight,
+  findDropZone,
+  handleNativeDrop,
+  setHighlight,
+} from "../../hooks/useNativeDrop";
 import { getTranslation, useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
@@ -261,10 +267,17 @@ export function Panel() {
     [onProperties],
   );
 
-  // ネイティブドラッグ: mousedown + mousemove閾値でstartDrag
+  // ハイブリッドドラッグ: カスタム内部ドラッグ + ウィンドウ外でネイティブOS D&D
   const dragStartRef = useRef<{ x: number; y: number; index: number } | null>(null);
   const draggingRef = useRef(false);
   const dragIconRef = useRef<string>("");
+  const dragPathsRef = useRef<string[]>([]);
+  const [dragGhostPaths, setDragGhostPaths] = useState<{
+    paths: string[];
+    names: string[];
+    isDirs: boolean[];
+  } | null>(null);
+  const dragGhostRef = useRef<HTMLDivElement>(null);
 
   // 起動時にドラッグアイコンのパスを解決
   useEffect(() => {
@@ -276,9 +289,22 @@ export function Panel() {
   }, []);
 
   const handleFileMouseDown = useCallback((e: React.MouseEvent, index: number) => {
-    if (e.button !== 0) return; // 左クリックのみ
+    if (e.button !== 0) return;
     dragStartRef.current = { x: e.clientX, y: e.clientY, index };
     draggingRef.current = false;
+  }, []);
+
+  // カスタムドラッグのクリーンアップ
+  const cleanupDrag = useCallback(() => {
+    draggingRef.current = false;
+    dragPathsRef.current = [];
+    setDragGhostPaths(null);
+    clearHighlight();
+    document.body.classList.remove("file-dragging");
+    if (suggestionTimerRef.current) {
+      clearTimeout(suggestionTimerRef.current);
+      suggestionTimerRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -286,13 +312,25 @@ export function Panel() {
 
     const handleMouseMove = (e: MouseEvent) => {
       const start = dragStartRef.current;
-      if (!start || draggingRef.current) return;
+
+      // カスタムドラッグ中: ゴースト追従 + ハイライト更新
+      if (draggingRef.current) {
+        if (dragGhostRef.current) {
+          dragGhostRef.current.style.left = `${e.clientX + 12}px`;
+          dragGhostRef.current.style.top = `${e.clientY + 12}px`;
+        }
+        const zone = findDropZone(e.clientX, e.clientY);
+        setHighlight(zone);
+        return;
+      }
+
+      if (!start) return;
 
       const dx = e.clientX - start.x;
       const dy = e.clientY - start.y;
       if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
 
-      // 閾値超過 → ネイティブドラッグ開始
+      // 閾値超過 → カスタムドラッグモード開始
       draggingRef.current = true;
       dragStartRef.current = null;
 
@@ -301,14 +339,26 @@ export function Panel() {
       const entries = activeTab.searchResults ?? activeTab.entries;
       const index = start.index;
 
-      // ドラッグ対象の選択ロジック
       const indices =
         activeTab.selectedIndices.size > 0 && activeTab.selectedIndices.has(index)
           ? Array.from(activeTab.selectedIndices)
           : [index];
       const dragEntries = indices.map((i) => entries[i]).filter(Boolean);
       const paths = dragEntries.map((de) => de.path);
-      if (paths.length === 0) return;
+      if (paths.length === 0) {
+        draggingRef.current = false;
+        return;
+      }
+
+      dragPathsRef.current = paths;
+      document.body.classList.add("file-dragging");
+
+      // ゴースト表示
+      setDragGhostPaths({
+        paths,
+        names: dragEntries.map((de) => de.name),
+        isDirs: dragEntries.map((de) => de.is_dir),
+      });
 
       // サジェスト表示（300ms後）
       const extensions = dragEntries
@@ -324,37 +374,42 @@ export function Panel() {
             useSuggestionStore.getState().show(e.clientX, e.clientY);
           });
       }, 300);
-
-      // ネイティブドラッグ開始
-      startDrag({ item: paths, icon: dragIconRef.current || "" }, (payload) => {
-        // ドラッグ完了コールバック
-        if (payload.result === "Dropped") {
-          // 外部アプリへのドロップ後はリフレッシュ
-          useExplorerStore.getState().refreshDirectory();
-        }
-        // サジェストクリーンアップ
-        if (suggestionTimerRef.current) {
-          clearTimeout(suggestionTimerRef.current);
-          suggestionTimerRef.current = null;
-        }
-        useSuggestionStore.getState().hide();
-        draggingRef.current = false;
-      }).catch(() => {
-        draggingRef.current = false;
-      });
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: MouseEvent) => {
+      if (draggingRef.current && dragPathsRef.current.length > 0) {
+        // カスタムドラッグ中のmouseup → 内部ドロップ実行
+        handleNativeDrop(dragPathsRef.current, e.clientX, e.clientY);
+        useSuggestionStore.getState().hide();
+        cleanupDrag();
+        return;
+      }
       dragStartRef.current = null;
+    };
+
+    // ウィンドウ外にカーソルが出たらネイティブドラッグに切り替え
+    const handleMouseLeave = () => {
+      if (!draggingRef.current || dragPathsRef.current.length === 0) return;
+      const paths = [...dragPathsRef.current];
+      cleanupDrag();
+      useSuggestionStore.getState().hide();
+
+      startDrag({ item: paths, icon: dragIconRef.current || "" }, (payload) => {
+        if (payload.result === "Dropped") {
+          useExplorerStore.getState().refreshDirectory();
+        }
+      }).catch(() => {});
     };
 
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
+    document.documentElement.addEventListener("mouseleave", handleMouseLeave);
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
+      document.documentElement.removeEventListener("mouseleave", handleMouseLeave);
     };
-  }, []);
+  }, [cleanupDrag]);
 
   // クリップボードからファイル生成
   const handleClipboardToFile = useCallback(
@@ -522,18 +577,17 @@ export function Panel() {
         case "v":
           if (e.ctrlKey && !e.shiftKey) {
             e.preventDefault();
-            // Filer内部クリップボードがあればそれを優先
-            const internalClipboard = useExplorerStore.getState().clipboard;
-            if (internalClipboard) {
-              clipboardPaste();
-            } else {
-              // システムクリップボードからファイル生成を試みる
-              handleClipboardToFile(activeTab.path).catch((err: unknown) => {
-                toast.error(
-                  `${t.panel.fileOperationFailed}: ${err instanceof Error ? err.message : String(err)}`,
-                );
-              });
-            }
+            // OSクリップボード/内部クリップボードのファイルを先に試行
+            // ファイルがなければ画像/テキストのファイル生成にフォールバック
+            clipboardPaste().then((handled) => {
+              if (!handled) {
+                handleClipboardToFile(activeTab.path).catch((err: unknown) => {
+                  toast.error(
+                    `${t.panel.fileOperationFailed}: ${err instanceof Error ? err.message : String(err)}`,
+                  );
+                });
+              }
+            });
           }
           break;
         case "S":
@@ -920,6 +974,40 @@ export function Panel() {
 
       {/* 移動先サジェストポップアップ */}
       <DragSuggestion onSelectDestination={handleSuggestionSelect} />
+
+      {/* カスタムドラッグゴースト */}
+      {dragGhostPaths && (
+        <div
+          ref={dragGhostRef}
+          className="fixed z-[9999] pointer-events-none"
+          style={{ left: -9999, top: -9999 }}
+        >
+          <div className="relative">
+            {dragGhostPaths.names.slice(0, 3).map((name, i) => (
+              <div
+                key={dragGhostPaths.paths[i]}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#d0d0d0] rounded-md shadow-md max-w-[220px] absolute left-0 top-0 text-xs"
+                style={{
+                  transform: `translate(${i * 4}px, ${i * 2}px) rotate(${i * 3}deg)`,
+                  transformOrigin: "bottom left",
+                  opacity: i > 0 ? 0.7 : 1,
+                  zIndex: 3 - i,
+                }}
+              >
+                <span className={dragGhostPaths.isDirs[i] ? "text-amber-500" : "text-[#666]"}>
+                  {dragGhostPaths.isDirs[i] ? "\uD83D\uDCC1" : "\uD83D\uDCC4"}
+                </span>
+                <span className="truncate">{name}</span>
+              </div>
+            ))}
+            {dragGhostPaths.paths.length > 1 && (
+              <span className="absolute -top-2 right-0 text-[11px] bg-[var(--accent)] text-white rounded-full px-1.5 min-w-[20px] text-center font-semibold leading-[18px] shadow-sm z-10">
+                +{dragGhostPaths.paths.length}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

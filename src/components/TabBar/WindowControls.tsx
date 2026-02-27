@@ -26,7 +26,7 @@ export function WindowControls() {
       {/* 最小化 */}
       <button
         type="button"
-        className="w-[46px] h-full flex items-center justify-center hover:bg-[#e0e0e0] transition-colors"
+        className="w-[46px] h-full flex items-center justify-center hover:bg-[var(--tab-hover)] transition-colors"
         onClick={() => appWindow.minimize()}
         title="最小化"
       >
@@ -38,24 +38,22 @@ export function WindowControls() {
       {/* 最大化 / 復元 */}
       <button
         type="button"
-        className="w-[46px] h-full flex items-center justify-center hover:bg-[#e0e0e0] transition-colors"
+        className="w-[46px] h-full flex items-center justify-center hover:bg-[var(--tab-hover)] transition-colors"
         onClick={() => appWindow.toggleMaximize()}
         title={maximized ? "元に戻す" : "最大化"}
       >
         {maximized ? (
           // 復元アイコン（重なった四角）
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <rect x="2" y="0" width="8" height="8" rx="0.5" stroke="currentColor" strokeWidth="1" />
-            <rect
-              x="0"
-              y="2"
-              width="8"
-              height="8"
-              rx="0.5"
+            {/* 背面の四角（前面に隠れない部分だけ描画） */}
+            <polyline
+              points="2.5,7.5 2.5,0.5 9.5,0.5 9.5,7.5"
               stroke="currentColor"
               strokeWidth="1"
-              fill="#e8e8e8"
+              fill="none"
             />
+            {/* 前面の四角 */}
+            <rect x="0.5" y="2.5" width="7" height="7" stroke="currentColor" strokeWidth="1" />
           </svg>
         ) : (
           // 最大化アイコン（四角）

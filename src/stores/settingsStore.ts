@@ -1,6 +1,15 @@
 import { create } from "zustand";
 import type { Language } from "../i18n";
 
+export type PathStyle = "windows" | "linux";
+
+export interface ColumnWidths {
+  name: number;
+  modified: number;
+  extension: number;
+  size: number;
+}
+
 interface SettingsState {
   // Bar heights (px)
   tabBarHeight: number;
@@ -20,12 +29,22 @@ interface SettingsState {
   gridFontSize: number; // グリッドセルのファイル名
   uiFontSize: number; // タブ・ブックマーク・ステータスバー等のUI
 
+  // Column widths (px)
+  columnWidths: ColumnWidths;
+
+  // Color theme
+  colorTheme: string;
+
   // Language
   language: Language;
 
+  // Path display style
+  pathStyle: PathStyle;
+
   // Settings dialog
   isOpen: boolean;
-  openSettings: () => void;
+  initialTab: string | null;
+  openSettings: (tab?: string) => void;
   closeSettings: () => void;
 
   // Actions
@@ -49,11 +68,21 @@ interface SettingsData {
   fontSize: number;
   gridFontSize: number;
   uiFontSize: number;
+  columnWidths: ColumnWidths;
+  colorTheme: string;
   language: Language;
+  pathStyle: PathStyle;
 }
 
+const DEFAULT_COLUMN_WIDTHS: ColumnWidths = {
+  name: 260,
+  modified: 132,
+  extension: 88,
+  size: 80,
+};
+
 const DEFAULTS: SettingsData = {
-  tabBarHeight: 32,
+  tabBarHeight: 46,
   bookmarkBarHeight: 36,
   bookmarkItemHeight: 28,
   toolbarHeight: 40,
@@ -65,7 +94,10 @@ const DEFAULTS: SettingsData = {
   fontSize: 14,
   gridFontSize: 12,
   uiFontSize: 12,
+  columnWidths: DEFAULT_COLUMN_WIDTHS,
+  colorTheme: "auto",
   language: "ja",
+  pathStyle: "windows" as PathStyle,
 };
 
 function loadSettings(): Partial<SettingsData> {
@@ -91,7 +123,10 @@ function saveSettings(state: SettingsState) {
     fontSize: state.fontSize,
     gridFontSize: state.gridFontSize,
     uiFontSize: state.uiFontSize,
+    columnWidths: state.columnWidths,
+    colorTheme: state.colorTheme,
     language: state.language,
+    pathStyle: state.pathStyle,
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -115,11 +150,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   fontSize: saved.fontSize ?? DEFAULTS.fontSize,
   gridFontSize: saved.gridFontSize ?? DEFAULTS.gridFontSize,
   uiFontSize: saved.uiFontSize ?? DEFAULTS.uiFontSize,
+  columnWidths: { ...DEFAULT_COLUMN_WIDTHS, ...saved.columnWidths },
+  colorTheme: saved.colorTheme ?? DEFAULTS.colorTheme,
   language: saved.language ?? DEFAULTS.language,
+  pathStyle: saved.pathStyle ?? DEFAULTS.pathStyle,
 
   isOpen: false,
-  openSettings: () => set({ isOpen: true }),
-  closeSettings: () => set({ isOpen: false }),
+  initialTab: null,
+  openSettings: (tab) => set({ isOpen: true, initialTab: tab ?? null }),
+  closeSettings: () => set({ isOpen: false, initialTab: null }),
 
   setSetting: (key, value) => {
     set({ [key]: value } as Partial<SettingsState>);
@@ -137,6 +176,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     saveSettings(get());
   },
 }));
+
+// 列幅合計（横スクロール用の最小幅計算）
+// アイコン(16) + mr(8) + px-2左右(16) + 全列幅
+export function getTotalColumnWidth(cw: ColumnWidths) {
+  return 24 + 16 + cw.name + cw.modified + cw.extension + cw.size;
+}
 
 // Computed helpers (not in store to avoid re-renders)
 export function getGridCellWidth(state: { gridIconSize: number }) {

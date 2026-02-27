@@ -5,6 +5,7 @@ import { useAiStore } from "../../stores/aiStore";
 import { useDirSizeStore } from "../../stores/dirSizeStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+
 import { formatFileSize } from "../../utils/format";
 import { calculateQuickTidiness, getScoreColor, getStars } from "../../utils/tidiness";
 import { CopyQueueMiniIndicator } from "../CopyQueue";
@@ -21,7 +22,7 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
   const uiFontSize = useSettingsStore((s) => s.uiFontSize);
   const usageInfo = useAiStore((s) => s.usageInfo);
   const hasApiKey = useAiStore((s) => s.hasApiKey);
-  const openSettings = useAiStore((s) => s.openSettings);
+  const openSettings = useSettingsStore((s) => s.openSettings);
 
   const entries = tab.entries;
   const selectedIndices = tab.selectedIndices;
@@ -56,9 +57,19 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
 
   return (
     <div
-      className="flex items-center px-3 text-[#666] bg-[#f9f9f9] border-t border-[#e5e5e5] select-none shrink-0"
-      style={{ height: statusBarHeight, fontSize: uiFontSize }}
+      className="relative flex items-center px-3 text-[var(--chrome-text-dim)] border-t border-[var(--chrome-border)] select-none shrink-0"
+      style={{
+        height: statusBarHeight,
+        fontSize: uiFontSize,
+        background: "var(--chrome-bg)",
+      }}
     >
+      {/* ロード進捗バー */}
+      {tab.loading && (
+        <div className="absolute top-0 left-0 right-0 h-[2px] overflow-hidden">
+          <div className="statusbar-progress-bar" />
+        </div>
+      )}
       <span>
         {totalItems} {t.statusBar.items} ({totalDirs} {t.statusBar.folders}, {totalFiles}{" "}
         {t.statusBar.files})
@@ -66,8 +77,8 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
 
       {selectedCount > 0 && (
         <span key={selectedCount} className="animate-fade-in flex items-center">
-          <span className="mx-2 text-[#ccc]">|</span>
-          <span className="text-[#0078d4]">
+          <span className="mx-2 text-[var(--chrome-border)]">|</span>
+          <span className="text-[var(--accent)]">
             {selectedCount} {t.statusBar.selected} ({formatFileSize(selectedSize)})
           </span>
         </span>
@@ -75,7 +86,7 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
 
       {tidiness && (
         <span className="animate-fade-in flex items-center">
-          <span className="mx-2 text-[#ccc]">|</span>
+          <span className="mx-2 text-[var(--chrome-border)]">|</span>
           <span
             className={`${getScoreColor(tidiness.total)} cursor-default`}
             title={`${t.statusBar.tidiness.score}: ${tidiness.total}/100\n${getStars(tidiness.total)}\n\n${t.statusBar.tidiness.extTypes}: ${tidiness.ext_score} (${tidiness.ext_count}${t.statusBar.tidiness.types})\n${t.statusBar.tidiness.oldFiles}: ${tidiness.age_score}\n${t.statusBar.tidiness.fileCount}: ${tidiness.count_score} (${tidiness.file_count}${t.statusBar.tidiness.count})\n${t.statusBar.tidiness.nestDepth}: ${tidiness.nest_score}${tidiness.max_depth > 0 ? ` (${t.statusBar.tidiness.depth}${tidiness.max_depth})` : ""}`}
@@ -93,8 +104,8 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
       {/* AI使用量バジェットインジケータ */}
       {hasApiKey && (
         <button
-          className={`flex items-center gap-1 px-1.5 py-0.5 mr-2 rounded hover:bg-[#e0e0e0] transition-colors ${getBudgetColor()}`}
-          onClick={openSettings}
+          className={`flex items-center gap-1 px-1.5 py-0.5 mr-2 rounded hover:bg-[var(--chrome-hover)] transition-colors ${getBudgetColor()}`}
+          onClick={() => openSettings("ai")}
           title={t.statusBar.aiUsageTooltip}
         >
           <Sparkles className="w-3 h-3" />
@@ -112,7 +123,7 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
       )}
 
       <button
-        className="p-0.5 mr-2 rounded hover:bg-[#e0e0e0] text-[#999] transition-colors"
+        className="p-0.5 mr-2 rounded hover:bg-[var(--chrome-hover)] text-[var(--chrome-text-dim)] transition-colors"
         onClick={onTogglePreview}
         title={t.statusBar.togglePreview}
       >
@@ -123,7 +134,7 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
         )}
       </button>
 
-      <span className="text-[#999] truncate max-w-md">{tab.path}</span>
+      <span className="text-[var(--chrome-text-dim)] truncate max-w-md">{tab.path}</span>
     </div>
   );
 }

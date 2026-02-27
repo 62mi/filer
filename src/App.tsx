@@ -1,6 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
-import { AiSettings } from "./components/AiSettings";
 import { BookmarkBar } from "./components/BookmarkBar";
 import { CommandPalette } from "./components/CommandPalette";
 import { CopyQueuePanel } from "./components/CopyQueue";
@@ -80,6 +79,21 @@ function App() {
     const unlistenPromise = useCopyQueueStore.getState().initListener();
     return () => {
       unlistenPromise.then((fn) => fn()).catch(() => {});
+    };
+  }, []);
+
+  // クリップボード変更イベント（OS側のクリップボード監視）
+  useEffect(() => {
+    const unlisten = listen<{ paths: string[]; operation: string }>(
+      "clipboard-changed",
+      (event) => {
+        useExplorerStore
+          .getState()
+          .syncExternalClipboard(event.payload.paths, event.payload.operation);
+      },
+    );
+    return () => {
+      unlisten.then((f) => f()).catch(() => {});
     };
   }, []);
 
@@ -183,11 +197,11 @@ function App() {
       <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
         <div
-          className="shrink-0 border-r border-[rgba(var(--accent-rgb),0.2)] overflow-hidden"
+          className="shrink-0 border-r border-[var(--chrome-border)] overflow-hidden"
           style={{
             width: sidebarWidth,
-            background:
-              "linear-gradient(rgba(var(--accent-rgb), 0.12), rgba(var(--accent-rgb), 0.12)), #f3f3f3",
+            background: "var(--chrome-bg)",
+            color: "var(--chrome-text)",
           }}
         >
           <Sidebar />
@@ -196,7 +210,7 @@ function App() {
         {/* Sidebar resize handle */}
         <div
           className={`w-1 cursor-col-resize hover:bg-[var(--accent)] transition-colors shrink-0 ${
-            dragging ? "bg-[var(--accent)]" : "bg-[#e5e5e5]"
+            dragging ? "bg-[var(--accent)]" : "bg-[var(--chrome-border)]"
           }`}
           onMouseDown={handleMouseDown}
         />
@@ -231,10 +245,7 @@ function App() {
       {/* AI Rule Wizard Dialog */}
       <RuleWizard />
 
-      {/* AI Settings Dialog (global) */}
-      <AiSettings />
-
-      {/* UI Settings Dialog */}
+      {/* Settings Dialog */}
       <SettingsDialog />
 
       {/* Command Palette */}

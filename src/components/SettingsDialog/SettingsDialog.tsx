@@ -1,7 +1,9 @@
-import { RotateCcw, X } from "lucide-react";
+import { Check, DollarSign, Key, Monitor, RotateCcw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type Language, useTranslation } from "../../i18n";
-import { useSettingsStore } from "../../stores/settingsStore";
+import { useAiStore } from "../../stores/aiStore";
+import { type PathStyle, useSettingsStore } from "../../stores/settingsStore";
+import { COLOR_THEMES, useThemeStore } from "../../stores/themeStore";
 import { cn } from "../../utils/cn";
 
 type SettingKey =
@@ -26,16 +28,29 @@ interface SettingField {
   unit?: string;
 }
 
-type TabMode = "general" | "simple" | "advanced";
+type TabMode = "general" | "simple" | "advanced" | "ai" | "about";
+
+const APP_VERSION = "1.2.0";
 
 export function SettingsDialog() {
   const t = useTranslation();
   const isOpen = useSettingsStore((s) => s.isOpen);
+  const initialTab = useSettingsStore((s) => s.initialTab);
   const closeSettings = useSettingsStore((s) => s.closeSettings);
   const resetToDefaults = useSettingsStore((s) => s.resetToDefaults);
   const language = useSettingsStore((s) => s.language);
+  const pathStyle = useSettingsStore((s) => s.pathStyle);
   const setSetting = useSettingsStore((s) => s.setSetting);
   const [tab, setTab] = useState<TabMode>("general");
+
+  // initialTab指定でダイアログが開かれた場合、そのタブに切り替え
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setTab(initialTab as TabMode);
+    } else if (isOpen) {
+      setTab("general");
+    }
+  }, [isOpen, initialTab]);
 
   // 簡易モード: よく使う設定だけ
   const SIMPLE_FIELDS: SettingField[] = useMemo(
@@ -125,7 +140,7 @@ export function SettingsDialog() {
             className={cn(
               "px-3 py-2 text-xs transition-colors border-b-2",
               tab === "general"
-                ? "text-[#0078d4] border-[#0078d4]"
+                ? "text-[var(--accent)] border-[var(--accent)]"
                 : "text-[#888] border-transparent hover:text-[#555]",
             )}
             onClick={() => setTab("general")}
@@ -136,7 +151,7 @@ export function SettingsDialog() {
             className={cn(
               "px-3 py-2 text-xs transition-colors border-b-2",
               tab === "simple"
-                ? "text-[#0078d4] border-[#0078d4]"
+                ? "text-[var(--accent)] border-[var(--accent)]"
                 : "text-[#888] border-transparent hover:text-[#555]",
             )}
             onClick={() => setTab("simple")}
@@ -147,12 +162,34 @@ export function SettingsDialog() {
             className={cn(
               "px-3 py-2 text-xs transition-colors border-b-2",
               tab === "advanced"
-                ? "text-[#0078d4] border-[#0078d4]"
+                ? "text-[var(--accent)] border-[var(--accent)]"
                 : "text-[#888] border-transparent hover:text-[#555]",
             )}
             onClick={() => setTab("advanced")}
           >
             {t.settingsDialog.advanced}
+          </button>
+          <button
+            className={cn(
+              "px-3 py-2 text-xs transition-colors border-b-2",
+              tab === "ai"
+                ? "text-[var(--accent)] border-[var(--accent)]"
+                : "text-[#888] border-transparent hover:text-[#555]",
+            )}
+            onClick={() => setTab("ai")}
+          >
+            AI
+          </button>
+          <button
+            className={cn(
+              "px-3 py-2 text-xs transition-colors border-b-2",
+              tab === "about"
+                ? "text-[var(--accent)] border-[var(--accent)]"
+                : "text-[#888] border-transparent hover:text-[#555]",
+            )}
+            onClick={() => setTab("about")}
+          >
+            {t.settingsDialog.about}
           </button>
         </div>
 
@@ -160,17 +197,37 @@ export function SettingsDialog() {
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {tab === "general" && (
             <div className="space-y-4">
+              {/* カラーテーマ */}
               <div>
+                <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+                  {t.settingsDialog.colorTheme}
+                </div>
+                <ThemePicker />
+              </div>
+              <div className="border-t border-[#f0f0f0] pt-3">
                 <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
                   {t.settingsDialog.language}
                 </div>
                 <select
-                  className="w-full h-8 px-2 text-xs border border-[#d0d0d0] rounded outline-none focus:border-[#0078d4] bg-white"
+                  className="w-full h-8 px-2 text-xs border border-[#d0d0d0] rounded outline-none focus:border-[var(--accent)] bg-white"
                   value={language}
                   onChange={(e) => setSetting("language", e.target.value as Language)}
                 >
                   <option value="ja">{t.settingsDialog.languageJa}</option>
                   <option value="en">{t.settingsDialog.languageEn}</option>
+                </select>
+              </div>
+              <div className="border-t border-[#f0f0f0] pt-3">
+                <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+                  {t.settingsDialog.pathStyle}
+                </div>
+                <select
+                  className="w-full h-8 px-2 text-xs border border-[#d0d0d0] rounded outline-none focus:border-[var(--accent)] bg-white"
+                  value={pathStyle}
+                  onChange={(e) => setSetting("pathStyle", e.target.value as PathStyle)}
+                >
+                  <option value="windows">{t.settingsDialog.pathStyleWindows}</option>
+                  <option value="linux">{t.settingsDialog.pathStyleLinux}</option>
                 </select>
               </div>
             </div>
@@ -226,19 +283,71 @@ export function SettingsDialog() {
               </div>
             </div>
           )}
+          {tab === "ai" && <AiSettingsTab />}
+          {tab === "about" && (
+            <div className="space-y-4">
+              <div>
+                <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+                  {t.settingsDialog.aboutAppName}
+                </div>
+                <div className="text-xs text-[#555]">TomaFiler</div>
+              </div>
+              <div className="border-t border-[#f0f0f0] pt-3">
+                <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+                  {t.settingsDialog.aboutVersion}
+                </div>
+                <div className="text-xs text-[#555]">v{APP_VERSION}</div>
+              </div>
+              <div className="border-t border-[#f0f0f0] pt-3">
+                <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+                  {t.settingsDialog.aboutCopyright}
+                </div>
+                <div className="text-xs text-[#555]">&copy; Tomako</div>
+              </div>
+              <div className="border-t border-[#f0f0f0] pt-3">
+                <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+                  {t.settingsDialog.aboutWebsite}
+                </div>
+                <a
+                  href="https://www.tomatobiyori.com/tools/filer/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-[var(--accent)] underline hover:opacity-80"
+                >
+                  https://www.tomatobiyori.com/tools/filer/
+                </a>
+              </div>
+              <div className="border-t border-[#f0f0f0] pt-3">
+                <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+                  {t.settingsDialog.aboutContact}
+                </div>
+                <a
+                  href="mailto:tomako@tomatobiyori.com"
+                  className="text-xs text-[var(--accent)] underline hover:opacity-80"
+                >
+                  tomako@tomatobiyori.com
+                </a>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="flex justify-end px-4 py-3 border-t border-[#e5e5e5] gap-2">
+          {tab !== "about" && tab !== "ai" && (
+            <button
+              className="flex items-center gap-1 px-3 py-1.5 text-xs rounded border border-[#d0d0d0] text-[#666] hover:bg-[#f0f0f0] transition-colors"
+              onClick={() => {
+                resetToDefaults();
+                useThemeStore.getState().applyTheme("auto");
+              }}
+            >
+              <RotateCcw className="w-3 h-3" />
+              {t.common.resetAll}
+            </button>
+          )}
           <button
-            className="flex items-center gap-1 px-3 py-1.5 text-xs rounded border border-[#d0d0d0] text-[#666] hover:bg-[#f0f0f0] transition-colors"
-            onClick={resetToDefaults}
-          >
-            <RotateCcw className="w-3 h-3" />
-            {t.common.resetAll}
-          </button>
-          <button
-            className="px-4 py-1.5 text-xs rounded bg-[#0078d4] text-white hover:bg-[#006cbd] transition-colors"
+            className="px-4 py-1.5 text-xs rounded bg-[var(--accent)] text-white hover:opacity-90 transition-colors"
             onClick={closeSettings}
           >
             {t.common.close}
@@ -264,7 +373,7 @@ function SettingRow({ field }: { field: SettingField }) {
           max={field.max}
           value={value}
           onChange={(e) => setSetting(field.key, Number(e.target.value))}
-          className="w-24 h-1 accent-[#0078d4]"
+          className="w-24 h-1 accent-[var(--accent)]"
         />
         <input
           type="number"
@@ -276,10 +385,279 @@ function SettingRow({ field }: { field: SettingField }) {
             if (!Number.isNaN(v))
               setSetting(field.key, Math.max(field.min, Math.min(field.max, v)));
           }}
-          className="w-14 h-6 px-1 text-xs text-center border border-[#d0d0d0] rounded outline-none focus:border-[#0078d4]"
+          className="w-14 h-6 px-1 text-xs text-center border border-[#d0d0d0] rounded outline-none focus:border-[var(--accent)]"
         />
         <span className="text-[10px] text-[#999] w-5">{unit}</span>
       </div>
+    </div>
+  );
+}
+
+function AiSettingsTab() {
+  const t = useTranslation();
+  const hasApiKey = useAiStore((s) => s.hasApiKey);
+  const usageInfo = useAiStore((s) => s.usageInfo);
+  const saveApiKey = useAiStore((s) => s.saveApiKey);
+  const deleteApiKey = useAiStore((s) => s.deleteApiKey);
+  const setBudget = useAiStore((s) => s.setBudget);
+  const loadUsage = useAiStore((s) => s.loadUsage);
+
+  const [keyInput, setKeyInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [budgetInput, setBudgetInput] = useState("");
+  const [budgetSaved, setBudgetSaved] = useState(false);
+
+  useEffect(() => {
+    setKeyInput("");
+    setSaved(false);
+    setError(null);
+    setBudgetSaved(false);
+    loadUsage();
+  }, [loadUsage]);
+
+  useEffect(() => {
+    if (usageInfo?.budget_usd != null) {
+      setBudgetInput(String(usageInfo.budget_usd));
+    }
+  }, [usageInfo?.budget_usd]);
+
+  const handleSave = async () => {
+    if (!keyInput.trim()) {
+      setError(t.aiSettings.enterApiKey);
+      return;
+    }
+    if (!keyInput.trim().startsWith("sk-")) {
+      setError(t.aiSettings.apiKeyMustStartWithSk);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await saveApiKey(keyInput.trim());
+      setSaved(true);
+      setKeyInput("");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteApiKey();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const handleBudgetSave = async () => {
+    const amount = Number.parseFloat(budgetInput);
+    if (Number.isNaN(amount) || amount < 0) {
+      setError(t.aiSettings.enterValidAmount);
+      return;
+    }
+    try {
+      await setBudget(amount);
+      setBudgetSaved(true);
+      setTimeout(() => setBudgetSaved(false), 2000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const usagePercent = usageInfo?.budget_usd
+    ? Math.min(100, (usageInfo.cost_usd / usageInfo.budget_usd) * 100)
+    : 0;
+  const barColor =
+    usagePercent >= 90 ? "bg-red-500" : usagePercent >= 70 ? "bg-amber-500" : "bg-green-500";
+
+  return (
+    <div className="space-y-4">
+      {/* APIキー */}
+      <div>
+        <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+          <Key className="w-3 h-3 inline mr-1" />
+          Claude API Key
+        </div>
+        <input
+          type="password"
+          value={keyInput}
+          onChange={(e) => setKeyInput(e.target.value)}
+          placeholder={hasApiKey ? t.aiSettings.apiKeyPlaceholderSet : "sk-ant-..."}
+          className="w-full px-3 py-1.5 text-xs border border-[#d0d0d0] rounded focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/30"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+          }}
+        />
+        <div className="flex items-center justify-between mt-1.5">
+          <div className="flex items-center gap-2 text-xs">
+            {hasApiKey ? (
+              <span className="text-green-600 flex items-center gap-1">
+                <Check className="w-3 h-3" /> {t.aiSettings.apiKeyConfigured}
+              </span>
+            ) : (
+              <span className="text-[#999]">{t.aiSettings.apiKeyNotConfigured}</span>
+            )}
+          </div>
+          <div className="flex gap-1.5">
+            {hasApiKey && (
+              <button
+                className="flex items-center gap-1 px-2 py-1 text-[10px] text-red-500 hover:bg-red-50 rounded transition-colors"
+                onClick={handleDelete}
+              >
+                <Trash2 className="w-3 h-3" />
+                {t.aiSettings.deleteKey}
+              </button>
+            )}
+            <button
+              className="px-3 py-1 text-[10px] bg-[var(--accent)] hover:opacity-90 rounded text-white transition-colors disabled:opacity-50"
+              onClick={handleSave}
+              disabled={saving || !keyInput.trim()}
+            >
+              {saving ? t.common.saving : t.common.save}
+            </button>
+          </div>
+        </div>
+        <p className="text-[10px] text-[#bbb] mt-1">{t.aiSettings.apiKeyDescription}</p>
+      </div>
+
+      {saved && (
+        <div className="text-xs text-green-600 bg-green-50 border border-green-200 rounded px-3 py-2">
+          {t.aiSettings.apiKeySaved}
+        </div>
+      )}
+
+      {error && (
+        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+          {error}
+        </div>
+      )}
+
+      {/* 月間予算 */}
+      <div className="border-t border-[#f0f0f0] pt-3">
+        <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+          <DollarSign className="w-3 h-3 inline mr-1" />
+          {t.aiSettings.monthlyBudget}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[#999]">$</span>
+          <input
+            type="number"
+            value={budgetInput}
+            onChange={(e) => setBudgetInput(e.target.value)}
+            placeholder={t.aiSettings.budgetPlaceholder}
+            min="0"
+            step="0.5"
+            className="flex-1 px-3 py-1.5 text-xs border border-[#d0d0d0] rounded focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/30"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleBudgetSave();
+            }}
+          />
+          <button
+            className="px-3 py-1.5 text-[10px] bg-[var(--accent)] hover:opacity-90 rounded text-white transition-colors disabled:opacity-50"
+            onClick={handleBudgetSave}
+            disabled={!budgetInput.trim()}
+          >
+            {budgetSaved ? t.common.saved : t.common.configure}
+          </button>
+        </div>
+      </div>
+
+      {/* 今月の使用量 */}
+      {usageInfo && (
+        <div className="border-t border-[#f0f0f0] pt-3">
+          <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+            {t.aiSettings.currentUsage}
+          </div>
+          <div className="bg-[#fafafa] rounded-lg p-3 space-y-2">
+            <div className="flex items-center gap-4 text-[11px] text-[#999]">
+              <span>
+                {t.aiSettings.input}: {usageInfo.input_tokens.toLocaleString()} tok
+              </span>
+              <span>
+                {t.aiSettings.output}: {usageInfo.output_tokens.toLocaleString()} tok
+              </span>
+              <span className="font-medium text-[#1a1a1a]">${usageInfo.cost_usd.toFixed(3)}</span>
+            </div>
+
+            {usageInfo.budget_usd !== null && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-[#999]">
+                  <span>
+                    ${usageInfo.cost_usd.toFixed(2)} / ${usageInfo.budget_usd.toFixed(0)}
+                  </span>
+                  <span>{usagePercent.toFixed(0)}%</span>
+                </div>
+                <div className="w-full bg-[#e5e5e5] rounded-full h-1.5">
+                  <div
+                    className={`${barColor} h-1.5 rounded-full transition-all`}
+                    style={{ width: `${usagePercent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ThemePicker() {
+  const t = useTranslation();
+  const colorTheme = useSettingsStore((s) => s.colorTheme);
+  const setSetting = useSettingsStore((s) => s.setSetting);
+  const applyTheme = useThemeStore((s) => s.applyTheme);
+  const windowsAccent = useThemeStore((s) => s.windowsAccent);
+
+  const handleSelect = (themeId: string) => {
+    setSetting("colorTheme", themeId);
+    applyTheme(themeId);
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {COLOR_THEMES.map((theme) => {
+        const isActive = colorTheme === theme.id;
+        const displayColor = theme.id === "auto" ? windowsAccent : theme.accent;
+        return (
+          <button
+            key={theme.id}
+            className={cn(
+              "flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all duration-150 min-w-[52px]",
+              isActive
+                ? "border-[var(--accent)] bg-[rgba(var(--accent-rgb),0.08)]"
+                : "border-transparent hover:border-[#d0d0d0] hover:bg-[#f5f5f5]",
+            )}
+            onClick={() => handleSelect(theme.id)}
+            title={theme.id === "auto" ? t.settingsDialog.colorThemeAuto : theme.label}
+          >
+            {theme.id === "auto" ? (
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center border border-[#d0d0d0]"
+                style={{
+                  background: `linear-gradient(135deg, ${windowsAccent}, ${windowsAccent}88)`,
+                }}
+              >
+                <Monitor className="w-3.5 h-3.5 text-white" />
+              </div>
+            ) : (
+              <div
+                className="w-7 h-7 rounded-full relative"
+                style={{ backgroundColor: displayColor }}
+              >
+                {isActive && <Check className="w-3.5 h-3.5 text-white absolute inset-0 m-auto" />}
+              </div>
+            )}
+            <span className="text-[10px] text-[#666] leading-tight">
+              {theme.id === "auto" ? "Auto" : theme.label}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

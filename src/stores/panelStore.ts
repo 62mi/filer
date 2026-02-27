@@ -109,7 +109,7 @@ interface ExplorerStore {
   clipboard: ClipboardData | null;
 
   // Tab actions
-  addTab: (path?: string) => void;
+  addTab: (path?: string, background?: boolean) => void;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   nextTab: () => void;
@@ -139,7 +139,7 @@ interface ExplorerStore {
   // File operations
   clipboardCopy: () => void;
   clipboardCut: () => void;
-  clipboardPaste: () => Promise<void>;
+  clipboardPaste: () => Promise<boolean>;
   deleteSelected: () => Promise<void>;
   createNewFolder: () => Promise<void>;
   createNewFile: () => Promise<void>;
@@ -155,10 +155,13 @@ interface ExplorerStore {
   search: (query: string) => Promise<void>;
   clearSearch: () => void;
 
+  // External clipboard sync
+  syncExternalClipboard: (paths: string[], operation: string) => void;
+
   // Stack
   stackItems: string[];
   addToStack: (paths: string[]) => void;
-  removeFromStack: (path: string) => void;
+  removeFromStack: (paths: string | string[]) => void;
   clearStack: () => void;
   pasteFromStack: (operation: "copy" | "move") => Promise<void>;
 }
@@ -190,14 +193,30 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   },
 
   // Tab management
-  addTab: (path = "C:\\") => {
+  addTab: (path = "C:\\", background = false) => {
     const newTab = createTabState(path);
-    set((s) => ({
-      tabs: [...s.tabs, newTab],
-      activeTabId: newTab.id,
-    }));
-    // Load directory for the new tab
-    get().loadDirectory(path, false);
+    if (background) {
+      // バックグラウンドタブ: アクティブタブを切り替えずにディレクトリを読み込む
+      set((s) => ({ tabs: [...s.tabs, newTab] }));
+      const { showHidden } = get();
+      invoke<FileEntry[]>("list_directory", { path })
+        .then((entries) => {
+          const filtered = showHidden ? entries : entries.filter((e) => !e.is_hidden);
+          const sorted = sortEntries(filtered, "name", "asc");
+          set((s) => ({
+            tabs: s.tabs.map((t) =>
+              t.id === newTab.id ? { ...t, entries: sorted, loading: false } : t,
+            ),
+          }));
+        })
+        .catch(() => {});
+    } else {
+      set((s) => ({
+        tabs: [...s.tabs, newTab],
+        activeTabId: newTab.id,
+      }));
+      get().loadDirectory(path, false);
+    }
   },
 
   closeTab: (id) => {
@@ -457,6 +476,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
     if (paths.length > 0) {
       set({ clipboard: { paths, operation: "copy" } });
+      invoke("clipboard_write_files", { paths, operation: "copy" }).catch(() => {});
     }
   },
 
@@ -468,48 +488,67 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
     if (paths.length > 0) {
       set({ clipboard: { paths, operation: "cut" } });
+      invoke("clipboard_write_files", { paths, operation: "cut" }).catch(() => {});
     }
   },
 
   clipboardPaste: async () => {
-    const { clipboard } = get();
     const tab = get().getActiveTab();
-    if (!clipboard) return;
+
+    // 1. OSクリップボードからファイルパスを読み取り試行
+    let clipData: ClipboardData | null = get().clipboard;
+    try {
+      const osResult = await invoke<{ paths: string[]; operation: string } | null>(
+        "clipboard_read_files",
+      );
+      if (osResult && osResult.paths.length > 0) {
+        clipData = {
+          paths: osResult.paths,
+          operation: osResult.operation === "cut" ? "cut" : "copy",
+        };
+      }
+    } catch {
+      // OS読み取り失敗時は内部クリップボードにフォールバック
+    }
+
+    // 2. どちらにもファイルがなければfalseを返す（画像/テキストペーストへのフォールバック用）
+    if (!clipData || clipData.paths.length === 0) return false;
+
     try {
       // Undo用に移動先パスを記録
-      const entries = clipboard.paths.map((sourcePath) => {
+      const entries = clipData.paths.map((sourcePath) => {
         const fileName = sourcePath.substring(sourcePath.lastIndexOf("\\") + 1);
         return { sourcePath, destPath: `${tab.path}\\${fileName}` };
       });
 
-      if (clipboard.operation === "copy") {
-        // コピーはキュー経由（バックグラウンド進捗付き）
-        await useCopyQueueStore.getState().enqueue(clipboard.paths, tab.path, "copy");
+      if (clipData.operation === "copy") {
+        await useCopyQueueStore.getState().enqueue(clipData.paths, tab.path, "copy");
         useUndoStore.getState().pushAction({ type: "copy", entries });
       } else {
-        // 移動はrename（同ドライブなら即座）なので直接実行
-        await invoke("move_files", { sources: clipboard.paths, dest: tab.path });
+        await invoke("move_files", { sources: clipData.paths, dest: tab.path });
         useUndoStore.getState().pushAction({ type: "move", entries });
         set({ clipboard: null });
       }
       // 移動履歴記録
-      const exts = clipboard.paths
+      const exts = clipData.paths
         .map((p) => getExtension(p))
         .filter((v, i, a) => a.indexOf(v) === i);
       invoke("record_move_operation", {
-        sourceDir: clipboard.paths[0] ? getParentDir(clipboard.paths[0]) : "",
+        sourceDir: clipData.paths[0] ? getParentDir(clipData.paths[0]) : "",
         destDir: tab.path,
         extensions: exts,
-        operation: clipboard.operation === "copy" ? "copy" : "move",
-        fileCount: clipboard.paths.length,
+        operation: clipData.operation === "copy" ? "copy" : "move",
+        fileCount: clipData.paths.length,
       }).catch((_err) => {});
       await get().loadDirectory(tab.path, false);
+      return true;
     } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
           error: e instanceof Error ? e.message : String(e),
         })),
       }));
+      return true; // エラーでもファイルペーストを試みたのでtrue
     }
   },
 
@@ -747,6 +786,32 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }));
   },
 
+  // External clipboard sync
+  syncExternalClipboard: (paths, operation) => {
+    const current = get().clipboard;
+
+    // 自己ループ防止: 内部クリップボードと完全一致ならスキップ
+    if (
+      current &&
+      current.paths.length === paths.length &&
+      current.paths.every((p, i) => p === paths[i])
+    ) {
+      return;
+    }
+
+    if (paths.length > 0 && (operation === "cut" || operation === "copy")) {
+      // 外部カット/コピー検知 → clipboard 更新で半透明化反映
+      set({ clipboard: { paths, operation } });
+    } else {
+      // CF_HDROP なし or 不明な操作
+      if (current?.operation === "cut") {
+        // 内部カット状態だった → クリアして更新
+        set({ clipboard: null });
+        get().refreshDirectory();
+      }
+    }
+  },
+
   // Stack
   addToStack: (paths) => {
     set((s) => {
@@ -756,8 +821,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     });
   },
 
-  removeFromStack: (path) => {
-    set((s) => ({ stackItems: s.stackItems.filter((p) => p !== path) }));
+  removeFromStack: (paths) => {
+    const arr = Array.isArray(paths) ? paths : [paths];
+    const toRemove = new Set(arr);
+    set((s) => ({ stackItems: s.stackItems.filter((p) => !toRemove.has(p)) }));
   },
 
   clearStack: () => set({ stackItems: [] }),

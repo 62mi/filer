@@ -51,7 +51,7 @@ export function getCommands(): Command[] {
     {
       id: "ai-settings",
       label: "AI設定",
-      action: () => useAiStore.getState().openSettings(),
+      action: () => useSettingsStore.getState().openSettings("ai"),
     },
     {
       id: "reload",

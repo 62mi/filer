@@ -163,6 +163,17 @@ export const ja = {
     languageJa: "日本語",
     languageEn: "English",
     general: "一般",
+    colorTheme: "カラーテーマ",
+    colorThemeAuto: "自動 (Windows連動)",
+    pathStyle: "パス形式",
+    pathStyleWindows: "Windows (C:\\Users\\...)",
+    pathStyleLinux: "Linux (C:/Users/...)",
+    about: "このアプリについて",
+    aboutAppName: "アプリ名",
+    aboutVersion: "バージョン",
+    aboutCopyright: "著作権",
+    aboutWebsite: "公式サイト",
+    aboutContact: "お問い合わせ",
   },
 
   // ── AI自動整理 ──

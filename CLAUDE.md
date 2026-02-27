@@ -24,10 +24,11 @@ filer/
 │   ├── src/
 │   │   ├── main.rs     # エントリポイント
 │   │   ├── lib.rs      # Tauriアプリ初期化・コマンド登録
+│   │   ├── clipboard_watcher.rs # クリップボード監視 (WM_CLIPBOARDUPDATE → フロントエンド通知)
 │   │   ├── commands/   # Tauri コマンド (IPC)
 │   │   │   ├── fs.rs   # ファイル操作 (読取・作成・削除・リネーム・テンプレート展開・フォルダサイズ計算)
 │   │   │   ├── ai.rs   # AI自動整理 (Claude API連携)
-│   │   │   ├── clipboard.rs # クリップボード→ファイル生成
+│   │   │   ├── clipboard.rs # クリップボード操作 (ファイル生成 / OSクリップボード CF_HDROP読み書き)
 │   │   │   ├── copy_queue.rs # コピーキュー (バックグラウンドコピー)
 │   │   │   ├── icons.rs # Windows Shellアイコン抽出
 │   │   │   └── system.rs # システム情報 (ドライブ一覧等)
@@ -51,7 +52,6 @@ filer/
 │   │   ├── StatusBar/  # ステータスバー
 │   │   ├── BookmarkBar/ # ブックマークバー
 │   │   ├── AiOrganizer/ # AI自動整理ダイアログ
-│   │   ├── AiSettings/ # AI設定 (APIキー・予算)
 │   │   ├── RuleManager/ # ルール管理・エディタ
 │   │   ├── RuleWizard/ # ルール作成ウィザード
 │   │   ├── RuleSuggestion/ # ルール提案バナー
@@ -81,8 +81,10 @@ filer/
 │   │   ├── suggestionStore.ts # ドラッグ移動先サジェスト
 │   │   ├── ruleSuggestionStore.ts # ルール提案状態
 │   │   ├── ruleWizardStore.ts # ルール作成ウィザード状態
-│   │   └── dirSizeStore.ts # フォルダサイズ計算状態
+│   │   ├── dirSizeStore.ts # フォルダサイズ計算状態
+│   │   └── themeStore.ts # テーマ管理
 │   ├── i18n/           # 国際化 (ja.ts/en.ts)
+│   ├── hooks/          # カスタムフック (useNativeDrop等)
 │   ├── commands/       # コマンドレジストリ (コマンドパレット用)
 │   ├── types/          # TypeScript 型定義
 │   ├── utils/          # ユーティリティ
@@ -142,9 +144,17 @@ git tag -a v1.1.1 -m "v1.1.1: 説明" && git push origin v1.1.1
 
 ## 開発フロー
 機能追加・バグ修正などの作業を始める前に、以下を必ず行う:
-1. **GitHub Issue作成**: 作業内容をIssueとして登録する（`gh issue create`）
-2. **ブランチ作成**: Issue番号を含むブランチを切る（例: `feat/#19-custom-titlebar`）
-3. masterへの直接コミットは避ける
+1. **Issue作成**: `/create-issue` でGitHub Issueを作成する（Issueなしの実装は行わない）
+2. **実装**: `/implement-plan` でIssue番号を使ってブランチ作成→実装→検証まで一気通貫
+3. **既存Issueの修正**: `/fix-issue <番号>` で修正→コミット→クローズ
+4. masterへの直接コミットは避ける
+
+## エージェント活用方針
+- **トークン効率より速度優先**: サブエージェントを積極的に使い、並列化できるものはすべて並列化する
+- **調査**: 複数方面の調査は並列Exploreエージェントで同時実行
+- **実装**: 独立した変更はworktree並列で同時進行
+- **ビルド・テスト**: バックグラウンド実行し、完了を待たず次の作業に着手
+- **設計**: Planエージェントで別コンテキストに切り出し、メインの作業を止めない
 
 ## 並列実装ルール
 ### セッション内（Taskエージェント並列起動）
