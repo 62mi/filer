@@ -25,7 +25,7 @@ filer/
 │   │   ├── main.rs     # エントリポイント
 │   │   ├── lib.rs      # Tauriアプリ初期化・コマンド登録
 │   │   ├── commands/   # Tauri コマンド (IPC)
-│   │   │   ├── fs.rs   # ファイル操作 (読取・作成・削除・リネーム・テンプレート展開)
+│   │   │   ├── fs.rs   # ファイル操作 (読取・作成・削除・リネーム・テンプレート展開・フォルダサイズ計算)
 │   │   │   ├── ai.rs   # AI自動整理 (Claude API連携)
 │   │   │   ├── clipboard.rs # クリップボード→ファイル生成
 │   │   │   ├── copy_queue.rs # コピーキュー (バックグラウンドコピー)
@@ -57,7 +57,7 @@ filer/
 │   │   ├── RuleSuggestion/ # ルール提案バナー
 │   │   ├── QuickLook/  # ファイルプレビュー
 │   │   ├── PreviewPanel/ # プレビューパネル
-│   │   ├── ContextMenu/ # 右クリックメニュー
+│   │   ├── ContextMenu/ # 右クリックメニュー (Tauri v2 ネイティブMenu API)
 │   │   ├── DragSuggestion/ # ドラッグ時の移動先サジェスト
 │   │   ├── PropertiesDialog/ # プロパティダイアログ
 │   │   ├── SettingsDialog/ # 設定ダイアログ
@@ -136,7 +136,7 @@ pnpm check                   # lint:fix + tsc --noEmit
 ## リリース
 タグをpushすると GitHub Actions が自動でビルド・リリースを作成する:
 ```bash
-git tag -a v1.1.0 -m "v1.1.0: 説明" && git push origin v1.1.0
+git tag -a v1.1.1 -m "v1.1.1: 説明" && git push origin v1.1.1
 ```
 `.github/workflows/release.yml` が Windows ランナー上で `pnpm tauri build` を実行し、MSI/EXEをGitHub Releaseに添付する。
 
@@ -170,6 +170,8 @@ git tag -a v1.1.0 -m "v1.1.0: 説明" && git push origin v1.1.0
 - Mutex: `.lock().unwrap_or_else(|e| e.into_inner())` でpoisoning時も回復（`.unwrap()` は使わない）
 - TSのcatch: `catch (err: unknown)` + `err instanceof Error ? err.message : String(err)`
 - Tauri IPC コマンドは `commands/` 配下にモジュール分割
+- Tauri v2 重い処理: `pub fn`(同期)はメインスレッドをブロックする。`pub async fn` + `tauri::async_runtime::spawn_blocking` でバックグラウンド化する
+- Tauri v2 イベント: `listen()` は非同期。`await listen()` でリスナー登録完了を待ってから `invoke()` を呼ぶ（登録前にイベントが発行されるレースを防止）
 - 1ファイル1責務を意識、大きくなったら分割
 - ユーザー通知は `toast.success/error/info` (toastStore) を使用、`console.error` は使わない
 
