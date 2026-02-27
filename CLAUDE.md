@@ -35,11 +35,11 @@ filer/
 │   │   │   ├── mod.rs  # DB初期化・マイグレーション
 │   │   │   ├── rules.rs # ルール管理
 │   │   │   ├── history.rs # 操作履歴
-│   │   │   └── usage.rs # AI使用量トラッキング
+│   │   │   ├── usage.rs # AI使用量トラッキング
+│   │   │   └── dir_size_cache.rs # フォルダサイズキャッシュ
 │   │   └── watcher/    # ファイル監視・ルール自動適用
 │   │       ├── mod.rs
-│   │       ├── engine.rs  # ルールマッチングエンジン
-│   │       └── directory.rs # ディレクトリ監視
+│   │       └── engine.rs  # ルールマッチングエンジン
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 ├── src/                # React フロントエンド
@@ -80,7 +80,8 @@ filer/
 │   │   ├── thumbnailStore.ts # サムネイルキャッシュ
 │   │   ├── suggestionStore.ts # ドラッグ移動先サジェスト
 │   │   ├── ruleSuggestionStore.ts # ルール提案状態
-│   │   └── ruleWizardStore.ts # ルール作成ウィザード状態
+│   │   ├── ruleWizardStore.ts # ルール作成ウィザード状態
+│   │   └── dirSizeStore.ts # フォルダサイズ計算状態
 │   ├── i18n/           # 国際化 (ja.ts/en.ts)
 │   ├── commands/       # コマンドレジストリ (コマンドパレット用)
 │   ├── types/          # TypeScript 型定義

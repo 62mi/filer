@@ -223,7 +223,6 @@ fn get_shell_icon(ext: &str) -> Result<String, String> {
 pub fn hicon_to_data_url(
     hicon: windows_sys::Win32::UI::WindowsAndMessaging::HICON,
 ) -> Result<String, String> {
-    use image::ImageBuffer;
     use std::mem;
     use windows_sys::Win32::Graphics::Gdi::DeleteObject;
     use windows_sys::Win32::UI::WindowsAndMessaging::{GetIconInfo, ICONINFO};

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
 
 interface DirSizeEntry {
@@ -17,6 +18,9 @@ interface DirSizeStore {
   requestSizes: (dirPaths: string[]) => void;
 }
 
+// モジュールレベルでリスナー管理
+let currentUnlisten: (() => void) | null = null;
+
 export const useDirSizeStore = create<DirSizeStore>((set, get) => ({
   sizes: {},
   calculatingPaths: new Set(),
@@ -24,6 +28,12 @@ export const useDirSizeStore = create<DirSizeStore>((set, get) => ({
 
   requestSizes: (dirPaths) => {
     const version = get()._version + 1;
+
+    // 前回のリスナーを解除
+    if (currentUnlisten) {
+      currentUnlisten();
+      currentUnlisten = null;
+    }
 
     if (dirPaths.length === 0) {
       set({ sizes: {}, calculatingPaths: new Set(), _version: version });
@@ -36,17 +46,36 @@ export const useDirSizeStore = create<DirSizeStore>((set, get) => ({
       _version: version,
     });
 
-    invoke<DirSizeEntry[]>("calculate_directory_sizes", { paths: dirPaths })
-      .then((results) => {
+    // イベントリスナーを設定（結果が1件ずつ届く）
+    listen<DirSizeEntry>("dir-size-calculated", (event) => {
+      if (get()._version !== version) return;
+      const { path, size } = event.payload;
+      set((s) => {
+        const newCalculating = new Set(s.calculatingPaths);
+        newCalculating.delete(path);
+        return {
+          sizes: { ...s.sizes, [path]: size },
+          calculatingPaths: newCalculating,
+        };
+      });
+    }).then((unlisten) => {
+      if (get()._version !== version) {
+        unlisten();
+        return;
+      }
+      currentUnlisten = unlisten;
+    });
+
+    // 計算をトリガー（結果はイベントで届く）
+    invoke("calculate_directory_sizes", { paths: dirPaths })
+      .catch(() => {})
+      .finally(() => {
         if (get()._version !== version) return;
-        const newSizes: Record<string, number> = {};
-        for (const r of results) {
-          newSizes[r.path] = r.size;
+        // 全計算完了後にリスナー解除
+        if (currentUnlisten) {
+          currentUnlisten();
+          currentUnlisten = null;
         }
-        set({ sizes: newSizes, calculatingPaths: new Set() });
-      })
-      .catch(() => {
-        if (get()._version !== version) return;
         set({ calculatingPaths: new Set() });
       });
   },

@@ -4,6 +4,7 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use tauri::Emitter;
 use walkdir::WalkDir;
 
 const DEFAULT_SEARCH_MAX_RESULTS: usize = 200;
@@ -526,7 +527,7 @@ fn create_nodes_recursive(
 }
 
 /// フォルダサイズ計算結果
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DirSizeEntry {
     pub path: String,
     pub size: u64,
@@ -539,14 +540,14 @@ const DIR_SIZE_PER_DIR_TIMEOUT: u64 = 5;
 /// 全体のタイムアウト: 60秒
 const DIR_SIZE_TOTAL_TIMEOUT: u64 = 60;
 
-/// 複数フォルダのサイズを一括計算（キャッシュ付き）
+/// 複数フォルダのサイズを計算（キャッシュ付き、イベントで逐次通知）
 #[tauri::command]
 pub fn calculate_directory_sizes(
     paths: Vec<String>,
     state: tauri::State<'_, Database>,
-) -> Result<Vec<DirSizeEntry>, String> {
+    app: tauri::AppHandle,
+) -> Result<(), String> {
     let total_start = Instant::now();
-    let mut results = Vec::new();
 
     for dir_path in &paths {
         // 全体タイムアウトチェック
@@ -556,20 +557,28 @@ pub fn calculate_directory_sizes(
 
         // キャッシュ確認
         if let Some(cached_size) = state.get_cached_dir_size(dir_path, DIR_SIZE_CACHE_TTL) {
-            results.push(DirSizeEntry {
-                path: dir_path.clone(),
-                size: cached_size,
-            });
+            app.emit(
+                "dir-size-calculated",
+                DirSizeEntry {
+                    path: dir_path.clone(),
+                    size: cached_size,
+                },
+            )
+            .ok();
             continue;
         }
 
         // フォルダでなければスキップ
         let p = Path::new(dir_path);
         if !p.is_dir() {
-            results.push(DirSizeEntry {
-                path: dir_path.clone(),
-                size: 0,
-            });
+            app.emit(
+                "dir-size-calculated",
+                DirSizeEntry {
+                    path: dir_path.clone(),
+                    size: 0,
+                },
+            )
+            .ok();
             continue;
         }
 
@@ -592,13 +601,17 @@ pub fn calculate_directory_sizes(
 
         // キャッシュに保存
         state.save_dir_size(dir_path, size).ok();
-        results.push(DirSizeEntry {
-            path: dir_path.clone(),
-            size,
-        });
+        app.emit(
+            "dir-size-calculated",
+            DirSizeEntry {
+                path: dir_path.clone(),
+                size,
+            },
+        )
+        .ok();
     }
 
-    Ok(results)
+    Ok(())
 }
 
 /// 煩雑度（整理度）スコア
