@@ -5,6 +5,7 @@ import { useBookmarkStore } from "../../stores/bookmarkStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { cn } from "../../utils/cn";
+import { clampMenuPosition } from "../../utils/menuPosition";
 
 export function BookmarkBar() {
   const bookmarks = useBookmarkStore((s) => s.bookmarks);
@@ -38,6 +39,7 @@ export function BookmarkBar() {
   const [openFolderId, setOpenFolderId] = useState<string | null>(null);
   // 外部D&D受付中の表示
   const [externalDragOver, setExternalDragOver] = useState(false);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
   const barHeight = useSettingsStore((s) => s.bookmarkBarHeight);
   const itemHeight = useSettingsStore((s) => s.bookmarkItemHeight);
   const uiFontSize = useSettingsStore((s) => s.uiFontSize);
@@ -72,6 +74,15 @@ export function BookmarkBar() {
     window.addEventListener("mousedown", close);
     return () => window.removeEventListener("mousedown", close);
   }, [contextMenu, openFolderId]);
+
+  // コンテキストメニューをビューポート内にクランプ
+  useEffect(() => {
+    if (!contextMenu || !contextMenuRef.current) return;
+    const rect = contextMenuRef.current.getBoundingClientRect();
+    const clamped = clampMenuPosition(contextMenu.x, contextMenu.y, rect.width, rect.height);
+    contextMenuRef.current.style.left = `${clamped.x}px`;
+    contextMenuRef.current.style.top = `${clamped.y}px`;
+  }, [contextMenu]);
 
   // ブックマーク同士のD&D（並べ替え）
   const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
@@ -296,6 +307,7 @@ export function BookmarkBar() {
       {/* コンテキストメニュー */}
       {contextMenu && (
         <div
+          ref={contextMenuRef}
           data-bookmark-ctx
           className="fixed bg-white border border-[#d0d0d0] rounded-md shadow-lg py-1 z-50 min-w-[140px] animate-fade-scale-in"
           style={{ left: contextMenu.x, top: contextMenu.y }}
@@ -432,6 +444,7 @@ function BookmarkFolderItem({
   const bookmarks = useBookmarkStore((s) => s.bookmarks);
   const folderBookmarks = bookmarks.filter((b) => b.folderId === folder.id);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [dropdownPos, setDropdownPos] = useState({ left: 0, top: 0 });
 
   useEffect(() => {
@@ -440,6 +453,15 @@ function BookmarkFolderItem({
       setDropdownPos({ left: rect.left, top: rect.bottom + 2 });
     }
   }, [isOpen]);
+
+  // ドロップダウンをビューポート内にクランプ
+  useEffect(() => {
+    if (!isOpen || !dropdownRef.current) return;
+    const rect = dropdownRef.current.getBoundingClientRect();
+    const clamped = clampMenuPosition(dropdownPos.left, dropdownPos.top, rect.width, rect.height);
+    dropdownRef.current.style.left = `${clamped.x}px`;
+    dropdownRef.current.style.top = `${clamped.y}px`;
+  }, [isOpen, dropdownPos]);
 
   const isRenaming = renamingId === folder.id;
 
@@ -483,6 +505,7 @@ function BookmarkFolderItem({
       {/* ドロップダウン */}
       {isOpen && (
         <div
+          ref={dropdownRef}
           data-bookmark-dropdown
           className="fixed bg-white border border-[#d0d0d0] rounded-md shadow-lg py-1 z-50 min-w-[160px] max-w-[240px] animate-fade-scale-in"
           style={{ left: dropdownPos.left, top: dropdownPos.top }}

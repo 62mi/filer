@@ -14,11 +14,12 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useIconStore } from "../../stores/iconStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import type { DriveInfo } from "../../types";
 import { cn } from "../../utils/cn";
+import { clampMenuPosition } from "../../utils/menuPosition";
 import { createDragGhost, removeDragGhost } from "../Panel/DragGhost";
 
 interface QuickAccessItem {
@@ -58,6 +59,7 @@ export function Sidebar() {
     y: number;
     path: string | null; // null = background context menu
   } | null>(null);
+  const stackContextMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     invoke<DriveInfo[]>("get_drives").then(setDrives);
@@ -139,6 +141,15 @@ export function Sidebar() {
       window.removeEventListener("mousedown", handleClick);
       window.removeEventListener("keydown", handleKey);
     };
+  }, [stackContextMenu]);
+
+  // スタックコンテキストメニューをビューポート内にクランプ
+  useEffect(() => {
+    if (!stackContextMenu || !stackContextMenuRef.current) return;
+    const rect = stackContextMenuRef.current.getBoundingClientRect();
+    const clamped = clampMenuPosition(stackContextMenu.x, stackContextMenu.y, rect.width, rect.height);
+    stackContextMenuRef.current.style.left = `${clamped.x}px`;
+    stackContextMenuRef.current.style.top = `${clamped.y}px`;
   }, [stackContextMenu]);
 
   // Get file name from path
@@ -323,6 +334,7 @@ export function Sidebar() {
       {/* Stack context menu */}
       {stackContextMenu && (
         <div
+          ref={stackContextMenuRef}
           className="fixed z-50 min-w-40 bg-white border border-[#e0e0e0] rounded-lg shadow-lg py-1 animate-fade-scale-in origin-top-left"
           style={{ left: stackContextMenu.x, top: stackContextMenu.y }}
           onMouseDown={(e) => e.stopPropagation()}

@@ -17,10 +17,11 @@ import {
   Wand2,
   Zap,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { useExplorerStore } from "../../stores/panelStore";
+import { clampMenuPosition } from "../../utils/menuPosition";
 import { useRuleStore } from "../../stores/ruleStore";
 import { useRuleWizardStore } from "../../stores/ruleWizardStore";
 import { useTemplateStore } from "../../stores/templateStore";
@@ -96,17 +97,14 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     };
   }, [onClose]);
 
-  // Adjust position to stay within viewport
+  // メニュー位置をビューポート内にクランプ
   useEffect(() => {
     if (!menuRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
-    if (rect.right > window.innerWidth) {
-      menuRef.current.style.left = `${window.innerWidth - rect.width - 4}px`;
-    }
-    if (rect.bottom > window.innerHeight) {
-      menuRef.current.style.top = `${window.innerHeight - rect.height - 4}px`;
-    }
-  }, []);
+    const clamped = clampMenuPosition(x, y, rect.width, rect.height);
+    menuRef.current.style.left = `${clamped.x}px`;
+    menuRef.current.style.top = `${clamped.y}px`;
+  }, [x, y]);
 
   const items: MenuEntry[] = [
     ...(hasTarget
@@ -317,6 +315,7 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
 
   const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
   const submenuTimeoutRef = useRef<number | null>(null);
+  const submenuRef = useRef<HTMLDivElement>(null);
 
   const handleSubmenuEnter = (index: number) => {
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
@@ -356,22 +355,13 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
                 <ChevronRight className="w-3.5 h-3.5 text-[#999]" />
               </div>
               {openSubmenu === i && (
-                <div
-                  className="absolute left-full top-0 ml-0.5 min-w-44 bg-white border border-[#e0e0e0] rounded-lg shadow-lg py-1 z-50"
+                <SubmenuPopup
+                  ref={submenuRef}
+                  items={sub.submenu}
+                  parentMenuRef={menuRef}
                   onMouseEnter={() => handleSubmenuEnter(i)}
                   onMouseLeave={handleSubmenuLeave}
-                >
-                  {sub.submenu.map((subItem) => (
-                    <button
-                      key={subItem.label}
-                      className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[#e8e8e8] transition-colors"
-                      onClick={subItem.onClick}
-                    >
-                      <span className="text-[#666]">{subItem.icon}</span>
-                      {subItem.label}
-                    </button>
-                  ))}
-                </div>
+                />
               )}
             </div>
           );
@@ -392,3 +382,64 @@ export function ContextMenu({ x, y, onClose, targetIndex, onProperties }: Contex
     </div>
   );
 }
+
+/** サブメニューポップアップ — 左右フリップ + ビューポートクランプ */
+const SubmenuPopup = forwardRef<
+  HTMLDivElement,
+  {
+    items: MenuItem[];
+    parentMenuRef: React.RefObject<HTMLDivElement | null>;
+    onMouseEnter: () => void;
+    onMouseLeave: () => void;
+  }
+>(function SubmenuPopup({ items, parentMenuRef, onMouseEnter, onMouseLeave }, ref) {
+  const localRef = useRef<HTMLDivElement>(null);
+  const resolvedRef = (ref as React.RefObject<HTMLDivElement | null>) || localRef;
+
+  useEffect(() => {
+    const el = resolvedRef.current;
+    const parentEl = parentMenuRef.current;
+    if (!el || !parentEl) return;
+
+    const parentRect = parentEl.getBoundingClientRect();
+    const subRect = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+
+    // デフォルト: 親メニューの右側に表示
+    let left = parentRect.right + 2;
+    // 右端に収まらない場合は左側にフリップ
+    if (left + subRect.width > vw - 4) {
+      left = parentRect.left - subRect.width - 2;
+    }
+    // 左端クランプ
+    if (left < 4) {
+      left = 4;
+    }
+
+    // 上下クランプ
+    const clamped = clampMenuPosition(left, subRect.top, subRect.width, subRect.height);
+    el.style.position = "fixed";
+    el.style.left = `${clamped.x}px`;
+    el.style.top = `${clamped.y}px`;
+  }, [parentMenuRef, resolvedRef]);
+
+  return (
+    <div
+      ref={resolvedRef}
+      className="fixed min-w-44 bg-white border border-[#e0e0e0] rounded-lg shadow-lg py-1 z-50"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      {items.map((subItem) => (
+        <button
+          key={subItem.label}
+          className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[#e8e8e8] transition-colors"
+          onClick={subItem.onClick}
+        >
+          <span className="text-[#666]">{subItem.icon}</span>
+          {subItem.label}
+        </button>
+      ))}
+    </div>
+  );
+});
