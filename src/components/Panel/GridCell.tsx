@@ -5,6 +5,7 @@ import { getGridCellHeight, getGridCellWidth, useSettingsStore } from "../../sto
 import { VIDEO_EXTS, useThumbnailStore } from "../../stores/thumbnailStore";
 import type { FileEntry } from "../../types";
 import { cn } from "../../utils/cn";
+import { GOOGLE_DOCS_EXTENSIONS } from "../../utils/previewConstants";
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp"]);
 
@@ -64,11 +65,14 @@ export const GridCell = memo(function GridCell({
 
   const isImage = !entry.is_dir && IMAGE_EXTS.has(entry.extension);
   const isVideo = !entry.is_dir && VIDEO_EXTS.has(entry.extension);
-  const hasThumbnailMedia = isImage || isVideo;
+  const isGoogleDocs = !entry.is_dir && GOOGLE_DOCS_EXTENSIONS.has(entry.extension);
+  const hasThumbnailMedia = isImage || isVideo || isGoogleDocs;
   const THUMB_SIZE = 128;
   const thumbKey = hasThumbnailMedia ? `${entry.path}\0${THUMB_SIZE}` : "";
   const fetchThumbnails = useThumbnailStore((s) => s.fetchThumbnails);
   const fetchVideoThumbnail = useThumbnailStore((s) => s.fetchVideoThumbnail);
+  const fetchGoogleDocsThumbnails = useThumbnailStore((s) => s.fetchGoogleDocsThumbnails);
+  const removeThumbnail = useThumbnailStore((s) => s.removeThumbnail);
   const hasThumbnail = useThumbnailStore((s) => (hasThumbnailMedia ? !!s.thumbnails[thumbKey] : false));
   const isPending = useThumbnailStore((s) => (hasThumbnailMedia ? s.pending.has(thumbKey) : false));
 
@@ -83,6 +87,8 @@ export const GridCell = memo(function GridCell({
         if (entries[0]?.isIntersecting) {
           if (isImage) {
             fetchThumbnails([entry.path], THUMB_SIZE);
+          } else if (isGoogleDocs) {
+            fetchGoogleDocsThumbnails([entry.path], THUMB_SIZE);
           } else {
             fetchVideoThumbnail(entry.path, THUMB_SIZE);
           }
@@ -93,7 +99,7 @@ export const GridCell = memo(function GridCell({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasThumbnailMedia, isImage, hasThumbnail, isPending, entry.path, fetchThumbnails, fetchVideoThumbnail]);
+  }, [hasThumbnailMedia, isImage, isGoogleDocs, hasThumbnail, isPending, entry.path, fetchThumbnails, fetchVideoThumbnail, fetchGoogleDocsThumbnails]);
 
   useEffect(() => {
     return () => {
@@ -219,6 +225,7 @@ export const GridCell = memo(function GridCell({
               filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.2))",
             }}
             draggable={false}
+            onError={isGoogleDocs ? () => removeThumbnail(entry.path, THUMB_SIZE) : undefined}
           />
         ) : largeIcon ? (
           <img

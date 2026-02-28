@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import { GOOGLE_DOCS_EXTENSIONS } from "../utils/previewConstants";
 
 // キー: "path\0size" で複数サイズを共存キャッシュ
 function cacheKey(path: string, size: number) {
@@ -27,24 +28,29 @@ export function resetFfmpegCache() {
 }
 
 interface ThumbnailStore {
-  thumbnails: Record<string, string>; // cacheKey → dataURL
+  thumbnails: Record<string, string>; // cacheKey → dataURL or HTTP URL
   pending: Set<string>; // cacheKey
 
   fetchThumbnails: (paths: string[], size: number) => Promise<void>;
   fetchVideoThumbnail: (path: string, size: number) => Promise<void>;
+  fetchGoogleDocsThumbnails: (paths: string[], size: number) => Promise<void>;
   prefetchInBackground: (paths: string[], size: number) => void;
   prefetchVideosInBackground: (paths: string[], size: number) => void;
+  prefetchGoogleDocsInBackground: (paths: string[], size: number) => void;
   cancelPrefetch: () => void;
   cancelVideoPrefetch: () => void;
+  cancelGoogleDocsPrefetch: () => void;
   getThumbnail: (path: string, size: number) => string | undefined;
   hasThumbnail: (path: string, size: number) => boolean;
   isPending: (path: string, size: number) => boolean;
+  removeThumbnail: (path: string, size: number) => void;
   clearThumbnails: () => void;
 }
 
 // プリフェッチ中止用
 let prefetchAbort: AbortController | null = null;
 let videoPrefetchAbort: AbortController | null = null;
+let gdocsPrefetchAbort: AbortController | null = null;
 
 export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
   thumbnails: {},
@@ -144,6 +150,61 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
     if (videoPrefetchAbort) {
       videoPrefetchAbort.abort();
       videoPrefetchAbort = null;
+    }
+  },
+
+  cancelGoogleDocsPrefetch: () => {
+    if (gdocsPrefetchAbort) {
+      gdocsPrefetchAbort.abort();
+      gdocsPrefetchAbort = null;
+    }
+  },
+
+  removeThumbnail: (path, size) => {
+    const k = cacheKey(path, size);
+    set((s) => {
+      const next = { ...s.thumbnails };
+      delete next[k];
+      return { thumbnails: next };
+    });
+  },
+
+  // Google Docs サムネイルURL取得（バッチ）
+  fetchGoogleDocsThumbnails: async (paths: string[], size: number) => {
+    const { thumbnails, pending } = get();
+    const needed = paths.filter((p) => {
+      const k = cacheKey(p, size);
+      return !thumbnails[k] && !pending.has(k);
+    });
+    if (needed.length === 0) return;
+
+    const keys = needed.map((p) => cacheKey(p, size));
+    set((s) => {
+      const next = new Set(s.pending);
+      for (const k of keys) next.add(k);
+      return { pending: next };
+    });
+
+    try {
+      const result = await invoke<Record<string, string>>("get_google_docs_thumbnails", {
+        paths: needed,
+        size,
+      });
+      set((s) => {
+        const next = new Set(s.pending);
+        for (const k of keys) next.delete(k);
+        const merged = { ...s.thumbnails };
+        for (const [path, url] of Object.entries(result)) {
+          merged[cacheKey(path, size)] = url;
+        }
+        return { thumbnails: merged, pending: next };
+      });
+    } catch {
+      set((s) => {
+        const next = new Set(s.pending);
+        for (const k of keys) next.delete(k);
+        return { pending: next };
+      });
     }
   },
 
@@ -284,6 +345,64 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
       }
     })();
   },
+  // Google Docsサムネイルのバックグラウンドプリフェッチ
+  prefetchGoogleDocsInBackground: (paths: string[], size: number) => {
+    if (gdocsPrefetchAbort) gdocsPrefetchAbort.abort();
+    const controller = new AbortController();
+    gdocsPrefetchAbort = controller;
+
+    const { thumbnails, pending } = get();
+    const needed = paths.filter((p) => {
+      const k = cacheKey(p, size);
+      return !thumbnails[k] && !pending.has(k);
+    });
+    if (needed.length === 0) return;
+
+    (async () => {
+      // 画像・動画サムネイルの読み込みを優先させる
+      await new Promise((r) => setTimeout(r, 400));
+      if (controller.signal.aborted) return;
+
+      // 一括取得（DBアクセスのみなのでチャンク不要）
+      const current = get();
+      const todo = needed.filter((p) => {
+        const k = cacheKey(p, size);
+        return !current.thumbnails[k] && !current.pending.has(k);
+      });
+      if (todo.length === 0) return;
+
+      const keys = todo.map((p) => cacheKey(p, size));
+      set((s) => {
+        const next = new Set(s.pending);
+        for (const k of keys) next.add(k);
+        return { pending: next };
+      });
+
+      try {
+        const result = await invoke<Record<string, string>>("get_google_docs_thumbnails", {
+          paths: todo,
+          size,
+        });
+        if (controller.signal.aborted) return;
+        set((s) => {
+          const next = new Set(s.pending);
+          for (const k of keys) next.delete(k);
+          const merged = { ...s.thumbnails };
+          for (const [path, url] of Object.entries(result)) {
+            merged[cacheKey(path, size)] = url;
+          }
+          return { thumbnails: merged, pending: next };
+        });
+      } catch {
+        if (controller.signal.aborted) return;
+        set((s) => {
+          const next = new Set(s.pending);
+          for (const k of keys) next.delete(k);
+          return { pending: next };
+        });
+      }
+    })();
+  },
 }));
 
 /** エントリ配列から画像パスだけ抽出するヘルパー */
@@ -298,6 +417,15 @@ export function extractVideoPaths(
   entries: { is_dir: boolean; extension: string; path: string }[],
 ): string[] {
   return entries.filter((e) => !e.is_dir && VIDEO_EXTS.has(e.extension)).map((e) => e.path);
+}
+
+/** エントリ配列からGoogle Docsパスだけ抽出するヘルパー */
+export function extractGoogleDocsPaths(
+  entries: { is_dir: boolean; extension: string; path: string }[],
+): string[] {
+  return entries
+    .filter((e) => !e.is_dir && GOOGLE_DOCS_EXTENSIONS.has(e.extension))
+    .map((e) => e.path);
 }
 
 export { VIDEO_EXTS };

@@ -45,6 +45,7 @@ export const FileVideo = icon("FileVideo");
 export const Folder = icon("Folder");
 export const FolderOpen = icon("FolderOpen");
 export const FolderPlus = icon("FolderPlus");
+export const Globe = icon("Globe");
 export const GripVertical = icon("GripVertical");
 export const HardDrive = icon("HardDrive");
 export const History = icon("History");

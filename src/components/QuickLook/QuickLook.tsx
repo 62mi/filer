@@ -1,15 +1,19 @@
+import { openPath } from "@tauri-apps/plugin-opener";
 import {
+  ExternalLink,
   FileAudio,
   FileCode,
   FileText,
   FileVideo,
   Folder,
+  Globe,
   Image,
   Music,
   Play,
   X,
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "../../i18n";
 import { usePreview } from "../../hooks/usePreview";
 import type { FileEntry } from "../../types";
 import { formatDate, formatFileSize } from "../../utils/format";
@@ -30,6 +34,7 @@ interface QuickLookProps {
 }
 
 export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
+  const t = useTranslation();
   const preview = usePreview(entry, { maxTextBytes: 100000 });
   const [closing, setClosing] = useState(false);
   const [contentKey, setContentKey] = useState(0);
@@ -134,6 +139,8 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
         );
       case "pdf":
         return <FileText className="w-4 h-4 text-[#666] shrink-0" />;
+      case "googleDocs":
+        return <Globe className="w-4 h-4 text-[#666] shrink-0" />;
       default:
         return null;
     }
@@ -233,6 +240,47 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
             <PdfViewer url={preview.pdfUrl} />
           </Suspense>
         ) : null;
+
+      case "googleDocs":
+        return preview.googleDocsUrl ? (
+          <div className="flex flex-col" style={{ width: "70vw", height: "65vh" }}>
+            <iframe
+              src={preview.googleDocsUrl}
+              className="flex-1 w-full rounded-md border border-[#e5e5e5]"
+              title={entry.name}
+              sandbox="allow-scripts allow-same-origin allow-popups"
+            />
+            {preview.googleDocsOriginalUrl && (
+              <div className="flex justify-center mt-2 shrink-0">
+                <a
+                  href={preview.googleDocsOriginalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-[var(--accent)] hover:opacity-80"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  {t.settingsDialog.openInBrowser}
+                </a>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center text-[#999]">
+            <Globe className="w-16 h-16 text-[#bbb] mx-auto mb-3" />
+            <div className="text-base font-medium text-[#1a1a1a] mb-1">{entry.name}</div>
+            {preview.googleDocsReadFailed ? (
+              <button
+                className="mt-3 flex items-center gap-1.5 mx-auto px-4 py-2 text-xs rounded bg-[var(--accent)] text-white hover:opacity-90 transition-colors"
+                onClick={() => openPath(entry.path)}
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                {t.settingsDialog.openInBrowser}
+              </button>
+            ) : (
+              <div className="text-xs mt-3 text-[#bbb]">No preview available</div>
+            )}
+          </div>
+        );
 
       default:
         return (

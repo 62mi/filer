@@ -1,5 +1,18 @@
-import { FileAudio, FileCode, FileText, FileVideo, Image, Music, Play, X } from "lucide-react";
+import { openPath } from "@tauri-apps/plugin-opener";
+import {
+  ExternalLink,
+  FileAudio,
+  FileCode,
+  FileText,
+  FileVideo,
+  Globe,
+  Image,
+  Music,
+  Play,
+  X,
+} from "lucide-react";
 import { lazy, Suspense } from "react";
+import { useTranslation } from "../../i18n";
 import { usePreview } from "../../hooks/usePreview";
 import type { FileEntry } from "../../types";
 import { formatDate, formatFileSize } from "../../utils/format";
@@ -15,6 +28,7 @@ interface PreviewPanelProps {
 }
 
 export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
+  const t = useTranslation();
   const preview = usePreview(entry, { maxTextBytes: 50000 });
 
   if (!entry) return null;
@@ -40,6 +54,8 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
         );
       case "pdf":
         return <FileText className="w-3.5 h-3.5 text-[#666]" />;
+      case "googleDocs":
+        return <Globe className="w-3.5 h-3.5 text-[#666]" />;
       default:
         return null;
     }
@@ -192,6 +208,53 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
                 <PdfViewer url={preview.pdfUrl} maxHeight={500} />
               </Suspense>
             ) : null}
+          </div>
+        );
+
+      case "googleDocs":
+        return (
+          <div className="flex flex-col h-full min-h-0">
+            <div className="flex items-center gap-1 mb-2 shrink-0">
+              <Globe className="w-3.5 h-3.5 text-[#666]" />
+              <span className="text-xs font-medium text-[#1a1a1a] truncate">{e.name}</span>
+            </div>
+            {preview.googleDocsUrl ? (
+              <>
+                <iframe
+                  src={preview.googleDocsUrl}
+                  className="flex-1 w-full rounded border border-[#e5e5e5] min-h-0"
+                  title={e.name}
+                  sandbox="allow-scripts allow-same-origin allow-popups"
+                />
+                {preview.googleDocsOriginalUrl && (
+                  <div className="flex justify-center mt-2">
+                    <a
+                      href={preview.googleDocsOriginalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-[10px] text-[var(--accent)] hover:opacity-80"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      {t.settingsDialog.openInBrowser}
+                    </a>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center gap-2">
+                {preview.googleDocsReadFailed ? (
+                  <button
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-[var(--accent)] text-white hover:opacity-90 transition-colors"
+                    onClick={() => openPath(e.path)}
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    {t.settingsDialog.openInBrowser}
+                  </button>
+                ) : (
+                  <span className="text-xs text-[#999]">Unable to preview</span>
+                )}
+              </div>
+            )}
           </div>
         );
 

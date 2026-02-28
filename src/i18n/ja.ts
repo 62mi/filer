@@ -183,6 +183,14 @@ export const ja = {
     ffmpegDescription: "動画サムネイルの表示に必要です",
     ffmpegRecheck: "再チェック",
     ffmpegInstallGuide: "またはffmpeg.orgからダウンロードしてPATHを通してください",
+    googleAccount: "Googleアカウント連携",
+    googleLogin: "Googleにログイン",
+    googleLoginDescription: "Google Docs / Spreadsheet / Slidesのプレビューに必要です",
+    googleLoginNote: "※ Googleがログインをブロックする場合があります",
+    googleDriveDetected: "Google Drive 検出済み",
+    googleDriveNotDetected: "Google Drive 未検出",
+    googleDriveAccounts: "件のアカウント",
+    openInBrowser: "ブラウザで開く",
   },
 
   // ── AI自動整理 ──

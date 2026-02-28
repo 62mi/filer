@@ -176,6 +176,14 @@ export const en: Translations = {
     ffmpegDescription: "Required for video thumbnail display",
     ffmpegRecheck: "Re-check",
     ffmpegInstallGuide: "Or download from ffmpeg.org and add to PATH",
+    googleAccount: "Google Account",
+    googleLogin: "Sign in to Google",
+    googleLoginDescription: "Required for Google Docs / Spreadsheet / Slides preview",
+    googleLoginNote: "* Google may block sign-in from embedded browsers",
+    googleDriveDetected: "Google Drive detected",
+    googleDriveNotDetected: "Google Drive not detected",
+    googleDriveAccounts: "account(s)",
+    openInBrowser: "Open in browser",
   },
 
   aiOrganizer: {
