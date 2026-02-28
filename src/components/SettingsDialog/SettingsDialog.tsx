@@ -1,9 +1,11 @@
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { Check, DollarSign, Key, Monitor, RotateCcw, Trash2, X } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { Check, Copy, DollarSign, Key, Monitor, RefreshCw, RotateCcw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type Language, useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { type PathStyle, useSettingsStore } from "../../stores/settingsStore";
+import { resetFfmpegCache } from "../../stores/thumbnailStore";
 import { COLOR_THEMES, useThemeStore } from "../../stores/themeStore";
 import { cn } from "../../utils/cn";
 
@@ -236,6 +238,12 @@ export function SettingsDialog() {
                   {t.settingsDialog.startup}
                 </div>
                 <AutoStartToggle />
+              </div>
+              <div className="border-t border-[#f0f0f0] pt-3">
+                <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+                  {t.settingsDialog.externalTools}
+                </div>
+                <FfmpegStatus />
               </div>
             </div>
           )}
@@ -714,6 +722,83 @@ function AutoStartToggle() {
         <span className="text-xs text-[#555]">{t.settingsDialog.autoStartLabel}</span>
       </label>
       <p className="text-[10px] text-[#bbb] mt-1 ml-5.5">{t.settingsDialog.autoStartDescription}</p>
+    </div>
+  );
+}
+
+function FfmpegStatus() {
+  const t = useTranslation();
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [checking, setChecking] = useState(false);
+
+  const checkStatus = useCallback(() => {
+    setChecking(true);
+    invoke<boolean>("check_ffmpeg_available")
+      .then((result) => {
+        setAvailable(result);
+        if (result) resetFfmpegCache();
+      })
+      .catch(() => setAvailable(false))
+      .finally(() => setChecking(false));
+  }, []);
+
+  useEffect(() => {
+    checkStatus();
+  }, [checkStatus]);
+
+  const wingetCmd = "winget install Gyan.FFmpeg";
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(wingetCmd).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-[#555]">FFmpeg</span>
+        {available === null ? (
+          <span className="text-[10px] text-[#999]">...</span>
+        ) : available ? (
+          <span className="text-[10px] text-green-600 flex items-center gap-0.5">
+            <Check className="w-3 h-3" />
+            {t.settingsDialog.ffmpegInstalled}
+          </span>
+        ) : (
+          <span className="text-[10px] text-amber-600">{t.settingsDialog.ffmpegNotInstalled}</span>
+        )}
+        <button
+          className="p-0.5 rounded hover:bg-[#e8e8e8] text-[#999] transition-colors disabled:opacity-40"
+          onClick={checkStatus}
+          disabled={checking}
+          title={t.settingsDialog.ffmpegRecheck}
+        >
+          <RefreshCw className={cn("w-3 h-3", checking && "animate-spin")} />
+        </button>
+      </div>
+      <p className="text-[10px] text-[#bbb] mt-1">{t.settingsDialog.ffmpegDescription}</p>
+      {available === false && (
+        <div className="mt-1.5 bg-[#f5f5f5] rounded px-2 py-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <code className="text-[10px] text-[#555] select-all">{wingetCmd}</code>
+            <button
+              className="shrink-0 p-0.5 rounded hover:bg-[#e0e0e0] text-[#999] transition-colors"
+              onClick={handleCopy}
+              title="Copy"
+            >
+              {copied ? (
+                <Check className="w-3 h-3 text-green-600" />
+              ) : (
+                <Copy className="w-3 h-3" />
+              )}
+            </button>
+          </div>
+          <p className="text-[10px] text-[#999] mt-1">{t.settingsDialog.ffmpegInstallGuide}</p>
+        </div>
+      )}
     </div>
   );
 }

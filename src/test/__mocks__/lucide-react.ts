@@ -58,6 +58,7 @@ export const List = icon("List");
 export const Loader = icon("Loader");
 export const Loader2 = icon("Loader2");
 export const Monitor = icon("Monitor");
+export const RefreshCw = icon("RefreshCw");
 export const MoveRight = icon("MoveRight");
 export const Music = icon("Music");
 export const PanelRightClose = icon("PanelRightClose");

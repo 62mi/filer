@@ -170,6 +170,12 @@ export const en: Translations = {
     startup: "Startup",
     autoStartLabel: "Start in system tray on Windows startup",
     autoStartDescription: "TomaFiler will run in the system tray when Windows starts",
+    externalTools: "External Tools",
+    ffmpegInstalled: "Installed",
+    ffmpegNotInstalled: "Not installed",
+    ffmpegDescription: "Required for video thumbnail display",
+    ffmpegRecheck: "Re-check",
+    ffmpegInstallGuide: "Or download from ffmpeg.org and add to PATH",
   },
 
   aiOrganizer: {

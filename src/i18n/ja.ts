@@ -177,6 +177,12 @@ export const ja = {
     startup: "スタートアップ",
     autoStartLabel: "Windows起動時にトレイに常駐",
     autoStartDescription: "OSの起動時にTomaFilerがシステムトレイに常駐します",
+    externalTools: "外部ツール",
+    ffmpegInstalled: "インストール済み",
+    ffmpegNotInstalled: "未インストール",
+    ffmpegDescription: "動画サムネイルの表示に必要です",
+    ffmpegRecheck: "再チェック",
+    ffmpegInstallGuide: "またはffmpeg.orgからダウンロードしてPATHを通してください",
   },
 
   // ── AI自動整理 ──
