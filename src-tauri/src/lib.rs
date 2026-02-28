@@ -10,6 +10,7 @@ use commands::clipboard::*;
 use commands::copy_queue::*;
 use commands::fs::*;
 use commands::icons::*;
+use commands::media::*;
 use commands::system::*;
 use db::history::*;
 use db::rules::*;
@@ -228,6 +229,8 @@ pub fn run() {
             commands::tab_drag::start_tab_transfer,
             commands::tab_drag::cancel_tab_transfer,
             commands::tab_drag::check_pending_tab,
+            extract_video_thumbnail,
+            check_ffmpeg_available,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
