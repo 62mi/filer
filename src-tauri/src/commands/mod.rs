@@ -4,4 +4,5 @@ pub mod copy_queue;
 pub mod fs;
 pub mod icons;
 pub mod system;
+pub mod tab_drag;
 pub mod window;

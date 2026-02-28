@@ -91,6 +91,7 @@ pub fn run() {
             cache: std::sync::Mutex::new(std::collections::HashMap::new()),
         })
         .manage(CopyQueueManager::new())
+        .manage(commands::tab_drag::TabDragState::new())
         .setup(|app| {
             let handle = app.handle().clone();
             let watcher_manager = watcher::WatcherManager::new(handle.clone());
@@ -224,6 +225,9 @@ pub fn run() {
             get_accent_color,
             commands::window::create_new_window,
             commands::window::get_window_label,
+            commands::tab_drag::start_tab_transfer,
+            commands::tab_drag::cancel_tab_transfer,
+            commands::tab_drag::check_pending_tab,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {

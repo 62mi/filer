@@ -50,6 +50,16 @@ function sortEntries(entries: FileEntry[], key: SortKey, order: SortOrder): File
   });
 }
 
+/** ウィンドウ間タブ転送用のシリアライズ可能なタブデータ */
+export interface SerializedTab {
+  path: string;
+  history: string[];
+  historyIndex: number;
+  sortKey: SortKey;
+  sortOrder: SortOrder;
+  viewMode: "details" | "icons";
+}
+
 interface ClipboardData {
   paths: string[];
   operation: "copy" | "cut";
@@ -158,6 +168,11 @@ interface ExplorerStore {
 
   // External clipboard sync
   syncExternalClipboard: (paths: string[], operation: string) => void;
+
+  // Tab drag & drop
+  moveTab: (fromIndex: number, toIndex: number) => void;
+  insertTabFromData: (tabData: SerializedTab, atIndex?: number) => void;
+  removeTabForTransfer: (id: string) => SerializedTab | null;
 
   // Stack
   stackItems: string[];
@@ -820,6 +835,76 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         get().refreshDirectory();
       }
     }
+  },
+
+  // Tab drag & drop
+  moveTab: (fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return;
+    set((s) => {
+      const newTabs = [...s.tabs];
+      const [moved] = newTabs.splice(fromIndex, 1);
+      newTabs.splice(toIndex, 0, moved);
+      return { tabs: newTabs };
+    });
+  },
+
+  insertTabFromData: (tabData, atIndex) => {
+    const newTab = createTabState(tabData.path);
+    newTab.history = tabData.history;
+    newTab.historyIndex = tabData.historyIndex;
+    newTab.sortKey = tabData.sortKey;
+    newTab.sortOrder = tabData.sortOrder;
+    newTab.viewMode = tabData.viewMode;
+
+    set((s) => {
+      const newTabs = [...s.tabs];
+      const insertAt = atIndex !== undefined ? Math.min(atIndex, newTabs.length) : newTabs.length;
+      newTabs.splice(insertAt, 0, newTab);
+      return { tabs: newTabs, activeTabId: newTab.id };
+    });
+
+    // ディレクトリを読み込み
+    const { showHidden } = get();
+    invoke<FileEntry[]>("list_directory", { path: tabData.path })
+      .then((entries) => {
+        const filtered = showHidden ? entries : entries.filter((e) => !e.is_hidden);
+        const sorted = sortEntries(filtered, tabData.sortKey, tabData.sortOrder);
+        set((s) => ({
+          tabs: s.tabs.map((t) =>
+            t.id === newTab.id ? { ...t, entries: sorted, loading: false } : t,
+          ),
+        }));
+      })
+      .catch(() => {});
+  },
+
+  removeTabForTransfer: (id) => {
+    const { tabs, activeTabId } = get();
+    const tab = tabs.find((t) => t.id === id);
+    if (!tab) return null;
+
+    const serialized: SerializedTab = {
+      path: tab.path,
+      history: tab.history,
+      historyIndex: tab.historyIndex,
+      sortKey: tab.sortKey,
+      sortOrder: tab.sortOrder,
+      viewMode: tab.viewMode,
+    };
+
+    // タブが1つだけの場合はシリアライズだけして返す（ウィンドウ破棄は呼び出し側で）
+    if (tabs.length <= 1) {
+      return serialized;
+    }
+
+    const idx = tabs.findIndex((t) => t.id === id);
+    const newTabs = tabs.filter((t) => t.id !== id);
+    let newActiveId = activeTabId;
+    if (activeTabId === id) {
+      newActiveId = newTabs[Math.min(idx, newTabs.length - 1)].id;
+    }
+    set({ tabs: newTabs, activeTabId: newActiveId });
+    return serialized;
   },
 
   // Stack
