@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useIconStore } from "../../stores/iconStore";
 import { getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
-import { extractImagePaths, useThumbnailStore } from "../../stores/thumbnailStore";
+import { extractImagePaths, extractVideoPaths, useThumbnailStore } from "../../stores/thumbnailStore";
 import type { FileEntry } from "../../types";
 import { GridCell } from "./GridCell";
 
@@ -48,7 +48,9 @@ export function GridView({
   const cellWidth = getGridCellWidth({ gridIconSize });
 
   const prefetchInBackground = useThumbnailStore((s) => s.prefetchInBackground);
+  const prefetchVideosInBackground = useThumbnailStore((s) => s.prefetchVideosInBackground);
   const cancelPrefetch = useThumbnailStore((s) => s.cancelPrefetch);
+  const cancelVideoPrefetch = useThumbnailStore((s) => s.cancelVideoPrefetch);
   const THUMB_SIZE = 128;
 
   // Fetch large icons (lightweight, ext-based cache)
@@ -64,12 +66,20 @@ export function GridView({
 
   // Background prefetch thumbnails for all images in folder
   const imagePaths = useMemo(() => extractImagePaths(entries), [entries]);
+  const videoPaths = useMemo(() => extractVideoPaths(entries), [entries]);
 
   useEffect(() => {
     if (imagePaths.length === 0) return;
     prefetchInBackground(imagePaths, THUMB_SIZE);
     return () => cancelPrefetch();
   }, [imagePaths, prefetchInBackground, cancelPrefetch]);
+
+  // Background prefetch thumbnails for videos (FFmpeg, slower)
+  useEffect(() => {
+    if (videoPaths.length === 0) return;
+    prefetchVideosInBackground(videoPaths, THUMB_SIZE);
+    return () => cancelVideoPrefetch();
+  }, [videoPaths, prefetchVideosInBackground, cancelVideoPrefetch]);
 
   const handleSelectRange = useCallback(
     (toIndex: number) => onSelectRange(cursorIndex, toIndex),

@@ -2,7 +2,7 @@ import { Folder } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { useIconStore } from "../../stores/iconStore";
 import { getGridCellHeight, getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
-import { useThumbnailStore } from "../../stores/thumbnailStore";
+import { VIDEO_EXTS, useThumbnailStore } from "../../stores/thumbnailStore";
 import type { FileEntry } from "../../types";
 import { cn } from "../../utils/cn";
 
@@ -63,22 +63,29 @@ export const GridCell = memo(function GridCell({
   const cellHeight = getGridCellHeight({ gridIconSize });
 
   const isImage = !entry.is_dir && IMAGE_EXTS.has(entry.extension);
+  const isVideo = !entry.is_dir && VIDEO_EXTS.has(entry.extension);
+  const hasThumbnailMedia = isImage || isVideo;
   const THUMB_SIZE = 128;
-  const thumbKey = isImage ? `${entry.path}\0${THUMB_SIZE}` : "";
+  const thumbKey = hasThumbnailMedia ? `${entry.path}\0${THUMB_SIZE}` : "";
   const fetchThumbnails = useThumbnailStore((s) => s.fetchThumbnails);
-  const hasThumbnail = useThumbnailStore((s) => (isImage ? !!s.thumbnails[thumbKey] : false));
-  const isPending = useThumbnailStore((s) => (isImage ? s.pending.has(thumbKey) : false));
+  const fetchVideoThumbnail = useThumbnailStore((s) => s.fetchVideoThumbnail);
+  const hasThumbnail = useThumbnailStore((s) => (hasThumbnailMedia ? !!s.thumbnails[thumbKey] : false));
+  const isPending = useThumbnailStore((s) => (hasThumbnailMedia ? s.pending.has(thumbKey) : false));
 
   // IntersectionObserver: ビューポートに入ったらサムネイル取得
   useEffect(() => {
-    if (!isImage || hasThumbnail || isPending) return;
+    if (!hasThumbnailMedia || hasThumbnail || isPending) return;
     const el = cellRef.current;
     if (!el) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) {
-          fetchThumbnails([entry.path], THUMB_SIZE);
+          if (isImage) {
+            fetchThumbnails([entry.path], THUMB_SIZE);
+          } else {
+            fetchVideoThumbnail(entry.path, THUMB_SIZE);
+          }
           observer.disconnect();
         }
       },
@@ -86,7 +93,7 @@ export const GridCell = memo(function GridCell({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [isImage, hasThumbnail, isPending, entry.path, fetchThumbnails]);
+  }, [hasThumbnailMedia, isImage, hasThumbnail, isPending, entry.path, fetchThumbnails, fetchVideoThumbnail]);
 
   useEffect(() => {
     return () => {
@@ -118,7 +125,7 @@ export const GridCell = memo(function GridCell({
     }
   };
 
-  const thumbnail = useThumbnailStore((s) => (isImage ? s.thumbnails[thumbKey] : undefined));
+  const thumbnail = useThumbnailStore((s) => (hasThumbnailMedia ? s.thumbnails[thumbKey] : undefined));
   const largeIcon = useIconStore(
     (s) => s.largeIcons[entry.is_dir ? "__directory__" : entry.extension],
   );
@@ -200,7 +207,7 @@ export const GridCell = memo(function GridCell({
         className="flex items-center justify-center shrink-0"
         style={{ width: gridIconSize, height: gridIconSize }}
       >
-        {isImage && thumbnail ? (
+        {hasThumbnailMedia && thumbnail ? (
           <img
             src={thumbnail}
             alt=""

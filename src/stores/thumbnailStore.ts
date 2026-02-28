@@ -7,14 +7,35 @@ function cacheKey(path: string, size: number) {
 }
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp"]);
+const VIDEO_EXTS = new Set(["mp4", "webm", "mkv", "avi", "mov", "wmv", "flv", "m4v"]);
+
+// FFmpeg利用可否キャッシュ
+let ffmpegAvailable: boolean | null = null;
+async function checkFfmpeg(): Promise<boolean> {
+  if (ffmpegAvailable !== null) return ffmpegAvailable;
+  try {
+    ffmpegAvailable = await invoke<boolean>("check_ffmpeg_available");
+  } catch {
+    ffmpegAvailable = false;
+  }
+  return ffmpegAvailable;
+}
+
+/** FFmpegキャッシュをリセット（インストール後の再検出用） */
+export function resetFfmpegCache() {
+  ffmpegAvailable = null;
+}
 
 interface ThumbnailStore {
   thumbnails: Record<string, string>; // cacheKey → dataURL
   pending: Set<string>; // cacheKey
 
   fetchThumbnails: (paths: string[], size: number) => Promise<void>;
+  fetchVideoThumbnail: (path: string, size: number) => Promise<void>;
   prefetchInBackground: (paths: string[], size: number) => void;
+  prefetchVideosInBackground: (paths: string[], size: number) => void;
   cancelPrefetch: () => void;
+  cancelVideoPrefetch: () => void;
   getThumbnail: (path: string, size: number) => string | undefined;
   hasThumbnail: (path: string, size: number) => boolean;
   isPending: (path: string, size: number) => boolean;
@@ -23,6 +44,7 @@ interface ThumbnailStore {
 
 // プリフェッチ中止用
 let prefetchAbort: AbortController | null = null;
+let videoPrefetchAbort: AbortController | null = null;
 
 export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
   thumbnails: {},
@@ -82,10 +104,46 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
     }
   },
 
+  // 動画サムネイル取得（1ファイルずつ、FFmpeg経由）
+  fetchVideoThumbnail: async (path: string, size: number) => {
+    const k = cacheKey(path, size);
+    const { thumbnails, pending } = get();
+    if (thumbnails[k] || pending.has(k)) return;
+    if (!(await checkFfmpeg())) return;
+
+    set((s) => {
+      const next = new Set(s.pending);
+      next.add(k);
+      return { pending: next };
+    });
+
+    try {
+      const dataUrl = await invoke<string>("extract_video_thumbnail", { path, size });
+      set((s) => {
+        const next = new Set(s.pending);
+        next.delete(k);
+        return { thumbnails: { ...s.thumbnails, [k]: dataUrl }, pending: next };
+      });
+    } catch {
+      set((s) => {
+        const next = new Set(s.pending);
+        next.delete(k);
+        return { pending: next };
+      });
+    }
+  },
+
   cancelPrefetch: () => {
     if (prefetchAbort) {
       prefetchAbort.abort();
       prefetchAbort = null;
+    }
+  },
+
+  cancelVideoPrefetch: () => {
+    if (videoPrefetchAbort) {
+      videoPrefetchAbort.abort();
+      videoPrefetchAbort = null;
     }
   },
 
@@ -168,6 +226,64 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
       }
     })();
   },
+
+  // 動画サムネイルのバックグラウンドプリフェッチ（1ファイルずつ処理）
+  prefetchVideosInBackground: (paths: string[], size: number) => {
+    if (videoPrefetchAbort) videoPrefetchAbort.abort();
+    const controller = new AbortController();
+    videoPrefetchAbort = controller;
+
+    const { thumbnails, pending } = get();
+    const needed = paths.filter((p) => {
+      const k = cacheKey(p, size);
+      return !thumbnails[k] && !pending.has(k);
+    });
+    if (needed.length === 0) return;
+
+    (async () => {
+      if (!(await checkFfmpeg())) return;
+
+      // 画像サムネイルの読み込みを優先させるため長めに待つ
+      await new Promise((r) => setTimeout(r, 1000));
+      if (controller.signal.aborted) return;
+
+      for (const path of needed) {
+        if (controller.signal.aborted) return;
+
+        const k = cacheKey(path, size);
+        const current = get();
+        if (current.thumbnails[k] || current.pending.has(k)) continue;
+
+        set((s) => {
+          const next = new Set(s.pending);
+          next.add(k);
+          return { pending: next };
+        });
+
+        try {
+          const dataUrl = await invoke<string>("extract_video_thumbnail", { path, size });
+          if (controller.signal.aborted) return;
+          set((s) => {
+            const next = new Set(s.pending);
+            next.delete(k);
+            return { thumbnails: { ...s.thumbnails, [k]: dataUrl }, pending: next };
+          });
+        } catch {
+          if (controller.signal.aborted) return;
+          set((s) => {
+            const next = new Set(s.pending);
+            next.delete(k);
+            return { pending: next };
+          });
+        }
+
+        // FFmpegは重いので間隔を空ける
+        if (!controller.signal.aborted) {
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+    })();
+  },
 }));
 
 /** エントリ配列から画像パスだけ抽出するヘルパー */
@@ -176,3 +292,12 @@ export function extractImagePaths(
 ): string[] {
   return entries.filter((e) => !e.is_dir && IMAGE_EXTS.has(e.extension)).map((e) => e.path);
 }
+
+/** エントリ配列から動画パスだけ抽出するヘルパー */
+export function extractVideoPaths(
+  entries: { is_dir: boolean; extension: string; path: string }[],
+): string[] {
+  return entries.filter((e) => !e.is_dir && VIDEO_EXTS.has(e.extension)).map((e) => e.path);
+}
+
+export { VIDEO_EXTS };
