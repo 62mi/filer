@@ -1,6 +1,8 @@
 mod clipboard_watcher;
 mod commands;
 mod db;
+#[cfg(windows)]
+mod jumplist;
 mod watcher;
 
 use commands::ai::*;
@@ -12,6 +14,8 @@ use commands::system::*;
 use db::history::*;
 use db::rules::*;
 use db::Database;
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::TrayIconBuilder;
 use tauri::Manager;
 
 /// Windows MessageBox でエラーを表示する
@@ -36,6 +40,15 @@ fn show_error_dialog(_title: &str, message: &str) {
     eprintln!("{}", message);
 }
 
+/// メインウィンドウを表示・フォーカスする
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        w.show().ok();
+        w.unminimize().ok();
+        w.set_focus().ok();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let database = match Database::new() {
@@ -49,14 +62,34 @@ pub fn run() {
     };
     database.cleanup_old_entries().ok();
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
+        // single-instance は最初に登録（重要）
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if args.iter().any(|a| a == "--new-window") {
+                // --new-window → 新しいウィンドウを作成
+                commands::window::create_new_window_internal(app).ok();
+            } else {
+                // 通常の2回目起動 → 既存ウィンドウを表示・フォーカス
+                show_main_window(app);
+            }
+        }))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--hidden"]),
+        ))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_drag::init())
         .manage(database)
-        .manage(IconCache { cache: std::sync::Mutex::new(std::collections::HashMap::new()) })
-        .manage(IconCacheLarge { cache: std::sync::Mutex::new(std::collections::HashMap::new()) })
-        .manage(ThumbnailCache { cache: std::sync::Mutex::new(std::collections::HashMap::new()) })
+        .manage(IconCache {
+            cache: std::sync::Mutex::new(std::collections::HashMap::new()),
+        })
+        .manage(IconCacheLarge {
+            cache: std::sync::Mutex::new(std::collections::HashMap::new()),
+        })
+        .manage(ThumbnailCache {
+            cache: std::sync::Mutex::new(std::collections::HashMap::new()),
+        })
         .manage(CopyQueueManager::new())
         .setup(|app| {
             let handle = app.handle().clone();
@@ -67,11 +100,71 @@ pub fn run() {
             // クリップボード監視を開始
             #[cfg(windows)]
             {
-                let clip_watcher = clipboard_watcher::ClipboardWatcher::start(handle);
+                let clip_watcher = clipboard_watcher::ClipboardWatcher::start(handle.clone());
                 app.manage(clip_watcher);
             }
 
+            // タスクバー Jump List に「新しいウィンドウ」を追加
+            #[cfg(windows)]
+            jumplist::setup_jump_list();
+
+            // ── トレイアイコン構築 ──
+            let tray_menu = Menu::with_items(
+                app,
+                &[
+                    &MenuItem::with_id(app, "show", "TomaFilerを表示", true, None::<&str>)?,
+                    &MenuItem::with_id(app, "new_window", "新しいウィンドウ", true, None::<&str>)?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &MenuItem::with_id(app, "quit", "終了", true, None::<&str>)?,
+                ],
+            )?;
+
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("TomaFiler")
+                .menu(&tray_menu)
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Left,
+                        ..
+                    } = event
+                    {
+                        show_main_window(tray.app_handle());
+                    }
+                })
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "show" => {
+                        show_main_window(app);
+                    }
+                    "new_window" => {
+                        commands::window::create_new_window_internal(app).ok();
+                    }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .build(app)?;
+
+            // ── --hidden 起動対応 ──
+            let args: Vec<String> = std::env::args().collect();
+            let start_hidden = args.iter().any(|a| a == "--hidden");
+
+            if start_hidden {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.hide().ok();
+                }
+            }
+
             Ok(())
+        })
+        // ── ×ボタンで hide（全ウィンドウ共通） ──
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                #[cfg(windows)]
+                _window.hide().ok();
+                api.prevent_close();
+            }
         })
         .invoke_handler(tauri::generate_handler![
             list_directory,
@@ -129,11 +222,20 @@ pub fn run() {
             get_copy_queue,
             clear_completed_copies,
             get_accent_color,
+            commands::window::create_new_window,
+            commands::window::get_window_label,
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
             let msg = format!("アプリケーションの実行中にエラーが発生しました:\n{}", e);
             eprintln!("{}", msg);
             show_error_dialog("TomaFiler - 実行エラー", &msg);
+            std::process::exit(1);
         });
+
+    app.run(|_app_handle, event| {
+        if let tauri::RunEvent::ExitRequested { api, .. } = event {
+            api.prevent_exit(); // トレイ常駐のためプロセス維持
+        }
+    });
 }

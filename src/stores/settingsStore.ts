@@ -41,6 +41,9 @@ interface SettingsState {
   // Path display style
   pathStyle: PathStyle;
 
+  // Startup
+  autoStart: boolean;
+
   // Settings dialog
   isOpen: boolean;
   initialTab: string | null;
@@ -72,6 +75,7 @@ interface SettingsData {
   colorTheme: string;
   language: Language;
   pathStyle: PathStyle;
+  autoStart: boolean;
 }
 
 const DEFAULT_COLUMN_WIDTHS: ColumnWidths = {
@@ -98,6 +102,7 @@ const DEFAULTS: SettingsData = {
   colorTheme: "auto",
   language: "ja",
   pathStyle: "windows" as PathStyle,
+  autoStart: false,
 };
 
 function loadSettings(): Partial<SettingsData> {
@@ -127,6 +132,7 @@ function saveSettings(state: SettingsState) {
     colorTheme: state.colorTheme,
     language: state.language,
     pathStyle: state.pathStyle,
+    autoStart: state.autoStart,
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -154,6 +160,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   colorTheme: saved.colorTheme ?? DEFAULTS.colorTheme,
   language: saved.language ?? DEFAULTS.language,
   pathStyle: saved.pathStyle ?? DEFAULTS.pathStyle,
+  autoStart: saved.autoStart ?? DEFAULTS.autoStart,
 
   isOpen: false,
   initialTab: null,

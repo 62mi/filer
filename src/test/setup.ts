@@ -13,3 +13,9 @@ vi.mock("@tauri-apps/api/event", () => ({
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
 }));
+
+vi.mock("@tauri-apps/plugin-autostart", () => ({
+  enable: vi.fn().mockResolvedValue(undefined),
+  disable: vi.fn().mockResolvedValue(undefined),
+  isEnabled: vi.fn().mockResolvedValue(false),
+}));
