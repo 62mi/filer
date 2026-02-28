@@ -171,21 +171,37 @@ pub fn move_files(sources: Vec<String>, dest: String) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Debug, Serialize)]
+pub struct DeleteResult {
+    pub succeeded: Vec<String>,
+    pub failed: Vec<(String, String)>, // (path, error_message)
+}
+
 #[tauri::command]
-pub fn delete_files(paths: Vec<String>, to_trash: bool) -> Result<(), String> {
+pub fn delete_files(paths: Vec<String>, to_trash: bool) -> Result<DeleteResult, String> {
+    let mut succeeded = Vec::new();
+    let mut failed = Vec::new();
+
     for path_str in &paths {
         let path = Path::new(path_str);
-        if to_trash {
-            trash::delete(path).map_err(|e| format!("Failed to trash {}: {}", path_str, e))?;
+        let result = if to_trash {
+            trash::delete(path).map_err(|e| e.to_string())
         } else if path.is_dir() {
-            fs::remove_dir_all(path)
-                .map_err(|e| format!("Failed to delete {}: {}", path_str, e))?;
+            fs::remove_dir_all(path).map_err(|e| e.to_string())
         } else {
-            fs::remove_file(path)
-                .map_err(|e| format!("Failed to delete {}: {}", path_str, e))?;
+            fs::remove_file(path).map_err(|e| e.to_string())
+        };
+
+        match result {
+            Ok(()) => succeeded.push(path_str.clone()),
+            Err(e) => {
+                eprintln!("[fs] Failed to delete {}: {}", path_str, e);
+                failed.push((path_str.clone(), e));
+            }
         }
     }
-    Ok(())
+
+    Ok(DeleteResult { succeeded, failed })
 }
 
 #[tauri::command]

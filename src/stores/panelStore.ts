@@ -3,6 +3,7 @@ import { create } from "zustand";
 import type { FileEntry, SortKey, SortOrder, TidinessScore } from "../types";
 import { useCopyQueueStore } from "./copyQueueStore";
 import { useDirSizeStore } from "./dirSizeStore";
+import { toast } from "./toastStore";
 import { useUndoStore } from "./undoStore";
 
 /** Windowsパスから親ディレクトリを取得 */
@@ -560,19 +561,28 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
     if (paths.length === 0) return;
     try {
-      await invoke("delete_files", { paths, toTrash: true });
-      // Undo用に削除パスを記録（ゴミ箱送り）
-      useUndoStore.getState().pushAction({
-        type: "delete",
-        entries: paths.map((p) => ({ sourcePath: p, destPath: "" })),
-      });
+      const result = await invoke<{ succeeded: string[]; failed: [string, string][] }>(
+        "delete_files",
+        { paths, toTrash: true },
+      );
+      // 成功分のみUndoスタックに記録
+      if (result.succeeded.length > 0) {
+        useUndoStore.getState().pushAction({
+          type: "delete",
+          entries: result.succeeded.map((p) => ({ sourcePath: p, destPath: "" })),
+        });
+      }
+      // 失敗分をトースト通知
+      if (result.failed.length > 0) {
+        const names = result.failed
+          .map(([p]) => p.substring(p.lastIndexOf("\\") + 1))
+          .join(", ");
+        toast.error(`削除に失敗: ${names}`);
+      }
       await get().loadDirectory(tab.path, false);
     } catch (e: unknown) {
-      set((s) => ({
-        tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: e instanceof Error ? e.message : String(e),
-        })),
-      }));
+      toast.error(`削除エラー: ${e instanceof Error ? e.message : String(e)}`);
+      await get().loadDirectory(tab.path, false);
     }
   },
 
