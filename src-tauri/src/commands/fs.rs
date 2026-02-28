@@ -383,6 +383,173 @@ pub fn read_text_file(path: String, max_bytes: Option<usize>) -> Result<String, 
     Ok(String::from_utf8_lossy(&buf).to_string())
 }
 
+/// Google Drive等のCloud Filesプレースホルダーからdoc_idを取得する
+/// 通常のファイル読み込みが失敗する仮想ファイル向け
+#[tauri::command]
+pub fn read_cloud_doc_id(path: String, extension: String) -> Result<String, String> {
+    // Step 1: 通常のファイル読み込みを試す（ローカル/ミラーモード用）
+    match fs::read_to_string(&path) {
+        Ok(content) => {
+            if let Ok(data) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(doc_id) = data.get("doc_id").and_then(|v| v.as_str()) {
+                    return Ok(doc_id.to_string());
+                }
+                if let Some(url) = data.get("url").and_then(|v| v.as_str()) {
+                    return Ok(format!("url:{}", url));
+                }
+            }
+            Err("No doc_id or url found in file".to_string())
+        }
+        Err(e) if e.raw_os_error() == Some(1) => {
+            // ERROR_INVALID_FUNCTION - Cloud Filesプレースホルダー
+            // Google DriveのローカルメタデータDBからdoc_idを検索
+            let file_name = Path::new(&path)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .ok_or_else(|| "Invalid file name".to_string())?;
+            lookup_google_drive_doc_id(file_name, &extension)
+        }
+        Err(e) => Err(format!("Failed to read file: {}", e)),
+    }
+}
+
+/// Google Docs 拡張子 → MIMEタイプ変換
+fn gdocs_mime_type(ext: &str) -> Option<&'static str> {
+    match ext.to_lowercase().as_str() {
+        "gdoc" => Some("application/vnd.google-apps.document"),
+        "gsheet" => Some("application/vnd.google-apps.spreadsheet"),
+        "gslides" => Some("application/vnd.google-apps.presentation"),
+        _ => None,
+    }
+}
+
+/// DriveFS メタデータDBへの接続を一括で開く
+fn open_drivefs_connections() -> Result<Vec<rusqlite::Connection>, String> {
+    let local_app_data = std::env::var("LOCALAPPDATA")
+        .map_err(|_| "LOCALAPPDATA not set".to_string())?;
+    let drivefs_dir = Path::new(&local_app_data).join("Google").join("DriveFS");
+
+    if !drivefs_dir.exists() {
+        return Err("Google DriveFS directory not found".to_string());
+    }
+
+    let mut conns = Vec::new();
+    if let Ok(entries) = fs::read_dir(&drivefs_dir) {
+        for entry in entries.flatten() {
+            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                let db_path = entry.path().join("metadata_sqlite_db");
+                if db_path.exists() {
+                    let db_uri = format!(
+                        "file:///{}?mode=ro&nolock=1&immutable=1",
+                        db_path.to_string_lossy().replace('\\', "/")
+                    );
+                    if let Ok(c) = rusqlite::Connection::open_with_flags(
+                        &db_uri,
+                        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                            | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                    ) {
+                        conns.push(c);
+                    }
+                }
+            }
+        }
+    }
+
+    if conns.is_empty() {
+        return Err("No Google DriveFS metadata database found".to_string());
+    }
+    Ok(conns)
+}
+
+/// 開いた接続群から doc_id を検索
+fn lookup_doc_id_from_connections(
+    conns: &[rusqlite::Connection],
+    file_name: &str,
+    ext: &str,
+) -> Option<String> {
+    let mime_type = gdocs_mime_type(ext)?;
+    for conn in conns {
+        let result: Result<String, _> = conn.query_row(
+            "SELECT id FROM items WHERE local_title = ?1 AND mime_type = ?2 LIMIT 1",
+            rusqlite::params![file_name, mime_type],
+            |row| row.get(0),
+        );
+        if let Ok(doc_id) = result {
+            return Some(doc_id);
+        }
+    }
+    None
+}
+
+/// Google Drive for DesktopのローカルSQLiteメタデータDBからdoc_idを検索
+fn lookup_google_drive_doc_id(file_name: &str, extension: &str) -> Result<String, String> {
+    let conns = open_drivefs_connections()?;
+    lookup_doc_id_from_connections(&conns, file_name, extension).ok_or_else(|| {
+        format!(
+            "Document not found in Google Drive metadata: {}",
+            file_name
+        )
+    })
+}
+
+/// Google Drive for Desktop の検出状態を返す
+#[derive(Debug, Serialize)]
+pub struct GoogleDriveStatus {
+    pub available: bool,
+    pub account_count: usize,
+}
+
+#[tauri::command]
+pub fn check_google_drive_status() -> GoogleDriveStatus {
+    match open_drivefs_connections() {
+        Ok(conns) => GoogleDriveStatus {
+            available: true,
+            account_count: conns.len(),
+        },
+        Err(_) => GoogleDriveStatus {
+            available: false,
+            account_count: 0,
+        },
+    }
+}
+
+/// 複数の Google Docs ファイルからサムネイルURLをバッチ取得
+#[tauri::command]
+pub async fn get_google_docs_thumbnails(
+    paths: Vec<String>,
+    size: Option<u32>,
+) -> Result<std::collections::HashMap<String, String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let sz = size.unwrap_or(256);
+        let conns = open_drivefs_connections()?;
+        let mut result = std::collections::HashMap::new();
+
+        for path_str in &paths {
+            let p = Path::new(path_str);
+            let file_name = match p.file_name().and_then(|n| n.to_str()) {
+                Some(n) => n,
+                None => continue,
+            };
+            let ext = match p.extension().and_then(|e| e.to_str()) {
+                Some(e) => e,
+                None => continue,
+            };
+
+            if let Some(doc_id) = lookup_doc_id_from_connections(&conns, file_name, ext) {
+                let url = format!(
+                    "https://drive.google.com/thumbnail?authuser=0&sz=w{}&id={}",
+                    sz, doc_id
+                );
+                result.insert(path_str.clone(), url);
+            }
+        }
+
+        Ok(result)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub fn read_image_base64(path: String) -> Result<String, String> {
     use base64::Engine;

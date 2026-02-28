@@ -1,6 +1,18 @@
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { invoke } from "@tauri-apps/api/core";
-import { Check, Copy, DollarSign, Key, Monitor, RefreshCw, RotateCcw, Trash2, X } from "lucide-react";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import {
+  Check,
+  Copy,
+  DollarSign,
+  ExternalLink,
+  Key,
+  Monitor,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type Language, useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
@@ -244,6 +256,12 @@ export function SettingsDialog() {
                   {t.settingsDialog.externalTools}
                 </div>
                 <FfmpegStatus />
+              </div>
+              <div className="border-t border-[#f0f0f0] pt-3">
+                <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+                  {t.settingsDialog.googleAccount}
+                </div>
+                <GoogleLoginSection />
               </div>
             </div>
           )}
@@ -799,6 +817,77 @@ function FfmpegStatus() {
           <p className="text-[10px] text-[#999] mt-1">{t.settingsDialog.ffmpegInstallGuide}</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function GoogleLoginSection() {
+  const t = useTranslation();
+  const [opening, setOpening] = useState(false);
+  const [driveStatus, setDriveStatus] = useState<{
+    available: boolean;
+    account_count: number;
+  } | null>(null);
+
+  useEffect(() => {
+    invoke<{ available: boolean; account_count: number }>("check_google_drive_status")
+      .then(setDriveStatus)
+      .catch(() => setDriveStatus({ available: false, account_count: 0 }));
+  }, []);
+
+  const handleLogin = async () => {
+    setOpening(true);
+    try {
+      const existing = await WebviewWindow.getByLabel("google-login");
+      if (existing) {
+        await existing.setFocus();
+        return;
+      }
+      new WebviewWindow("google-login", {
+        url: "https://accounts.google.com",
+        title: "Google Login",
+        width: 500,
+        height: 700,
+        center: true,
+      });
+    } catch {
+      // ウィンドウ作成失敗
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  return (
+    <div>
+      {/* DriveFS 検出状態 */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xs text-[#555]">Google Drive for Desktop</span>
+        {driveStatus === null ? (
+          <span className="text-[10px] text-[#999]">...</span>
+        ) : driveStatus.available ? (
+          <span className="text-[10px] text-green-600 flex items-center gap-0.5">
+            <Check className="w-3 h-3" />
+            {t.settingsDialog.googleDriveDetected}
+            <span className="text-[#999] ml-1">
+              ({driveStatus.account_count} {t.settingsDialog.googleDriveAccounts})
+            </span>
+          </span>
+        ) : (
+          <span className="text-[10px] text-amber-600">
+            {t.settingsDialog.googleDriveNotDetected}
+          </span>
+        )}
+      </div>
+      <button
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded border border-[#d0d0d0] text-[#555] hover:bg-[#f0f0f0] transition-colors disabled:opacity-50"
+        onClick={handleLogin}
+        disabled={opening}
+      >
+        <ExternalLink className="w-3 h-3" />
+        {t.settingsDialog.googleLogin}
+      </button>
+      <p className="text-[10px] text-[#bbb] mt-1">{t.settingsDialog.googleLoginDescription}</p>
+      <p className="text-[10px] text-[#999] mt-0.5">{t.settingsDialog.googleLoginNote}</p>
     </div>
   );
 }

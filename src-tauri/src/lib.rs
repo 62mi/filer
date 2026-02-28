@@ -183,6 +183,7 @@ pub fn run() {
             open_terminal,
             search_files,
             read_text_file,
+            read_cloud_doc_id,
             read_image_base64,
             get_file_properties,
             group_files_into_folder,
@@ -231,6 +232,8 @@ pub fn run() {
             commands::tab_drag::check_pending_tab,
             extract_video_thumbnail,
             check_ffmpeg_available,
+            get_google_docs_thumbnails,
+            check_google_drive_status,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {

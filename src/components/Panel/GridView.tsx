@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useIconStore } from "../../stores/iconStore";
 import { getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
-import { extractImagePaths, extractVideoPaths, useThumbnailStore } from "../../stores/thumbnailStore";
+import { extractGoogleDocsPaths, extractImagePaths, extractVideoPaths, useThumbnailStore } from "../../stores/thumbnailStore";
 import type { FileEntry } from "../../types";
 import { GridCell } from "./GridCell";
 
@@ -49,8 +49,10 @@ export function GridView({
 
   const prefetchInBackground = useThumbnailStore((s) => s.prefetchInBackground);
   const prefetchVideosInBackground = useThumbnailStore((s) => s.prefetchVideosInBackground);
+  const prefetchGoogleDocsInBackground = useThumbnailStore((s) => s.prefetchGoogleDocsInBackground);
   const cancelPrefetch = useThumbnailStore((s) => s.cancelPrefetch);
   const cancelVideoPrefetch = useThumbnailStore((s) => s.cancelVideoPrefetch);
+  const cancelGoogleDocsPrefetch = useThumbnailStore((s) => s.cancelGoogleDocsPrefetch);
   const THUMB_SIZE = 128;
 
   // Fetch large icons (lightweight, ext-based cache)
@@ -67,6 +69,7 @@ export function GridView({
   // Background prefetch thumbnails for all images in folder
   const imagePaths = useMemo(() => extractImagePaths(entries), [entries]);
   const videoPaths = useMemo(() => extractVideoPaths(entries), [entries]);
+  const googleDocsPaths = useMemo(() => extractGoogleDocsPaths(entries), [entries]);
 
   useEffect(() => {
     if (imagePaths.length === 0) return;
@@ -80,6 +83,13 @@ export function GridView({
     prefetchVideosInBackground(videoPaths, THUMB_SIZE);
     return () => cancelVideoPrefetch();
   }, [videoPaths, prefetchVideosInBackground, cancelVideoPrefetch]);
+
+  // Background prefetch Google Docs thumbnails
+  useEffect(() => {
+    if (googleDocsPaths.length === 0) return;
+    prefetchGoogleDocsInBackground(googleDocsPaths, THUMB_SIZE);
+    return () => cancelGoogleDocsPrefetch();
+  }, [googleDocsPaths, prefetchGoogleDocsInBackground, cancelGoogleDocsPrefetch]);
 
   const handleSelectRange = useCallback(
     (toIndex: number) => onSelectRange(cursorIndex, toIndex),

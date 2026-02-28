@@ -62,6 +62,9 @@ export const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "flac", "ogg", "aac", "wm
 
 export const PDF_EXTENSIONS = new Set(["pdf"]);
 
+/** Google Docs系ショートカットファイル */
+export const GOOGLE_DOCS_EXTENSIONS = new Set(["gdoc", "gsheet", "gslides"]);
+
 /** コードファイルかどうか判定する拡張子 */
 export const CODE_EXTENSIONS = new Set(["ts", "tsx", "js", "jsx", "rs", "py", "html", "css"]);
 
@@ -72,6 +75,7 @@ export type PreviewType =
   | "videoThumbnail"
   | "audio"
   | "pdf"
+  | "googleDocs"
   | "unsupported";
 
 export function getPreviewType(extension: string): PreviewType {
@@ -82,5 +86,49 @@ export function getPreviewType(extension: string): PreviewType {
   if (VIDEO_THUMBNAIL_EXTENSIONS.has(ext)) return "videoThumbnail";
   if (AUDIO_EXTENSIONS.has(ext)) return "audio";
   if (PDF_EXTENSIONS.has(ext)) return "pdf";
+  if (GOOGLE_DOCS_EXTENSIONS.has(ext)) return "googleDocs";
   return "unsupported";
+}
+
+const GOOGLE_TYPE_MAP: Record<string, string> = {
+  gdoc: "document",
+  gsheet: "spreadsheets",
+  gslides: "presentation",
+};
+
+/** Google Docsファイルの情報からプレビュー用URLと元URLを生成 */
+export function buildGoogleDocsUrls(
+  data: { url?: string; doc_id?: string },
+  extension: string,
+): { previewUrl: string; originalUrl: string } | null {
+  const ext = extension.toLowerCase();
+  const docType = GOOGLE_TYPE_MAP[ext];
+
+  // doc_id からURL組み立て（新しいGoogle Drive形式）
+  if (data.doc_id && docType) {
+    const base = `https://docs.google.com/${docType}/d/${data.doc_id}`;
+    return { previewUrl: `${base}/preview`, originalUrl: `${base}/edit` };
+  }
+
+  // url フィールドがある場合（旧形式）
+  if (data.url) {
+    const match = data.url.match(
+      /https:\/\/docs\.google\.com\/(document|spreadsheets|presentation)\/d\/([^/]+)/,
+    );
+    if (match) {
+      const base = `https://docs.google.com/${match[1]}/d/${match[2]}`;
+      return { previewUrl: `${base}/preview`, originalUrl: data.url };
+    }
+
+    // open?id= 形式
+    const openMatch = data.url.match(/[?&]id=([^&]+)/);
+    if (openMatch && docType) {
+      const base = `https://docs.google.com/${docType}/d/${openMatch[1]}`;
+      return { previewUrl: `${base}/preview`, originalUrl: data.url };
+    }
+
+    return { previewUrl: data.url, originalUrl: data.url };
+  }
+
+  return null;
 }
