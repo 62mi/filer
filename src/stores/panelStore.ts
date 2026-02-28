@@ -589,9 +589,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       }
       // 失敗分をトースト通知
       if (result.failed.length > 0) {
-        const names = result.failed
-          .map(([p]) => p.substring(p.lastIndexOf("\\") + 1))
-          .join(", ");
+        const names = result.failed.map(([p]) => p.substring(p.lastIndexOf("\\") + 1)).join(", ");
         toast.error(`削除に失敗: ${names}`);
       }
       await get().loadDirectory(tab.path, false);

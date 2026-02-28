@@ -1,60 +1,13 @@
-import { invoke } from "@tauri-apps/api/core";
-import { FileCode, FileText, Image, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { FileAudio, FileCode, FileText, FileVideo, Image, Music, Play, X } from "lucide-react";
+import { lazy, Suspense } from "react";
+import { usePreview } from "../../hooks/usePreview";
 import type { FileEntry } from "../../types";
 import { formatDate, formatFileSize } from "../../utils/format";
+import { CODE_EXTENSIONS } from "../../utils/previewConstants";
 
-const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico"]);
-const TEXT_EXTENSIONS = new Set([
-  "txt",
-  "md",
-  "log",
-  "csv",
-  "json",
-  "xml",
-  "yaml",
-  "yml",
-  "toml",
-  "ini",
-  "cfg",
-  "ts",
-  "tsx",
-  "js",
-  "jsx",
-  "rs",
-  "py",
-  "html",
-  "css",
-  "scss",
-  "less",
-  "sh",
-  "bat",
-  "ps1",
-  "c",
-  "cpp",
-  "h",
-  "hpp",
-  "java",
-  "go",
-  "rb",
-  "php",
-  "sql",
-  "graphql",
-  "env",
-  "gitignore",
-  "dockerfile",
-]);
-
-const MIME_MAP: Record<string, string> = {
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  gif: "image/gif",
-  svg: "image/svg+xml",
-  webp: "image/webp",
-  bmp: "image/bmp",
-  ico: "image/x-icon",
-};
+const PdfViewer = lazy(() =>
+  import("../PdfViewer/PdfViewer").then((m) => ({ default: m.PdfViewer })),
+);
 
 interface PreviewPanelProps {
   entry: FileEntry | null;
@@ -62,52 +15,199 @@ interface PreviewPanelProps {
 }
 
 export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
-  const [textContent, setTextContent] = useState<string | null>(null);
-  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!entry || entry.is_dir) {
-      setTextContent(null);
-      setImageDataUrl(null);
-      return;
-    }
-
-    if (IMAGE_EXTENSIONS.has(entry.extension)) {
-      setLoading(true);
-      setTextContent(null);
-      invoke<string>("read_image_base64", { path: entry.path })
-        .then((base64) => {
-          const mime = MIME_MAP[entry.extension] || "image/png";
-          setImageDataUrl(`data:${mime};base64,${base64}`);
-          setLoading(false);
-        })
-        .catch(() => {
-          setImageDataUrl(null);
-          setLoading(false);
-        });
-    } else if (TEXT_EXTENSIONS.has(entry.extension)) {
-      setLoading(true);
-      setImageDataUrl(null);
-      invoke<string>("read_text_file", { path: entry.path, maxBytes: 50000 })
-        .then((content) => {
-          setTextContent(content);
-          setLoading(false);
-        })
-        .catch(() => {
-          setTextContent(null);
-          setLoading(false);
-        });
-    } else {
-      setTextContent(null);
-      setImageDataUrl(null);
-    }
-  }, [entry]);
+  const preview = usePreview(entry, { maxTextBytes: 50000 });
 
   if (!entry) return null;
 
-  const isImage = IMAGE_EXTENSIONS.has(entry.extension);
-  const isText = TEXT_EXTENSIONS.has(entry.extension);
+  // early returnの後なのでentryは非null確定だが、
+  // TSはネスト関数で認識しないためローカル変数に束縛
+  const e = entry;
+
+  function renderHeaderIcon() {
+    switch (preview.type) {
+      case "image":
+        return <Image className="w-3.5 h-3.5 text-[#666]" />;
+      case "video":
+      case "videoThumbnail":
+        return <FileVideo className="w-3.5 h-3.5 text-[#666]" />;
+      case "audio":
+        return <FileAudio className="w-3.5 h-3.5 text-[#666]" />;
+      case "text":
+        return CODE_EXTENSIONS.has(e.extension) ? (
+          <FileCode className="w-3.5 h-3.5 text-[#666]" />
+        ) : (
+          <FileText className="w-3.5 h-3.5 text-[#666]" />
+        );
+      case "pdf":
+        return <FileText className="w-3.5 h-3.5 text-[#666]" />;
+      default:
+        return null;
+    }
+  }
+
+  function renderContent() {
+    if (e.is_dir) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-[#999]">
+          <div className="text-sm font-medium text-[#1a1a1a] mb-1 text-center break-all">
+            {e.name}
+          </div>
+          <div className="text-xs">Folder</div>
+        </div>
+      );
+    }
+
+    switch (preview.type) {
+      case "image":
+        return (
+          <div className="flex flex-col items-center">
+            {preview.loading ? (
+              <div className="flex items-center justify-center h-32 text-xs text-[#999]">
+                Loading...
+              </div>
+            ) : preview.imageUrl ? (
+              <img
+                src={preview.imageUrl}
+                alt={e.name}
+                className="max-w-full max-h-[400px] object-contain rounded"
+                style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))" }}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-32 text-xs text-[#999]">
+                Unable to load image
+              </div>
+            )}
+            <div className="mt-3 text-xs text-[#666] text-center space-y-0.5">
+              <div className="font-medium text-[#1a1a1a]">{e.name}</div>
+              <div>{formatFileSize(e.size)}</div>
+              <div>{formatDate(e.modified)}</div>
+            </div>
+          </div>
+        );
+
+      case "text":
+        return (
+          <div className="flex flex-col h-full">
+            <div className="flex items-center gap-1 mb-2">
+              {renderHeaderIcon()}
+              <span className="text-xs font-medium text-[#1a1a1a] truncate">{e.name}</span>
+            </div>
+            {preview.loading ? (
+              <div className="flex-1 flex items-center justify-center text-xs text-[#999]">
+                Loading...
+              </div>
+            ) : preview.textContent !== null ? (
+              <pre className="flex-1 text-xs text-[#333] bg-[#f8f8f8] rounded p-2 overflow-auto whitespace-pre-wrap break-all font-mono border border-[#e5e5e5]">
+                {preview.textContent}
+              </pre>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-xs text-[#999]">
+                Unable to preview
+              </div>
+            )}
+          </div>
+        );
+
+      case "video":
+        return (
+          <div className="flex flex-col items-center">
+            {preview.mediaUrl ? (
+              <video src={preview.mediaUrl} controls className="max-w-full max-h-[400px] rounded">
+                <track kind="captions" />
+              </video>
+            ) : (
+              <div className="flex items-center justify-center h-32 text-xs text-[#999]">
+                Unable to load video
+              </div>
+            )}
+            <div className="mt-3 text-xs text-[#666] text-center space-y-0.5">
+              <div className="font-medium text-[#1a1a1a]">{e.name}</div>
+              <div>{formatFileSize(e.size)}</div>
+            </div>
+          </div>
+        );
+
+      case "audio":
+        return (
+          <div className="flex flex-col items-center justify-center h-full gap-3">
+            <Music className="w-10 h-10 text-[#bbb]" />
+            <div className="text-xs font-medium text-[#1a1a1a] text-center break-all">{e.name}</div>
+            {preview.mediaUrl && (
+              <audio src={preview.mediaUrl} controls className="w-full">
+                <track kind="captions" />
+              </audio>
+            )}
+            <div className="text-xs text-[#666]">{formatFileSize(e.size)}</div>
+          </div>
+        );
+
+      case "videoThumbnail":
+        return (
+          <div className="flex flex-col items-center">
+            {preview.loading ? (
+              <div className="flex items-center justify-center h-32 text-xs text-[#999]">
+                Loading...
+              </div>
+            ) : preview.videoThumbnail ? (
+              <div className="relative">
+                <img
+                  src={preview.videoThumbnail}
+                  alt={e.name}
+                  className="max-w-full max-h-[400px] object-contain rounded"
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center">
+                    <Play className="w-5 h-5 text-white ml-0.5" />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-32 text-xs text-[#999]">
+                <FileVideo className="w-8 h-8 mb-2" />
+                <div>FFmpeg required for preview</div>
+              </div>
+            )}
+            <div className="mt-3 text-xs text-[#666] text-center space-y-0.5">
+              <div className="font-medium text-[#1a1a1a]">{e.name}</div>
+              <div>{formatFileSize(e.size)}</div>
+            </div>
+          </div>
+        );
+
+      case "pdf":
+        return (
+          <div className="flex flex-col h-full">
+            <div className="flex items-center gap-1 mb-2">
+              <FileText className="w-3.5 h-3.5 text-[#666]" />
+              <span className="text-xs font-medium text-[#1a1a1a] truncate">{e.name}</span>
+            </div>
+            {preview.pdfUrl ? (
+              <Suspense
+                fallback={
+                  <div className="flex-1 flex items-center justify-center text-xs text-[#999]">
+                    Loading PDF...
+                  </div>
+                }
+              >
+                <PdfViewer url={preview.pdfUrl} maxHeight={500} />
+              </Suspense>
+            ) : null}
+          </div>
+        );
+
+      default:
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-[#999]">
+            <Image className="w-8 h-8 mb-2" />
+            <div className="text-sm font-medium text-[#1a1a1a] mb-1 text-center break-all">
+              {e.name}
+            </div>
+            <div className="text-xs">{formatFileSize(e.size)}</div>
+            <div className="text-xs mt-0.5">No preview available</div>
+          </div>
+        );
+    }
+  }
 
   return (
     <div className="flex flex-col h-full bg-white border-l border-[rgba(var(--accent-rgb),0.2)]">
@@ -124,73 +224,8 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
       </div>
 
       {/* Content */}
-      <div key={entry.path} className="flex-1 overflow-auto p-3 animate-fade-in">
-        {entry.is_dir ? (
-          <div className="flex flex-col items-center justify-center h-full text-[#999]">
-            <div className="text-sm font-medium text-[#1a1a1a] mb-1 text-center break-all">
-              {entry.name}
-            </div>
-            <div className="text-xs">Folder</div>
-          </div>
-        ) : isImage ? (
-          <div className="flex flex-col items-center">
-            {loading ? (
-              <div className="flex items-center justify-center h-32 text-xs text-[#999]">
-                Loading...
-              </div>
-            ) : imageDataUrl ? (
-              <img
-                src={imageDataUrl}
-                alt={entry.name}
-                className="max-w-full max-h-[400px] object-contain rounded"
-                style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))" }}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-32 text-xs text-[#999]">
-                Unable to load image
-              </div>
-            )}
-            <div className="mt-3 text-xs text-[#666] text-center space-y-0.5">
-              <div className="font-medium text-[#1a1a1a]">{entry.name}</div>
-              <div>{formatFileSize(entry.size)}</div>
-              <div>{formatDate(entry.modified)}</div>
-            </div>
-          </div>
-        ) : isText ? (
-          <div className="flex flex-col h-full">
-            <div className="flex items-center gap-1 mb-2">
-              {entry.extension &&
-              ["ts", "tsx", "js", "jsx", "rs", "py", "html", "css"].includes(entry.extension) ? (
-                <FileCode className="w-3.5 h-3.5 text-[#666]" />
-              ) : (
-                <FileText className="w-3.5 h-3.5 text-[#666]" />
-              )}
-              <span className="text-xs font-medium text-[#1a1a1a] truncate">{entry.name}</span>
-            </div>
-            {loading ? (
-              <div className="flex-1 flex items-center justify-center text-xs text-[#999]">
-                Loading...
-              </div>
-            ) : textContent !== null ? (
-              <pre className="flex-1 text-xs text-[#333] bg-[#f8f8f8] rounded p-2 overflow-auto whitespace-pre-wrap break-all font-mono border border-[#e5e5e5]">
-                {textContent}
-              </pre>
-            ) : (
-              <div className="flex-1 flex items-center justify-center text-xs text-[#999]">
-                Unable to preview
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-[#999]">
-            <Image className="w-8 h-8 mb-2" />
-            <div className="text-sm font-medium text-[#1a1a1a] mb-1 text-center break-all">
-              {entry.name}
-            </div>
-            <div className="text-xs">{formatFileSize(entry.size)}</div>
-            <div className="text-xs mt-0.5">No preview available</div>
-          </div>
-        )}
+      <div key={e.path} className="flex-1 overflow-auto p-3 animate-fade-in">
+        {renderContent()}
       </div>
     </div>
   );

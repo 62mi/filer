@@ -81,7 +81,10 @@ async function executeUndo(action: UndoAction): Promise<void> {
     case "copy": {
       // コピーの逆: コピー先を削除
       const paths = action.entries.map((e) => e.destPath);
-      await invoke<{ succeeded: string[]; failed: [string, string][] }>("delete_files", { paths, toTrash: true });
+      await invoke<{ succeeded: string[]; failed: [string, string][] }>("delete_files", {
+        paths,
+        toTrash: true,
+      });
       break;
     }
     case "rename": {
@@ -103,7 +106,10 @@ async function executeUndo(action: UndoAction): Promise<void> {
     case "create_file": {
       // 作成の逆: 作成したファイル/フォルダを削除
       const paths = action.entries.map((e) => e.destPath);
-      await invoke<{ succeeded: string[]; failed: [string, string][] }>("delete_files", { paths, toTrash: true });
+      await invoke<{ succeeded: string[]; failed: [string, string][] }>("delete_files", {
+        paths,
+        toTrash: true,
+      });
       break;
     }
     case "folderize": {
@@ -116,7 +122,10 @@ async function executeUndo(action: UndoAction): Promise<void> {
       }
       // 作成されたフォルダを削除（空のはず）
       if (action.createdFolder) {
-        await invoke<{ succeeded: string[]; failed: [string, string][] }>("delete_files", { paths: [action.createdFolder], toTrash: true });
+        await invoke<{ succeeded: string[]; failed: [string, string][] }>("delete_files", {
+          paths: [action.createdFolder],
+          toTrash: true,
+        });
       }
       break;
     }
@@ -153,7 +162,10 @@ async function executeRedo(action: UndoAction): Promise<void> {
     case "delete": {
       // 削除を再実行
       const paths = action.entries.map((e) => e.sourcePath);
-      await invoke<{ succeeded: string[]; failed: [string, string][] }>("delete_files", { paths, toTrash: true });
+      await invoke<{ succeeded: string[]; failed: [string, string][] }>("delete_files", {
+        paths,
+        toTrash: true,
+      });
       break;
     }
     case "create_dir": {

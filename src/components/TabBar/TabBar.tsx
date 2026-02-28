@@ -90,10 +90,7 @@ export function TabBar() {
                 <Folder className="w-3.5 h-3.5 text-[var(--folder-color)] shrink-0 fill-[var(--folder-fill)]" />
                 {hasAi && (
                   <Sparkles
-                    className={cn(
-                      "w-3 h-3 text-purple-500 shrink-0",
-                      aiLoading && "animate-pulse",
-                    )}
+                    className={cn("w-3 h-3 text-purple-500 shrink-0", aiLoading && "animate-pulse")}
                   />
                 )}
                 <span className="truncate flex-1">{label}</span>

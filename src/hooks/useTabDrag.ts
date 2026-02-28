@@ -66,21 +66,18 @@ export function useTabDrag(): TabDragResult {
     _setExternalDropIndex(v);
   }, []);
 
-  const handleTabMouseDown = useCallback(
-    (e: React.MouseEvent, tabId: string, tabIndex: number) => {
-      if (e.button !== 0) return;
-      if ((e.target as HTMLElement).closest("button")) return;
+  const handleTabMouseDown = useCallback((e: React.MouseEvent, tabId: string, tabIndex: number) => {
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest("button")) return;
 
-      candidateRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        tabId,
-        tabIndex,
-      };
-      transferStartedRef.current = false;
-    },
-    [],
-  );
+    candidateRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      tabId,
+      tabIndex,
+    };
+    transferStartedRef.current = false;
+  }, []);
 
   // ドラッグ中のmousemove / mouseup / keydownハンドラ
   useEffect(() => {
@@ -135,7 +132,9 @@ export function useTabDrag(): TabDragResult {
         }
       } else {
         // 最後のタブ → ウィンドウを破棄
-        getCurrentWindow().destroy().catch(() => {});
+        getCurrentWindow()
+          .destroy()
+          .catch(() => {});
       }
 
       reset();

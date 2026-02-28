@@ -26,6 +26,7 @@
     "@tauri-apps/plugin-opener": "^2",
     "clsx": "^2",
     "lucide-react": "^0.400",
+    "pdfjs-dist": "^5.4.624",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "tailwind-merge": "^2",
