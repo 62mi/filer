@@ -194,11 +194,11 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
 
       case "audio":
         return (
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-4 w-full max-w-md">
             <Music className="w-16 h-16 text-[#bbb]" />
             <div className="text-base font-medium text-[#1a1a1a]">{entry.name}</div>
             {preview.mediaUrl && (
-              <audio src={preview.mediaUrl} controls className="w-full max-w-md">
+              <audio src={preview.mediaUrl} controls className="w-full">
                 <track kind="captions" />
               </audio>
             )}

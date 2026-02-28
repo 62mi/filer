@@ -145,7 +145,7 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
 
       case "audio":
         return (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
+          <div className="flex flex-col items-center justify-center h-full gap-3 w-full">
             <Music className="w-10 h-10 text-[#bbb]" />
             <div className="text-xs font-medium text-[#1a1a1a] text-center break-all">{e.name}</div>
             {preview.mediaUrl && (
