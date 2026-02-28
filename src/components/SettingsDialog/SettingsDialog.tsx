@@ -1,3 +1,4 @@
+import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { Check, DollarSign, Key, Monitor, RotateCcw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type Language, useTranslation } from "../../i18n";
@@ -229,6 +230,12 @@ export function SettingsDialog() {
                   <option value="windows">{t.settingsDialog.pathStyleWindows}</option>
                   <option value="linux">{t.settingsDialog.pathStyleLinux}</option>
                 </select>
+              </div>
+              <div className="border-t border-[#f0f0f0] pt-3">
+                <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+                  {t.settingsDialog.startup}
+                </div>
+                <AutoStartToggle />
               </div>
             </div>
           )}
@@ -658,6 +665,55 @@ function ThemePicker() {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function AutoStartToggle() {
+  const t = useTranslation();
+  const autoStart = useSettingsStore((s) => s.autoStart);
+  const setSetting = useSettingsStore((s) => s.setSetting);
+  const [syncing, setSyncing] = useState(false);
+
+  // ダイアログ表示時に実際の登録状態と同期
+  useEffect(() => {
+    isEnabled()
+      .then((enabled) => {
+        setSetting("autoStart", enabled);
+      })
+      .catch(() => {});
+  }, [setSetting]);
+
+  const handleToggle = async () => {
+    setSyncing(true);
+    try {
+      if (autoStart) {
+        await disable();
+        setSetting("autoStart", false);
+      } else {
+        await enable();
+        setSetting("autoStart", true);
+      }
+    } catch {
+      // プラグインエラー時は状態を戻す
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  return (
+    <div>
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={autoStart}
+          onChange={handleToggle}
+          disabled={syncing}
+          className="w-3.5 h-3.5 accent-[var(--accent)]"
+        />
+        <span className="text-xs text-[#555]">{t.settingsDialog.autoStartLabel}</span>
+      </label>
+      <p className="text-[10px] text-[#bbb] mt-1 ml-5.5">{t.settingsDialog.autoStartDescription}</p>
     </div>
   );
 }

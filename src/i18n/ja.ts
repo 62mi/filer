@@ -174,6 +174,9 @@ export const ja = {
     aboutCopyright: "著作権",
     aboutWebsite: "公式サイト",
     aboutContact: "お問い合わせ",
+    startup: "スタートアップ",
+    autoStartLabel: "Windows起動時にトレイに常駐",
+    autoStartDescription: "OSの起動時にTomaFilerがシステムトレイに常駐します",
   },
 
   // ── AI自動整理 ──

@@ -167,6 +167,9 @@ export const en: Translations = {
     aboutCopyright: "Copyright",
     aboutWebsite: "Website",
     aboutContact: "Contact",
+    startup: "Startup",
+    autoStartLabel: "Start in system tray on Windows startup",
+    autoStartDescription: "TomaFiler will run in the system tray when Windows starts",
   },
 
   aiOrganizer: {

@@ -4,14 +4,15 @@
   "version": "1.2.0",
   "identifier": "com.filer.app",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "pnpm exec vite",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm exec tsc && pnpm exec vite build",
     "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "TomaFiler",
         "width": 1200,
         "height": 800,

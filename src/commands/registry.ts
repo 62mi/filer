@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { useAiStore } from "../stores/aiStore";
 import { useExplorerStore } from "../stores/panelStore";
 import { useRuleStore } from "../stores/ruleStore";
@@ -101,6 +102,14 @@ export function getCommands(): Command[] {
       label: "ホーム画面に移動",
       shortcut: "Alt+Home",
       action: () => useExplorerStore.getState().loadDirectory("home:"),
+    },
+    {
+      id: "new-window",
+      label: "新しいウィンドウ",
+      shortcut: "Ctrl+Shift+N",
+      action: () => {
+        invoke("create_new_window").catch(() => {});
+      },
     },
   ];
 }
