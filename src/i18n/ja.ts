@@ -471,6 +471,19 @@ export const ja = {
     clearAll: "すべてクリア",
   },
 
+  // ── 画像操作 ──
+  imageControls: {
+    rotateCcw: "左に回転",
+    rotateCw: "右に回転",
+    flipH: "左右反転",
+    flipV: "上下反転",
+    zoomIn: "拡大",
+    zoomOut: "縮小",
+    reset: "リセット",
+    saveToFile: "ファイルに保存",
+    saved: "画像を保存しました",
+  },
+
   // ── フォーマット ──
   format: {
     bytes: "バイト",

@@ -12,13 +12,15 @@ import {
   Play,
   X,
 } from "lucide-react";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useTranslation } from "../../i18n";
+import { useImageControls } from "../../hooks/useImageControls";
 import { usePreview } from "../../hooks/usePreview";
 import type { FileEntry } from "../../types";
 import { formatDate, formatFileSize } from "../../utils/format";
 import { CODE_EXTENSIONS } from "../../utils/previewConstants";
 import { FontPreview } from "../FontPreview";
+import { ImageToolbar } from "../ImageToolbar";
 
 const PdfViewer = lazy(() =>
   import("../PdfViewer/PdfViewer").then((m) => ({ default: m.PdfViewer })),
@@ -41,6 +43,8 @@ interface PreviewPanelProps {
 export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
   const t = useTranslation();
   const preview = usePreview(entry, { maxTextBytes: 50000 });
+  const controls = useImageControls(entry?.path ?? null);
+  const [imgVersion, setImgVersion] = useState(0);
 
   if (!entry) return null;
 
@@ -97,12 +101,45 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
                 Loading...
               </div>
             ) : preview.imageUrl ? (
-              <img
-                src={preview.imageUrl}
-                alt={e.name}
-                className="max-w-full max-h-[400px] object-contain rounded"
-                style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))" }}
-              />
+              <div
+                ref={controls.containerRef}
+                className="group relative flex items-center justify-center overflow-hidden"
+                onMouseDown={controls.onMouseDown}
+              >
+                <img
+                  src={preview.imageUrl + (imgVersion ? `?v=${imgVersion}` : "")}
+                  alt={e.name}
+                  className="max-w-full max-h-[400px] object-contain select-none"
+                  style={{
+                    ...controls.transformStyle,
+                    filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))",
+                  }}
+                  draggable={false}
+                />
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <ImageToolbar
+                    extension={e.extension}
+                    filePath={e.path}
+                    rotation={controls.rotation}
+                    flipH={controls.flipH}
+                    flipV={controls.flipV}
+                    isModified={controls.isModified}
+                    isTransformed={controls.isTransformed}
+                    zoomPercent={controls.zoomPercent}
+                    onZoomIn={controls.zoomIn}
+                    onZoomOut={controls.zoomOut}
+                    onRotateCcw={controls.rotateCcw}
+                    onRotateCw={controls.rotateCw}
+                    onFlipH={controls.toggleFlipH}
+                    onFlipV={controls.toggleFlipV}
+                    onReset={controls.resetAll}
+                    onSaved={() => {
+                      controls.resetAfterSave();
+                      setImgVersion((v) => v + 1);
+                    }}
+                  />
+                </div>
+              </div>
             ) : (
               <div className="flex items-center justify-center h-32 text-xs text-[#999]">
                 Unable to load image
@@ -157,15 +194,43 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
         return (
           <div className="flex flex-col items-center">
             {preview.imageUrl ? (
-              <Suspense
-                fallback={
-                  <div className="flex items-center justify-center h-32 text-xs text-[#999]">
-                    Loading PSD...
-                  </div>
-                }
+              <div
+                ref={controls.containerRef}
+                className="group relative flex items-center justify-center overflow-hidden"
+                onMouseDown={controls.onMouseDown}
               >
-                <PsdPreview url={preview.imageUrl} filePath={e.path} name={e.name} maxHeight="400px" />
-              </Suspense>
+                <Suspense
+                  fallback={
+                    <div className="flex items-center justify-center h-32 text-xs text-[#999]">
+                      Loading PSD...
+                    </div>
+                  }
+                >
+                  <div style={controls.transformStyle}>
+                    <PsdPreview url={preview.imageUrl} filePath={e.path} name={e.name} maxHeight="400px" />
+                  </div>
+                </Suspense>
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <ImageToolbar
+                    extension={e.extension}
+                    filePath={e.path}
+                    rotation={controls.rotation}
+                    flipH={controls.flipH}
+                    flipV={controls.flipV}
+                    isModified={controls.isModified}
+                    isTransformed={controls.isTransformed}
+                    zoomPercent={controls.zoomPercent}
+                    onZoomIn={controls.zoomIn}
+                    onZoomOut={controls.zoomOut}
+                    onRotateCcw={controls.rotateCcw}
+                    onRotateCw={controls.rotateCw}
+                    onFlipH={controls.toggleFlipH}
+                    onFlipV={controls.toggleFlipV}
+                    onReset={controls.resetAll}
+                    onSaved={controls.resetAfterSave}
+                  />
+                </div>
+              </div>
             ) : (
               <div className="flex items-center justify-center h-32 text-xs text-[#999]">
                 Unable to load PSD
@@ -219,16 +284,43 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
                 Loading...
               </div>
             ) : preview.videoThumbnail ? (
-              <div className="relative">
-                <img
-                  src={preview.videoThumbnail}
-                  alt={e.name}
-                  className="max-w-full max-h-[400px] object-contain rounded"
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center">
-                    <Play className="w-5 h-5 text-white ml-0.5" />
+              <div
+                ref={controls.containerRef}
+                className="group relative flex items-center justify-center overflow-hidden"
+                onMouseDown={controls.onMouseDown}
+              >
+                <div className="relative" style={controls.transformStyle}>
+                  <img
+                    src={preview.videoThumbnail}
+                    alt={e.name}
+                    className="max-w-full max-h-[400px] object-contain rounded select-none"
+                    draggable={false}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center">
+                      <Play className="w-5 h-5 text-white ml-0.5" />
+                    </div>
                   </div>
+                </div>
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <ImageToolbar
+                    extension={e.extension}
+                    filePath={e.path}
+                    rotation={controls.rotation}
+                    flipH={controls.flipH}
+                    flipV={controls.flipV}
+                    isModified={controls.isModified}
+                    isTransformed={controls.isTransformed}
+                    zoomPercent={controls.zoomPercent}
+                    onZoomIn={controls.zoomIn}
+                    onZoomOut={controls.zoomOut}
+                    onRotateCcw={controls.rotateCcw}
+                    onRotateCw={controls.rotateCw}
+                    onFlipH={controls.toggleFlipH}
+                    onFlipV={controls.toggleFlipV}
+                    onReset={controls.resetAll}
+                    onSaved={controls.resetAfterSave}
+                  />
                 </div>
               </div>
             ) : (

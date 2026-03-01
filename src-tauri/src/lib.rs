@@ -217,7 +217,7 @@ pub fn run() {
             clipboard_write_files,
             clipboard_read_files,
             create_from_template,
-            calculate_tidiness_score,
+            transform_image,
             calculate_directory_sizes,
             enqueue_copy,
             pause_copy,
