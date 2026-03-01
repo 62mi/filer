@@ -98,19 +98,19 @@ export function FileRow({
   return (
     <div
       className={cn(
-        "flex items-center px-2 cursor-default select-none relative",
+        "flex items-center px-2 mx-1 my-0.5 cursor-default select-none relative",
         "transition-[background-color,opacity,transform,box-shadow] duration-100 ease-out",
-        isCursor && !isSelected && "bg-[#e8e8e8] rounded",
-        isSelected && !isCursor && "bg-[rgba(var(--accent-rgb),0.15)] rounded",
-        isCursor && isSelected && "bg-[rgba(var(--accent-rgb),0.25)] rounded",
-        !isCursor && !isSelected && "hover:bg-[#f5f5f5] rounded",
+        isCursor && !isSelected && "bg-[#e8e8e8] rounded-[10px]",
+        isSelected && !isCursor && "bg-[rgba(var(--accent-rgb),0.15)] rounded-[10px]",
+        isCursor && isSelected && "bg-[rgba(var(--accent-rgb),0.25)] rounded-[10px]",
+        !isCursor && !isSelected && "hover:bg-[#f5f5f5] rounded-[10px]",
         isCut && "opacity-50",
       )}
       data-mid-click-path={entry.is_dir ? entry.path : undefined}
       data-drop-zone="file-row"
       data-file-path={entry.path}
       data-is-dir={entry.is_dir ? "true" : "false"}
-      style={{ height: rowHeight, fontSize, minWidth: getTotalColumnWidth(columnWidths) }}
+      style={{ height: rowHeight - 4, fontSize, minWidth: getTotalColumnWidth(columnWidths) }}
       onMouseDown={(e) => {
         didDragRef.current = false;
         // 修飾キーなし・左クリック・単一選択済み・カーソル一致 の場合に記録
