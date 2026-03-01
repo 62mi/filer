@@ -229,7 +229,7 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
               </div>
             }
           >
-            <PsdPreview url={preview.imageUrl} name={entry.name} />
+            <PsdPreview url={preview.imageUrl} filePath={entry.path} name={entry.name} />
           </Suspense>
         ) : null;
 

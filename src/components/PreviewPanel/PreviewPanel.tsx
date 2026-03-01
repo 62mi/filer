@@ -164,7 +164,7 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
                   </div>
                 }
               >
-                <PsdPreview url={preview.imageUrl} name={e.name} maxHeight="400px" />
+                <PsdPreview url={preview.imageUrl} filePath={e.path} name={e.name} maxHeight="400px" />
               </Suspense>
             ) : (
               <div className="flex items-center justify-center h-32 text-xs text-[#999]">

@@ -100,26 +100,33 @@ async function renderPdfThumbnail(filePath: string, size: number): Promise<strin
   return dataUrl;
 }
 
-/** PSDをag-psdでパースしてサムネイルdataURLを返す */
+/** PSDをag-psdでパースしてサムネイルdataURLを返す。CMYK等はFFmpegフォールバック */
 async function renderPsdThumbnail(filePath: string, size: number): Promise<string> {
-  const { readPsd } = await import("ag-psd");
-  const url = convertFileSrc(filePath);
-  const res = await fetch(url);
-  const buffer = await res.arrayBuffer();
-  const psd = readPsd(new Uint8Array(buffer), { skipLayerImageData: true });
-  if (!psd.canvas) throw new Error("PSD has no merged image");
+  // 1) ag-psdで試す（RGB対応）
+  try {
+    const { readPsd } = await import("ag-psd");
+    const url = convertFileSrc(filePath);
+    const res = await fetch(url);
+    const buffer = await res.arrayBuffer();
+    const psd = readPsd(new Uint8Array(buffer), { skipLayerImageData: true });
+    if (psd.canvas) {
+      const scale = size / Math.max(psd.canvas.width, psd.canvas.height);
+      const w = Math.round(psd.canvas.width * scale);
+      const h = Math.round(psd.canvas.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas context not available");
+      ctx.drawImage(psd.canvas, 0, 0, w, h);
+      return canvas.toDataURL("image/png");
+    }
+  } catch {
+    // ag-psd失敗 → FFmpegフォールバック
+  }
 
-  // サイズ調整
-  const scale = size / Math.max(psd.canvas.width, psd.canvas.height);
-  const w = Math.round(psd.canvas.width * scale);
-  const h = Math.round(psd.canvas.height * scale);
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas context not available");
-  ctx.drawImage(psd.canvas, 0, 0, w, h);
-  return canvas.toDataURL("image/png");
+  // 2) FFmpegフォールバック（CMYK等）
+  return invoke<string>("extract_video_thumbnail", { path: filePath, size });
 }
 
 export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({

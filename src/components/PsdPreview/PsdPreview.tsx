@@ -1,12 +1,15 @@
+import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 
 interface PsdPreviewProps {
   url: string;
+  /** ファイルの実パス（FFmpegフォールバック用） */
+  filePath?: string;
   name: string;
   maxHeight?: string;
 }
 
-export function PsdPreview({ url, name, maxHeight = "70vh" }: PsdPreviewProps) {
+export function PsdPreview({ url, filePath, name, maxHeight = "70vh" }: PsdPreviewProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -16,48 +19,54 @@ export function PsdPreview({ url, name, maxHeight = "70vh" }: PsdPreviewProps) {
     let objectUrl: string | null = null;
 
     (async () => {
+      // 1) ag-psdでパース（RGB対応）
       try {
         const { readPsd } = await import("ag-psd");
         const res = await fetch(url);
-        if (!res.ok) {
-          throw new Error(`fetch failed: ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
         const buffer = await res.arrayBuffer();
         if (cancelled) return;
 
-        const psd = readPsd(new Uint8Array(buffer), {
-          skipLayerImageData: true,
-        });
-
-        if (!psd.canvas) {
-          // canvasが生成されなかった場合の詳細情報
-          const info = [
-            `colorMode: ${psd.colorMode}`,
-            `size: ${psd.width}x${psd.height}`,
-            `bitsPerChannel: ${psd.bitsPerChannel}`,
-            `channels: ${psd.channels}`,
-          ].join(", ");
-          throw new Error(`No composite image (${info})`);
-        }
-        if (cancelled) return;
-
-        psd.canvas.toBlob((blob) => {
-          if (cancelled || !blob) {
-            if (!cancelled) {
-              setError("Failed to convert canvas to blob");
+        const psd = readPsd(new Uint8Array(buffer), { skipLayerImageData: true });
+        if (psd.canvas) {
+          await new Promise<void>((resolve, reject) => {
+            psd.canvas!.toBlob((blob) => {
+              if (cancelled || !blob) {
+                reject(new Error("toBlob failed"));
+                return;
+              }
+              objectUrl = URL.createObjectURL(blob);
+              setImageUrl(objectUrl);
               setLoading(false);
-            }
-            return;
-          }
-          objectUrl = URL.createObjectURL(blob);
-          setImageUrl(objectUrl);
-          setLoading(false);
-        });
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
-          setLoading(false);
+              resolve();
+            });
+          });
+          return;
         }
+      } catch {
+        // ag-psd失敗 → FFmpegフォールバック
+      }
+
+      // 2) FFmpegフォールバック（CMYK等）
+      if (cancelled) return;
+      if (filePath) {
+        try {
+          const dataUri = await invoke<string>("extract_video_thumbnail", {
+            path: filePath,
+            size: 1024,
+          });
+          if (cancelled) return;
+          setImageUrl(dataUri);
+          setLoading(false);
+          return;
+        } catch {
+          // FFmpegも失敗
+        }
+      }
+
+      if (!cancelled) {
+        setError("CMYK PSD — FFmpeg required for preview");
+        setLoading(false);
       }
     })();
 
@@ -65,7 +74,7 @@ export function PsdPreview({ url, name, maxHeight = "70vh" }: PsdPreviewProps) {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [url]);
+  }, [url, filePath]);
 
   if (loading) {
     return (
