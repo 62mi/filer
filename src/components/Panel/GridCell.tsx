@@ -2,7 +2,7 @@ import { Check, Folder } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { useIconStore } from "../../stores/iconStore";
 import { getGridCellHeight, getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
-import { PDF_EXTS, VIDEO_EXTS, useThumbnailStore } from "../../stores/thumbnailStore";
+import { PDF_EXTS, PSD_EXTS, VIDEO_EXTS, useThumbnailStore } from "../../stores/thumbnailStore";
 import type { FileEntry } from "../../types";
 import { cn } from "../../utils/cn";
 import { GOOGLE_DOCS_EXTENSIONS } from "../../utils/previewConstants";
@@ -66,12 +66,14 @@ export const GridCell = memo(function GridCell({
   const isImage = !entry.is_dir && IMAGE_EXTS.has(entry.extension);
   const isVideo = !entry.is_dir && VIDEO_EXTS.has(entry.extension);
   const isPdf = !entry.is_dir && PDF_EXTS.has(entry.extension);
+  const isPsd = !entry.is_dir && PSD_EXTS.has(entry.extension);
   const isGoogleDocs = !entry.is_dir && GOOGLE_DOCS_EXTENSIONS.has(entry.extension);
-  const hasThumbnailMedia = isImage || isVideo || isPdf || isGoogleDocs;
+  const hasThumbnailMedia = isImage || isVideo || isPdf || isPsd || isGoogleDocs;
   const THUMB_SIZE = 128;
   const thumbKey = hasThumbnailMedia ? `${entry.path}\0${THUMB_SIZE}` : "";
   const fetchThumbnails = useThumbnailStore((s) => s.fetchThumbnails);
   const fetchVideoThumbnail = useThumbnailStore((s) => s.fetchVideoThumbnail);
+  const fetchPsdThumbnail = useThumbnailStore((s) => s.fetchPsdThumbnail);
   const fetchGoogleDocsThumbnails = useThumbnailStore((s) => s.fetchGoogleDocsThumbnails);
   const removeThumbnail = useThumbnailStore((s) => s.removeThumbnail);
   const hasThumbnail = useThumbnailStore((s) => (hasThumbnailMedia ? !!s.thumbnails[thumbKey] : false));
@@ -90,6 +92,8 @@ export const GridCell = memo(function GridCell({
             fetchThumbnails([entry.path], THUMB_SIZE);
           } else if (isGoogleDocs) {
             fetchGoogleDocsThumbnails([entry.path], THUMB_SIZE);
+          } else if (isPsd) {
+            fetchPsdThumbnail(entry.path, THUMB_SIZE);
           } else {
             fetchVideoThumbnail(entry.path, THUMB_SIZE);
           }
@@ -100,7 +104,7 @@ export const GridCell = memo(function GridCell({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasThumbnailMedia, isImage, isGoogleDocs, hasThumbnail, isPending, entry.path, fetchThumbnails, fetchVideoThumbnail, fetchGoogleDocsThumbnails]);
+  }, [hasThumbnailMedia, isImage, isGoogleDocs, isPsd, hasThumbnail, isPending, entry.path, fetchThumbnails, fetchVideoThumbnail, fetchPsdThumbnail, fetchGoogleDocsThumbnails]);
 
   useEffect(() => {
     return () => {

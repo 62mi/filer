@@ -11,6 +11,7 @@ function cacheKey(path: string, size: number) {
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp"]);
 const VIDEO_EXTS = new Set(["mp4", "webm", "mkv", "avi", "mov", "wmv", "flv", "m4v"]);
 const PDF_EXTS = new Set(["pdf"]);
+const PSD_EXTS = new Set(["psd"]);
 
 // FFmpeg利用可否キャッシュ
 let ffmpegAvailable: boolean | null = null;
@@ -39,11 +40,14 @@ interface ThumbnailStore {
   prefetchInBackground: (paths: string[], size: number) => void;
   prefetchVideosInBackground: (paths: string[], size: number) => void;
   fetchPdfThumbnail: (path: string, size: number) => Promise<void>;
+  fetchPsdThumbnail: (path: string, size: number) => Promise<void>;
   prefetchPdfInBackground: (paths: string[], size: number) => void;
+  prefetchPsdInBackground: (paths: string[], size: number) => void;
   prefetchGoogleDocsInBackground: (paths: string[], size: number) => void;
   cancelPrefetch: () => void;
   cancelVideoPrefetch: () => void;
   cancelPdfPrefetch: () => void;
+  cancelPsdPrefetch: () => void;
   cancelGoogleDocsPrefetch: () => void;
   getThumbnail: (path: string, size: number) => string | undefined;
   hasThumbnail: (path: string, size: number) => boolean;
@@ -56,6 +60,7 @@ interface ThumbnailStore {
 let prefetchAbort: AbortController | null = null;
 let videoPrefetchAbort: AbortController | null = null;
 let pdfPrefetchAbort: AbortController | null = null;
+let psdPrefetchAbort: AbortController | null = null;
 let gdocsPrefetchAbort: AbortController | null = null;
 
 // pdfjs-dist の遅延ロード
@@ -93,6 +98,28 @@ async function renderPdfThumbnail(filePath: string, size: number): Promise<strin
   const dataUrl = canvas.toDataURL("image/png");
   pdf.destroy();
   return dataUrl;
+}
+
+/** PSDをag-psdでパースしてサムネイルdataURLを返す */
+async function renderPsdThumbnail(filePath: string, size: number): Promise<string> {
+  const { readPsd } = await import("ag-psd");
+  const url = convertFileSrc(filePath);
+  const res = await fetch(url);
+  const buffer = await res.arrayBuffer();
+  const psd = readPsd(new Uint8Array(buffer));
+  if (!psd.canvas) throw new Error("PSD has no merged image");
+
+  // サイズ調整
+  const scale = size / Math.max(psd.canvas.width, psd.canvas.height);
+  const w = Math.round(psd.canvas.width * scale);
+  const h = Math.round(psd.canvas.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context not available");
+  ctx.drawImage(psd.canvas, 0, 0, w, h);
+  return canvas.toDataURL("image/png");
 }
 
 export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
@@ -210,6 +237,34 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
     }
   },
 
+  // PSDサムネイル取得（1ファイルずつ、ag-psd経由）
+  fetchPsdThumbnail: async (path: string, size: number) => {
+    const k = cacheKey(path, size);
+    const { thumbnails, pending } = get();
+    if (thumbnails[k] || pending.has(k)) return;
+
+    set((s) => {
+      const next = new Set(s.pending);
+      next.add(k);
+      return { pending: next };
+    });
+
+    try {
+      const dataUrl = await renderPsdThumbnail(path, size);
+      set((s) => {
+        const next = new Set(s.pending);
+        next.delete(k);
+        return { thumbnails: { ...s.thumbnails, [k]: dataUrl }, pending: next };
+      });
+    } catch {
+      set((s) => {
+        const next = new Set(s.pending);
+        next.delete(k);
+        return { pending: next };
+      });
+    }
+  },
+
   cancelPrefetch: () => {
     if (prefetchAbort) {
       prefetchAbort.abort();
@@ -228,6 +283,13 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
     if (pdfPrefetchAbort) {
       pdfPrefetchAbort.abort();
       pdfPrefetchAbort = null;
+    }
+  },
+
+  cancelPsdPrefetch: () => {
+    if (psdPrefetchAbort) {
+      psdPrefetchAbort.abort();
+      psdPrefetchAbort = null;
     }
   },
 
@@ -479,6 +541,62 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
     })();
   },
 
+  // PSDサムネイルのバックグラウンドプリフェッチ（1ファイルずつ、ag-psd経由）
+  prefetchPsdInBackground: (paths: string[], size: number) => {
+    if (psdPrefetchAbort) psdPrefetchAbort.abort();
+    const controller = new AbortController();
+    psdPrefetchAbort = controller;
+
+    const { thumbnails, pending } = get();
+    const needed = paths.filter((p) => {
+      const k = cacheKey(p, size);
+      return !thumbnails[k] && !pending.has(k);
+    });
+    if (needed.length === 0) return;
+
+    (async () => {
+      // 他のサムネイル読み込みを優先させる
+      await new Promise((r) => setTimeout(r, 1500));
+      if (controller.signal.aborted) return;
+
+      for (const path of needed) {
+        if (controller.signal.aborted) return;
+
+        const k = cacheKey(path, size);
+        const current = get();
+        if (current.thumbnails[k] || current.pending.has(k)) continue;
+
+        set((s) => {
+          const next = new Set(s.pending);
+          next.add(k);
+          return { pending: next };
+        });
+
+        try {
+          const dataUrl = await renderPsdThumbnail(path, size);
+          if (controller.signal.aborted) return;
+          set((s) => {
+            const next = new Set(s.pending);
+            next.delete(k);
+            return { thumbnails: { ...s.thumbnails, [k]: dataUrl }, pending: next };
+          });
+        } catch {
+          if (controller.signal.aborted) return;
+          set((s) => {
+            const next = new Set(s.pending);
+            next.delete(k);
+            return { pending: next };
+          });
+        }
+
+        // PSDパースは重いので間隔を空ける
+        if (!controller.signal.aborted) {
+          await new Promise((r) => setTimeout(r, 400));
+        }
+      }
+    })();
+  },
+
   // Google Docsサムネイルのバックグラウンドプリフェッチ
   prefetchGoogleDocsInBackground: (paths: string[], size: number) => {
     if (gdocsPrefetchAbort) gdocsPrefetchAbort.abort();
@@ -569,4 +687,11 @@ export function extractPdfPaths(
   return entries.filter((e) => !e.is_dir && PDF_EXTS.has(e.extension)).map((e) => e.path);
 }
 
-export { VIDEO_EXTS, PDF_EXTS };
+/** エントリ配列からPSDパスだけ抽出するヘルパー */
+export function extractPsdPaths(
+  entries: { is_dir: boolean; extension: string; path: string }[],
+): string[] {
+  return entries.filter((e) => !e.is_dir && PSD_EXTS.has(e.extension)).map((e) => e.path);
+}
+
+export { VIDEO_EXTS, PDF_EXTS, PSD_EXTS };

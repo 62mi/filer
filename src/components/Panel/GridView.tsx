@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useIconStore } from "../../stores/iconStore";
 import { getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
-import { extractGoogleDocsPaths, extractImagePaths, extractPdfPaths, extractVideoPaths, useThumbnailStore } from "../../stores/thumbnailStore";
+import { extractGoogleDocsPaths, extractImagePaths, extractPdfPaths, extractPsdPaths, extractVideoPaths, useThumbnailStore } from "../../stores/thumbnailStore";
 import type { FileEntry } from "../../types";
 import { GridCell } from "./GridCell";
 
@@ -50,10 +50,12 @@ export function GridView({
   const prefetchInBackground = useThumbnailStore((s) => s.prefetchInBackground);
   const prefetchVideosInBackground = useThumbnailStore((s) => s.prefetchVideosInBackground);
   const prefetchPdfInBackground = useThumbnailStore((s) => s.prefetchPdfInBackground);
+  const prefetchPsdInBackground = useThumbnailStore((s) => s.prefetchPsdInBackground);
   const prefetchGoogleDocsInBackground = useThumbnailStore((s) => s.prefetchGoogleDocsInBackground);
   const cancelPrefetch = useThumbnailStore((s) => s.cancelPrefetch);
   const cancelVideoPrefetch = useThumbnailStore((s) => s.cancelVideoPrefetch);
   const cancelPdfPrefetch = useThumbnailStore((s) => s.cancelPdfPrefetch);
+  const cancelPsdPrefetch = useThumbnailStore((s) => s.cancelPsdPrefetch);
   const cancelGoogleDocsPrefetch = useThumbnailStore((s) => s.cancelGoogleDocsPrefetch);
   const THUMB_SIZE = 128;
 
@@ -72,6 +74,7 @@ export function GridView({
   const imagePaths = useMemo(() => extractImagePaths(entries), [entries]);
   const videoPaths = useMemo(() => extractVideoPaths(entries), [entries]);
   const pdfPaths = useMemo(() => extractPdfPaths(entries), [entries]);
+  const psdPaths = useMemo(() => extractPsdPaths(entries), [entries]);
   const googleDocsPaths = useMemo(() => extractGoogleDocsPaths(entries), [entries]);
 
   useEffect(() => {
@@ -93,6 +96,13 @@ export function GridView({
     prefetchPdfInBackground(pdfPaths, THUMB_SIZE);
     return () => cancelPdfPrefetch();
   }, [pdfPaths, prefetchPdfInBackground, cancelPdfPrefetch]);
+
+  // Background prefetch thumbnails for PSDs (ag-psd, client-side)
+  useEffect(() => {
+    if (psdPaths.length === 0) return;
+    prefetchPsdInBackground(psdPaths, THUMB_SIZE);
+    return () => cancelPsdPrefetch();
+  }, [psdPaths, prefetchPsdInBackground, cancelPsdPrefetch]);
 
   // Background prefetch Google Docs thumbnails
   useEffect(() => {
