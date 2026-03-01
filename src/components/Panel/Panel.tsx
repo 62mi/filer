@@ -867,9 +867,10 @@ export function Panel() {
         data-drop-zone="panel-bg"
         data-panel-path={tab.path}
         onClick={(e) => {
-          // ファイル行以外（空白エリア・グリッドgap等）をクリックしたら選択解除
+          // ファイル行以外（空白エリア・グリッドgap等）をクリックしたら選択・カーソル解除
           if (!(e.target as HTMLElement).closest?.("[data-file-path]")) {
             clearSelection();
+            setCursor(-1);
           }
         }}
         onContextMenu={handleBgContextMenu}

@@ -189,6 +189,7 @@ export const GridCell = memo(function GridCell({
           } else {
             onClearSelection();
             onCursor(index);
+            onSelect(index);
           }
         }
         wasSelectedOnMouseDownRef.current = false;

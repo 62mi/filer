@@ -146,6 +146,7 @@ export function FileRow({
           } else {
             onClearSelection();
             onCursor(index);
+            onSelect(index);
           }
         }
         wasSelectedOnMouseDownRef.current = false;
