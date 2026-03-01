@@ -11,7 +11,7 @@ function cacheKey(path: string, size: number) {
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp"]);
 const VIDEO_EXTS = new Set(["mp4", "webm", "mkv", "avi", "mov", "wmv", "flv", "m4v"]);
 const PDF_EXTS = new Set(["pdf"]);
-const PSD_EXTS = new Set(["psd"]);
+const PSD_EXTS = new Set(["psd", "psb"]);
 
 // FFmpeg利用可否キャッシュ
 let ffmpegAvailable: boolean | null = null;

@@ -96,8 +96,8 @@ export const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "flac", "ogg", "aac", "wm
 /** フォントファイル */
 export const FONT_EXTENSIONS = new Set(["ttf", "otf", "woff", "woff2"]);
 
-/** PSDファイル */
-export const PSD_EXTENSIONS = new Set(["psd"]);
+/** PSD/PSBファイル */
+export const PSD_EXTENSIONS = new Set(["psd", "psb"]);
 
 export const PDF_EXTENSIONS = new Set(["pdf"]);
 
