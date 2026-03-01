@@ -205,7 +205,7 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
                   </div>
                 }
               >
-                <PdfViewer url={preview.pdfUrl} maxHeight={500} />
+                <PdfViewer url={preview.pdfUrl} />
               </Suspense>
             ) : null}
           </div>

@@ -1,8 +1,8 @@
-import { Folder } from "lucide-react";
+import { Check, Folder } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { useIconStore } from "../../stores/iconStore";
 import { getGridCellHeight, getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
-import { VIDEO_EXTS, useThumbnailStore } from "../../stores/thumbnailStore";
+import { PDF_EXTS, VIDEO_EXTS, useThumbnailStore } from "../../stores/thumbnailStore";
 import type { FileEntry } from "../../types";
 import { cn } from "../../utils/cn";
 import { GOOGLE_DOCS_EXTENSIONS } from "../../utils/previewConstants";
@@ -65,8 +65,9 @@ export const GridCell = memo(function GridCell({
 
   const isImage = !entry.is_dir && IMAGE_EXTS.has(entry.extension);
   const isVideo = !entry.is_dir && VIDEO_EXTS.has(entry.extension);
+  const isPdf = !entry.is_dir && PDF_EXTS.has(entry.extension);
   const isGoogleDocs = !entry.is_dir && GOOGLE_DOCS_EXTENSIONS.has(entry.extension);
-  const hasThumbnailMedia = isImage || isVideo || isGoogleDocs;
+  const hasThumbnailMedia = isImage || isVideo || isPdf || isGoogleDocs;
   const THUMB_SIZE = 128;
   const thumbKey = hasThumbnailMedia ? `${entry.path}\0${THUMB_SIZE}` : "";
   const fetchThumbnails = useThumbnailStore((s) => s.fetchThumbnails);
@@ -143,7 +144,7 @@ export const GridCell = memo(function GridCell({
     <div
       ref={cellRef}
       className={cn(
-        "flex flex-col items-center justify-center p-1 rounded cursor-default select-none",
+        "flex flex-col items-center justify-center p-1 rounded-lg cursor-default select-none relative",
         "transition-[background-color,opacity] duration-100 ease-out",
         isCursor && !isSelected && "bg-[#e8e8e8]",
         isSelected && !isCursor && "bg-[rgba(var(--accent-rgb),0.15)]",
@@ -208,6 +209,12 @@ export const GridCell = memo(function GridCell({
         onContextMenu(e, index);
       }}
     >
+      {/* Selection checkmark */}
+      {isSelected && (
+        <span className="absolute top-1 right-1 w-4 h-4 bg-[rgb(var(--accent-rgb))] rounded-full flex items-center justify-center animate-[checkPop_150ms_ease-out] z-10">
+          <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+        </span>
+      )}
       {/* Icon / Thumbnail area */}
       <div
         className="flex items-center justify-center shrink-0"

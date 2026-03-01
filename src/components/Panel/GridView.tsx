@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useIconStore } from "../../stores/iconStore";
 import { getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
-import { extractGoogleDocsPaths, extractImagePaths, extractVideoPaths, useThumbnailStore } from "../../stores/thumbnailStore";
+import { extractGoogleDocsPaths, extractImagePaths, extractPdfPaths, extractVideoPaths, useThumbnailStore } from "../../stores/thumbnailStore";
 import type { FileEntry } from "../../types";
 import { GridCell } from "./GridCell";
 
@@ -49,9 +49,11 @@ export function GridView({
 
   const prefetchInBackground = useThumbnailStore((s) => s.prefetchInBackground);
   const prefetchVideosInBackground = useThumbnailStore((s) => s.prefetchVideosInBackground);
+  const prefetchPdfInBackground = useThumbnailStore((s) => s.prefetchPdfInBackground);
   const prefetchGoogleDocsInBackground = useThumbnailStore((s) => s.prefetchGoogleDocsInBackground);
   const cancelPrefetch = useThumbnailStore((s) => s.cancelPrefetch);
   const cancelVideoPrefetch = useThumbnailStore((s) => s.cancelVideoPrefetch);
+  const cancelPdfPrefetch = useThumbnailStore((s) => s.cancelPdfPrefetch);
   const cancelGoogleDocsPrefetch = useThumbnailStore((s) => s.cancelGoogleDocsPrefetch);
   const THUMB_SIZE = 128;
 
@@ -69,6 +71,7 @@ export function GridView({
   // Background prefetch thumbnails for all images in folder
   const imagePaths = useMemo(() => extractImagePaths(entries), [entries]);
   const videoPaths = useMemo(() => extractVideoPaths(entries), [entries]);
+  const pdfPaths = useMemo(() => extractPdfPaths(entries), [entries]);
   const googleDocsPaths = useMemo(() => extractGoogleDocsPaths(entries), [entries]);
 
   useEffect(() => {
@@ -84,6 +87,13 @@ export function GridView({
     return () => cancelVideoPrefetch();
   }, [videoPaths, prefetchVideosInBackground, cancelVideoPrefetch]);
 
+  // Background prefetch thumbnails for PDFs (pdfjs, client-side)
+  useEffect(() => {
+    if (pdfPaths.length === 0) return;
+    prefetchPdfInBackground(pdfPaths, THUMB_SIZE);
+    return () => cancelPdfPrefetch();
+  }, [pdfPaths, prefetchPdfInBackground, cancelPdfPrefetch]);
+
   // Background prefetch Google Docs thumbnails
   useEffect(() => {
     if (googleDocsPaths.length === 0) return;
@@ -98,12 +108,15 @@ export function GridView({
 
   return (
     <div
-      className="p-1"
+      className="p-1 min-h-full"
       style={{
         display: "grid",
         gridTemplateColumns: `repeat(auto-fill, ${cellWidth}px)`,
         gap: `${gridGap}px`,
         alignContent: "start",
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClearSelection();
       }}
     >
       {entries.map((entry, index) => (

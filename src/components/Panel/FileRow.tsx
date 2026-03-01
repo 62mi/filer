@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDirSizeStore } from "../../stores/dirSizeStore";
 import { getTotalColumnWidth, useSettingsStore } from "../../stores/settingsStore";
@@ -97,12 +98,12 @@ export function FileRow({
   return (
     <div
       className={cn(
-        "flex items-center px-2 cursor-default select-none",
+        "flex items-center px-2 cursor-default select-none relative",
         "transition-[background-color,opacity,transform,box-shadow] duration-100 ease-out",
-        isCursor && !isSelected && "bg-[#e8e8e8]",
-        isSelected && !isCursor && "bg-[rgba(var(--accent-rgb),0.15)]",
-        isCursor && isSelected && "bg-[rgba(var(--accent-rgb),0.25)]",
-        !isCursor && !isSelected && "hover:bg-[#f5f5f5]",
+        isCursor && !isSelected && "bg-[#e8e8e8] rounded",
+        isSelected && !isCursor && "bg-[rgba(var(--accent-rgb),0.15)] rounded",
+        isCursor && isSelected && "bg-[rgba(var(--accent-rgb),0.25)] rounded",
+        !isCursor && !isSelected && "hover:bg-[#f5f5f5] rounded",
         isCut && "opacity-50",
       )}
       data-mid-click-path={entry.is_dir ? entry.path : undefined}
@@ -166,11 +167,18 @@ export function FileRow({
         onContextMenu(e, index);
       }}
     >
-      <FileIcon
-        isDir={entry.is_dir}
-        extension={entry.extension}
-        className={cn("w-4 h-4 mr-2 shrink-0", entry.is_dir ? "text-amber-500" : "text-[#666]")}
-      />
+      <span className="relative mr-2 shrink-0">
+        <FileIcon
+          isDir={entry.is_dir}
+          extension={entry.extension}
+          className={cn("w-4 h-4", entry.is_dir ? "text-amber-500" : "text-[#666]")}
+        />
+        {isSelected && (
+          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[rgb(var(--accent-rgb))] rounded-full flex items-center justify-center animate-[checkPop_150ms_ease-out]">
+            <Check className="w-2 h-2 text-white" strokeWidth={3} />
+          </span>
+        )}
+      </span>
       {isRenaming ? (
         <input
           ref={inputRef}

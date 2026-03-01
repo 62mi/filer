@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import { GOOGLE_DOCS_EXTENSIONS } from "../utils/previewConstants";
 
@@ -9,6 +10,7 @@ function cacheKey(path: string, size: number) {
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp"]);
 const VIDEO_EXTS = new Set(["mp4", "webm", "mkv", "avi", "mov", "wmv", "flv", "m4v"]);
+const PDF_EXTS = new Set(["pdf"]);
 
 // FFmpeg利用可否キャッシュ
 let ffmpegAvailable: boolean | null = null;
@@ -36,9 +38,12 @@ interface ThumbnailStore {
   fetchGoogleDocsThumbnails: (paths: string[], size: number) => Promise<void>;
   prefetchInBackground: (paths: string[], size: number) => void;
   prefetchVideosInBackground: (paths: string[], size: number) => void;
+  fetchPdfThumbnail: (path: string, size: number) => Promise<void>;
+  prefetchPdfInBackground: (paths: string[], size: number) => void;
   prefetchGoogleDocsInBackground: (paths: string[], size: number) => void;
   cancelPrefetch: () => void;
   cancelVideoPrefetch: () => void;
+  cancelPdfPrefetch: () => void;
   cancelGoogleDocsPrefetch: () => void;
   getThumbnail: (path: string, size: number) => string | undefined;
   hasThumbnail: (path: string, size: number) => boolean;
@@ -50,7 +55,45 @@ interface ThumbnailStore {
 // プリフェッチ中止用
 let prefetchAbort: AbortController | null = null;
 let videoPrefetchAbort: AbortController | null = null;
+let pdfPrefetchAbort: AbortController | null = null;
 let gdocsPrefetchAbort: AbortController | null = null;
+
+// pdfjs-dist の遅延ロード
+let pdfjsPromise: Promise<typeof import("pdfjs-dist")> | null = null;
+async function getPdfjs() {
+  if (!pdfjsPromise) {
+    pdfjsPromise = import("pdfjs-dist").then((mod) => {
+      mod.GlobalWorkerOptions.workerSrc = new URL(
+        "pdfjs-dist/build/pdf.worker.min.mjs",
+        import.meta.url,
+      ).toString();
+      return mod;
+    });
+  }
+  return pdfjsPromise;
+}
+
+/** PDFの1ページ目をCanvasに描画してdataURLを返す */
+async function renderPdfThumbnail(filePath: string, size: number): Promise<string> {
+  const pdfjsLib = await getPdfjs();
+  const url = convertFileSrc(filePath);
+  const pdf = await pdfjsLib.getDocument(url).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 1 });
+  const scale = size / Math.max(viewport.width, viewport.height);
+  const scaledViewport = page.getViewport({ scale });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = scaledViewport.width;
+  canvas.height = scaledViewport.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context not available");
+
+  await page.render({ canvasContext: ctx, canvas, viewport: scaledViewport }).promise;
+  const dataUrl = canvas.toDataURL("image/png");
+  pdf.destroy();
+  return dataUrl;
+}
 
 export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
   thumbnails: {},
@@ -139,6 +182,34 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
     }
   },
 
+  // PDFサムネイル取得（1ファイルずつ、pdfjs経由）
+  fetchPdfThumbnail: async (path: string, size: number) => {
+    const k = cacheKey(path, size);
+    const { thumbnails, pending } = get();
+    if (thumbnails[k] || pending.has(k)) return;
+
+    set((s) => {
+      const next = new Set(s.pending);
+      next.add(k);
+      return { pending: next };
+    });
+
+    try {
+      const dataUrl = await renderPdfThumbnail(path, size);
+      set((s) => {
+        const next = new Set(s.pending);
+        next.delete(k);
+        return { thumbnails: { ...s.thumbnails, [k]: dataUrl }, pending: next };
+      });
+    } catch {
+      set((s) => {
+        const next = new Set(s.pending);
+        next.delete(k);
+        return { pending: next };
+      });
+    }
+  },
+
   cancelPrefetch: () => {
     if (prefetchAbort) {
       prefetchAbort.abort();
@@ -150,6 +221,13 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
     if (videoPrefetchAbort) {
       videoPrefetchAbort.abort();
       videoPrefetchAbort = null;
+    }
+  },
+
+  cancelPdfPrefetch: () => {
+    if (pdfPrefetchAbort) {
+      pdfPrefetchAbort.abort();
+      pdfPrefetchAbort = null;
     }
   },
 
@@ -345,6 +423,62 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
       }
     })();
   },
+  // PDFサムネイルのバックグラウンドプリフェッチ（1ファイルずつ、pdfjs経由）
+  prefetchPdfInBackground: (paths: string[], size: number) => {
+    if (pdfPrefetchAbort) pdfPrefetchAbort.abort();
+    const controller = new AbortController();
+    pdfPrefetchAbort = controller;
+
+    const { thumbnails, pending } = get();
+    const needed = paths.filter((p) => {
+      const k = cacheKey(p, size);
+      return !thumbnails[k] && !pending.has(k);
+    });
+    if (needed.length === 0) return;
+
+    (async () => {
+      // 画像・動画サムネイルの読み込みを優先させる
+      await new Promise((r) => setTimeout(r, 1200));
+      if (controller.signal.aborted) return;
+
+      for (const path of needed) {
+        if (controller.signal.aborted) return;
+
+        const k = cacheKey(path, size);
+        const current = get();
+        if (current.thumbnails[k] || current.pending.has(k)) continue;
+
+        set((s) => {
+          const next = new Set(s.pending);
+          next.add(k);
+          return { pending: next };
+        });
+
+        try {
+          const dataUrl = await renderPdfThumbnail(path, size);
+          if (controller.signal.aborted) return;
+          set((s) => {
+            const next = new Set(s.pending);
+            next.delete(k);
+            return { thumbnails: { ...s.thumbnails, [k]: dataUrl }, pending: next };
+          });
+        } catch {
+          if (controller.signal.aborted) return;
+          set((s) => {
+            const next = new Set(s.pending);
+            next.delete(k);
+            return { pending: next };
+          });
+        }
+
+        // PDF描画はやや重いので間隔を空ける
+        if (!controller.signal.aborted) {
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      }
+    })();
+  },
+
   // Google Docsサムネイルのバックグラウンドプリフェッチ
   prefetchGoogleDocsInBackground: (paths: string[], size: number) => {
     if (gdocsPrefetchAbort) gdocsPrefetchAbort.abort();
@@ -428,4 +562,11 @@ export function extractGoogleDocsPaths(
     .map((e) => e.path);
 }
 
-export { VIDEO_EXTS };
+/** エントリ配列からPDFパスだけ抽出するヘルパー */
+export function extractPdfPaths(
+  entries: { is_dir: boolean; extension: string; path: string }[],
+): string[] {
+  return entries.filter((e) => !e.is_dir && PDF_EXTS.has(e.extension)).map((e) => e.path);
+}
+
+export { VIDEO_EXTS, PDF_EXTS };

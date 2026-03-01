@@ -240,7 +240,7 @@ export function Sidebar() {
           <button
             key={item.path}
             className={cn(
-              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[var(--chrome-hover)] text-left w-full truncate transition-colors duration-100",
+              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[var(--chrome-hover)] text-left w-full min-w-0 transition-colors duration-100",
               isActive(item.path) && "bg-[var(--chrome-active)]",
             )}
             onClick={() => loadDirectory(item.path)}
@@ -269,7 +269,7 @@ export function Sidebar() {
           <button
             key={drive.path}
             className={cn(
-              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[var(--chrome-hover)] text-left w-full transition-colors duration-100",
+              "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[var(--chrome-hover)] text-left w-full min-w-0 transition-colors duration-100",
               isActive(drive.path) && "bg-[var(--chrome-active)]",
             )}
             onClick={() => loadDirectory(drive.path)}

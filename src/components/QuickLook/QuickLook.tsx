@@ -229,16 +229,18 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
 
       case "pdf":
         return preview.pdfUrl ? (
-          <Suspense
-            fallback={
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-6 h-6 border-2 border-[#0078d4] border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs text-[#999]">Loading PDF...</span>
-              </div>
-            }
-          >
-            <PdfViewer url={preview.pdfUrl} />
-          </Suspense>
+          <div className="flex flex-col" style={{ width: "70vw", height: "65vh" }}>
+            <Suspense
+              fallback={
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-6 h-6 border-2 border-[#0078d4] border-t-transparent rounded-full animate-spin" />
+                  <span className="text-xs text-[#999]">Loading PDF...</span>
+                </div>
+              }
+            >
+              <PdfViewer url={preview.pdfUrl} />
+            </Suspense>
+          </div>
         ) : null;
 
       case "googleDocs":
