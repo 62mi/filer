@@ -13,6 +13,7 @@ export interface GridCellProps {
   entry: FileEntry;
   index: number;
   isCursor: boolean;
+  cursorVisible: boolean;
   isSelected: boolean;
   isRenaming: boolean;
   isCut: boolean;
@@ -34,6 +35,7 @@ export const GridCell = memo(function GridCell({
   entry,
   index,
   isCursor,
+  cursorVisible,
   isSelected,
   isRenaming,
   isCut,
@@ -153,10 +155,10 @@ export const GridCell = memo(function GridCell({
       className={cn(
         "flex flex-col items-center justify-center gap-1 p-1 rounded-lg cursor-default select-none relative",
         "transition-[background-color,opacity] duration-100 ease-out",
-        isCursor && !isSelected && "bg-[#e8e8e8]",
-        isSelected && !isCursor && "bg-[rgba(var(--accent-rgb),0.15)]",
-        isCursor && isSelected && "bg-[rgba(var(--accent-rgb),0.25)]",
-        !isCursor && !isSelected && "hover:bg-[#f5f5f5]",
+        isCursor && cursorVisible && !isSelected && "bg-[#e8e8e8]",
+        isSelected && !(isCursor && cursorVisible) && "bg-[rgba(var(--accent-rgb),0.15)]",
+        isCursor && cursorVisible && isSelected && "bg-[rgba(var(--accent-rgb),0.25)]",
+        !(isCursor && cursorVisible) && !isSelected && "hover:bg-[#f5f5f5]",
         isCut && "opacity-50",
       )}
       data-mid-click-path={entry.is_dir ? entry.path : undefined}

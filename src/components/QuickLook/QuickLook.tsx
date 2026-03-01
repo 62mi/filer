@@ -15,11 +15,13 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "../../i18n";
+import { useImageControls } from "../../hooks/useImageControls";
 import { usePreview } from "../../hooks/usePreview";
 import type { FileEntry } from "../../types";
 import { formatDate, formatFileSize } from "../../utils/format";
 import { CODE_EXTENSIONS } from "../../utils/previewConstants";
 import { FontPreview } from "../FontPreview";
+import { ImageToolbar } from "../ImageToolbar";
 
 const PdfViewer = lazy(() =>
   import("../PdfViewer/PdfViewer").then((m) => ({ default: m.PdfViewer })),
@@ -47,7 +49,9 @@ interface QuickLookProps {
 export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
   const t = useTranslation();
   const preview = usePreview(entry, { maxTextBytes: 100000 });
+  const controls = useImageControls(entry.path);
   const [closing, setClosing] = useState(false);
+  const [imgVersion, setImgVersion] = useState(0);
   const [contentKey, setContentKey] = useState(0);
   const prevPathRef = useRef(entry.path);
 
@@ -185,12 +189,42 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
     switch (preview.type) {
       case "image":
         return preview.imageUrl ? (
-          <img
-            src={preview.imageUrl}
-            alt={entry.name}
-            className="max-w-full max-h-[70vh] object-contain rounded-md"
-            style={{ imageRendering: "auto" }}
-          />
+          <div
+            ref={controls.containerRef}
+            className="group relative w-full h-full flex items-center justify-center overflow-hidden"
+            onMouseDown={controls.onMouseDown}
+          >
+            <img
+              src={preview.imageUrl + (imgVersion ? `?v=${imgVersion}` : "")}
+              alt={entry.name}
+              className="max-w-full max-h-[70vh] object-contain select-none"
+              style={{ ...controls.transformStyle, imageRendering: "auto" }}
+              draggable={false}
+            />
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <ImageToolbar
+                extension={entry.extension}
+                filePath={entry.path}
+                rotation={controls.rotation}
+                flipH={controls.flipH}
+                flipV={controls.flipV}
+                isModified={controls.isModified}
+                isTransformed={controls.isTransformed}
+                zoomPercent={controls.zoomPercent}
+                onZoomIn={controls.zoomIn}
+                onZoomOut={controls.zoomOut}
+                onRotateCcw={controls.rotateCcw}
+                onRotateCw={controls.rotateCw}
+                onFlipH={controls.toggleFlipH}
+                onFlipV={controls.toggleFlipV}
+                onReset={controls.resetAll}
+                onSaved={() => {
+                  controls.resetAfterSave();
+                  setImgVersion((v) => v + 1);
+                }}
+              />
+            </div>
+          </div>
         ) : null;
 
       case "text":
@@ -221,16 +255,44 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
 
       case "psd":
         return preview.imageUrl ? (
-          <Suspense
-            fallback={
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-6 h-6 border-2 border-[#0078d4] border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs text-[#999]">Loading PSD...</span>
-              </div>
-            }
+          <div
+            ref={controls.containerRef}
+            className="group relative w-full h-full flex items-center justify-center overflow-hidden"
+            onMouseDown={controls.onMouseDown}
           >
-            <PsdPreview url={preview.imageUrl} filePath={entry.path} name={entry.name} />
-          </Suspense>
+            <Suspense
+              fallback={
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-6 h-6 border-2 border-[#0078d4] border-t-transparent rounded-full animate-spin" />
+                  <span className="text-xs text-[#999]">Loading PSD...</span>
+                </div>
+              }
+            >
+              <div style={controls.transformStyle}>
+                <PsdPreview url={preview.imageUrl} filePath={entry.path} name={entry.name} />
+              </div>
+            </Suspense>
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <ImageToolbar
+                extension={entry.extension}
+                filePath={entry.path}
+                rotation={controls.rotation}
+                flipH={controls.flipH}
+                flipV={controls.flipV}
+                isModified={controls.isModified}
+                isTransformed={controls.isTransformed}
+                zoomPercent={controls.zoomPercent}
+                onZoomIn={controls.zoomIn}
+                onZoomOut={controls.zoomOut}
+                onRotateCcw={controls.rotateCcw}
+                onRotateCw={controls.rotateCw}
+                onFlipH={controls.toggleFlipH}
+                onFlipV={controls.toggleFlipV}
+                onReset={controls.resetAll}
+                onSaved={controls.resetAfterSave}
+              />
+            </div>
+          </div>
         ) : null;
 
       case "video":
@@ -255,16 +317,43 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
 
       case "videoThumbnail":
         return preview.videoThumbnail ? (
-          <div className="relative">
-            <img
-              src={preview.videoThumbnail}
-              alt={entry.name}
-              className="max-w-full max-h-[70vh] object-contain rounded-md"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-12 h-12 bg-black/50 rounded-full flex items-center justify-center">
-                <Play className="w-6 h-6 text-white ml-0.5" />
+          <div
+            ref={controls.containerRef}
+            className="group relative w-full h-full flex items-center justify-center overflow-hidden"
+            onMouseDown={controls.onMouseDown}
+          >
+            <div className="relative" style={controls.transformStyle}>
+              <img
+                src={preview.videoThumbnail}
+                alt={entry.name}
+                className="max-w-full max-h-[70vh] object-contain rounded-md select-none"
+                draggable={false}
+              />
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-12 h-12 bg-black/50 rounded-full flex items-center justify-center">
+                  <Play className="w-6 h-6 text-white ml-0.5" />
+                </div>
               </div>
+            </div>
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <ImageToolbar
+                extension={entry.extension}
+                filePath={entry.path}
+                rotation={controls.rotation}
+                flipH={controls.flipH}
+                flipV={controls.flipV}
+                isModified={controls.isModified}
+                isTransformed={controls.isTransformed}
+                zoomPercent={controls.zoomPercent}
+                onZoomIn={controls.zoomIn}
+                onZoomOut={controls.zoomOut}
+                onRotateCcw={controls.rotateCcw}
+                onRotateCw={controls.rotateCw}
+                onFlipH={controls.toggleFlipH}
+                onFlipV={controls.toggleFlipV}
+                onReset={controls.resetAll}
+                onSaved={controls.resetAfterSave}
+              />
             </div>
           </div>
         ) : (

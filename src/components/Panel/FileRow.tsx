@@ -12,6 +12,7 @@ interface FileRowProps {
   entry: FileEntry;
   index: number;
   isCursor: boolean;
+  cursorVisible: boolean;
   isSelected: boolean;
   isRenaming: boolean;
   isCut: boolean;
@@ -34,6 +35,7 @@ export function FileRow({
   entry,
   index,
   isCursor,
+  cursorVisible,
   isSelected,
   isRenaming,
   isCut,
@@ -100,10 +102,10 @@ export function FileRow({
       className={cn(
         "flex items-center px-2 mx-1 my-0.5 cursor-default select-none relative",
         "transition-[background-color,opacity,transform,box-shadow] duration-100 ease-out",
-        isCursor && !isSelected && "bg-[#e8e8e8] rounded-[10px]",
-        isSelected && !isCursor && "bg-[rgba(var(--accent-rgb),0.15)] rounded-[10px]",
-        isCursor && isSelected && "bg-[rgba(var(--accent-rgb),0.25)] rounded-[10px]",
-        !isCursor && !isSelected && "hover:bg-[#f5f5f5] rounded-[10px]",
+        isCursor && cursorVisible && !isSelected && "bg-[#e8e8e8] rounded-[10px]",
+        isSelected && !(isCursor && cursorVisible) && "bg-[rgba(var(--accent-rgb),0.15)] rounded-[10px]",
+        isCursor && cursorVisible && isSelected && "bg-[rgba(var(--accent-rgb),0.25)] rounded-[10px]",
+        !(isCursor && cursorVisible) && !isSelected && "hover:bg-[#f5f5f5] rounded-[10px]",
         isCut && "opacity-50",
       )}
       data-mid-click-path={entry.is_dir ? entry.path : undefined}

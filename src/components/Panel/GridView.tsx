@@ -8,6 +8,7 @@ import { GridCell } from "./GridCell";
 interface GridViewProps {
   entries: FileEntry[];
   cursorIndex: number;
+  cursorVisible: boolean;
   selectedIndices: Set<number>;
   renamingIndex: number | null;
   cutPaths: Set<string>;
@@ -27,6 +28,7 @@ interface GridViewProps {
 export function GridView({
   entries,
   cursorIndex,
+  cursorVisible,
   selectedIndices,
   renamingIndex,
   cutPaths,
@@ -132,6 +134,7 @@ export function GridView({
           entry={entry}
           index={index}
           isCursor={index === cursorIndex}
+          cursorVisible={cursorVisible}
           isSelected={selectedIndices.has(index)}
           isRenaming={index === renamingIndex}
           isCut={cutPaths.has(entry.path)}

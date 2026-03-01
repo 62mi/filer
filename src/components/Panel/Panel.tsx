@@ -47,6 +47,8 @@ export function Panel() {
   const navigateBack = useExplorerStore((s) => s.navigateBack);
   const navigateForward = useExplorerStore((s) => s.navigateForward);
   const setCursor = useExplorerStore((s) => s.setCursor);
+  const cursorVisible = useExplorerStore((s) => s.cursorVisible);
+  const setCursorVisible = useExplorerStore((s) => s.setCursorVisible);
   const toggleSelection = useExplorerStore((s) => s.toggleSelection);
   const selectRange = useExplorerStore((s) => s.selectRange);
   const selectAll = useExplorerStore((s) => s.selectAll);
@@ -256,10 +258,11 @@ export function Panel() {
     (e: React.MouseEvent, index: number) => {
       e.preventDefault();
       e.stopPropagation();
+      setCursorVisible(false);
       setCursor(index);
       showNativeContextMenu(index, onProperties);
     },
-    [setCursor, onProperties],
+    [setCursor, setCursorVisible, onProperties],
   );
 
   const handleBgContextMenu = useCallback(
@@ -293,9 +296,10 @@ export function Panel() {
 
   const handleFileMouseDown = useCallback((e: React.MouseEvent, index: number) => {
     if (e.button !== 0) return;
+    setCursorVisible(false);
     dragStartRef.current = { x: e.clientX, y: e.clientY, index };
     draggingRef.current = false;
-  }, []);
+  }, [setCursorVisible]);
 
   // カスタムドラッグのクリーンアップ
   const cleanupDrag = useCallback(() => {
@@ -495,6 +499,11 @@ export function Panel() {
         const cellW = getGridCellWidth(s) + s.gridGap;
         return Math.max(1, Math.floor(listRef.current.clientWidth / cellW));
       };
+
+      // カーソル移動系キーでカーソルを可視化（マウス操作後の非表示状態から復帰）
+      if (["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "Home", "End", " "].includes(e.key)) {
+        useExplorerStore.getState().setCursorVisible(true);
+      }
 
       switch (e.key) {
         case "ArrowDown": {
@@ -913,6 +922,7 @@ export function Panel() {
                 entry={entry}
                 index={index}
                 isCursor={index === tab.cursorIndex}
+                cursorVisible={cursorVisible}
                 isSelected={tab.selectedIndices.has(index)}
                 isRenaming={index === tab.renamingIndex}
                 isCut={cutPaths.has(entry.path)}
@@ -935,6 +945,7 @@ export function Panel() {
             <GridView
               entries={displayEntries}
               cursorIndex={tab.cursorIndex}
+              cursorVisible={cursorVisible}
               selectedIndices={tab.selectedIndices}
               renamingIndex={tab.renamingIndex}
               cutPaths={cutPaths}

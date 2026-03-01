@@ -449,6 +449,18 @@ export const en: Translations = {
     clearAll: "Clear all",
   },
 
+  imageControls: {
+    rotateCcw: "Rotate left",
+    rotateCw: "Rotate right",
+    flipH: "Flip horizontal",
+    flipV: "Flip vertical",
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    reset: "Reset",
+    saveToFile: "Save to file",
+    saved: "Image saved",
+  },
+
   format: {
     bytes: "bytes",
   },
