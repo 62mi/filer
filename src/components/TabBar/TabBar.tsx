@@ -66,7 +66,9 @@ export function TabBar() {
           const isActive = tab.id === activeTabId;
           const isDragging = tab.id === draggingTabId;
           const isHome = tab.path === "home:";
-          const label = isHome ? t.sidebar.home : (tab.path.split(/[\\/]/).filter(Boolean).pop() || tab.path);
+          const label = isHome
+            ? t.sidebar.home
+            : tab.path.split(/[\\/]/).filter(Boolean).pop() || tab.path;
           const hasAi = aiDialogOpen && aiDialogTabId === tab.id;
           return (
             <div key={tab.id} className="flex items-end h-full">

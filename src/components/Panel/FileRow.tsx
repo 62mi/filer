@@ -103,8 +103,13 @@ export function FileRow({
         "flex items-center px-2 mx-1 my-0.5 cursor-default select-none relative",
         "transition-[background-color,opacity,transform,box-shadow] duration-100 ease-out",
         isCursor && cursorVisible && !isSelected && "bg-[#e8e8e8] rounded-[10px]",
-        isSelected && !(isCursor && cursorVisible) && "bg-[rgba(var(--accent-rgb),0.15)] rounded-[10px]",
-        isCursor && cursorVisible && isSelected && "bg-[rgba(var(--accent-rgb),0.25)] rounded-[10px]",
+        isSelected &&
+          !(isCursor && cursorVisible) &&
+          "bg-[rgba(var(--accent-rgb),0.15)] rounded-[10px]",
+        isCursor &&
+          cursorVisible &&
+          isSelected &&
+          "bg-[rgba(var(--accent-rgb),0.25)] rounded-[10px]",
         !(isCursor && cursorVisible) && !isSelected && "hover:bg-[#f5f5f5] rounded-[10px]",
         isCut && "opacity-50",
       )}

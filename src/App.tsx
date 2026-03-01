@@ -217,9 +217,7 @@ function App() {
         />
 
         {/* File list panel */}
-        <div className="flex-1 min-w-0">
-          {tab.path === "home:" ? <HomeView /> : <Panel />}
-        </div>
+        <div className="flex-1 min-w-0">{tab.path === "home:" ? <HomeView /> : <Panel />}</div>
 
         {/* Preview panel */}
         {previewOpen && (

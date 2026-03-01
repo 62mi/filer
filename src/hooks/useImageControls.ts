@@ -30,6 +30,7 @@ export function useImageControls(entryPath: string | null) {
   const containerNodeRef = useRef<HTMLDivElement | null>(null);
 
   // ファイルが変わったらリセット
+  // biome-ignore lint/correctness/useExhaustiveDependencies: entryPath変更時のリセットが目的
   useEffect(() => {
     setState(INITIAL);
     setCacheBust(0);

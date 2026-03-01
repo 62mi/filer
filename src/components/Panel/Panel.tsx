@@ -244,7 +244,7 @@ export function Panel() {
       if (entry.is_dir) {
         loadDirectory(entry.path);
       } else {
-        invoke("open_in_default_app", { path: entry.path });
+        invoke("open_in_default_app", { path: entry.path }).catch(() => {});
       }
     },
     [loadDirectory],
@@ -294,12 +294,15 @@ export function Panel() {
       .catch(() => {});
   }, []);
 
-  const handleFileMouseDown = useCallback((e: React.MouseEvent, index: number) => {
-    if (e.button !== 0) return;
-    setCursorVisible(false);
-    dragStartRef.current = { x: e.clientX, y: e.clientY, index };
-    draggingRef.current = false;
-  }, [setCursorVisible]);
+  const handleFileMouseDown = useCallback(
+    (e: React.MouseEvent, index: number) => {
+      if (e.button !== 0) return;
+      setCursorVisible(false);
+      dragStartRef.current = { x: e.clientX, y: e.clientY, index };
+      draggingRef.current = false;
+    },
+    [setCursorVisible],
+  );
 
   // カスタムドラッグのクリーンアップ
   const cleanupDrag = useCallback(() => {

@@ -139,7 +139,7 @@ export function CommandPalette() {
           if (entry.is_dir) {
             useExplorerStore.getState().loadDirectory(entry.path);
           } else {
-            invoke("open_in_default_app", { path: entry.path });
+            invoke("open_in_default_app", { path: entry.path }).catch(() => {});
           }
         },
       });

@@ -46,7 +46,7 @@ async function buildFileMenu(
         if (entry.is_dir) {
           useExplorerStore.getState().loadDirectory(entry.path);
         } else {
-          invoke("open_in_default_app", { path: entry.path });
+          invoke("open_in_default_app", { path: entry.path }).catch(() => {});
         }
       },
     }),
@@ -60,7 +60,7 @@ async function buildFileMenu(
       await MenuItem.new({
         text: t.contextMenu.openWith,
         action: () => {
-          invoke("open_with_dialog", { path: entry.path });
+          invoke("open_with_dialog", { path: entry.path }).catch(() => {});
         },
       }),
     );
@@ -73,10 +73,7 @@ async function buildFileMenu(
       await MenuItem.new({
         text: t.contextMenu.addToStack,
         action: () => {
-          const indices =
-            selectedIndices.size > 0
-              ? Array.from(selectedIndices)
-              : [targetIndex];
+          const indices = selectedIndices.size > 0 ? Array.from(selectedIndices) : [targetIndex];
           const paths = indices.map((i) => entries[i]?.path).filter(Boolean);
           if (paths.length > 0) useExplorerStore.getState().addToStack(paths);
         },
@@ -105,10 +102,7 @@ async function buildFileMenu(
     await MenuItem.new({
       text: t.contextMenu.copyPath,
       action: async () => {
-        const indices =
-          selectedIndices.size > 0
-            ? Array.from(selectedIndices)
-            : [targetIndex];
+        const indices = selectedIndices.size > 0 ? Array.from(selectedIndices) : [targetIndex];
         const paths = indices.map((i) => entries[i]?.path).filter(Boolean);
         const text = paths.join("\n");
         try {
@@ -249,7 +243,10 @@ async function buildBackgroundMenu(
     sortSubItems.push(
       await MenuItem.new({
         text: `${currentSortKey === opt.key ? "● " : "  "}${opt.label}`,
-        action: () => useExplorerStore.getState().setSort(opt.key as "name" | "modified" | "extension" | "size"),
+        action: () =>
+          useExplorerStore
+            .getState()
+            .setSort(opt.key as "name" | "modified" | "extension" | "size"),
       }),
     );
   }

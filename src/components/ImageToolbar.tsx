@@ -161,9 +161,7 @@ function ToolButton({
   return (
     <button
       className={`p-1.5 rounded transition-colors ${
-        active
-          ? "bg-white/25 text-white"
-          : "text-white/70 hover:bg-white/15 hover:text-white"
+        active ? "bg-white/25 text-white" : "text-white/70 hover:bg-white/15 hover:text-white"
       } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
       onClick={onClick}
       title={title}

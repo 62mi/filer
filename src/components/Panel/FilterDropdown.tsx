@@ -58,13 +58,17 @@ export function DropdownCheckItem({ label, checked, onChange }: DropdownCheckIte
       <span
         className={cn(
           "w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0",
-          checked
-            ? "bg-[var(--accent)] border-[var(--accent)] text-white"
-            : "border-[#ccc]",
+          checked ? "bg-[var(--accent)] border-[var(--accent)] text-white" : "border-[#ccc]",
         )}
       >
         {checked && (
-          <svg viewBox="0 0 12 12" className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            viewBox="0 0 12 12"
+            className="w-2.5 h-2.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M2 6l3 3 5-5" />
           </svg>
         )}
@@ -89,9 +93,7 @@ export function DropdownRadioItem({ label, selected, onChange }: DropdownRadioIt
       <span
         className={cn(
           "w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0",
-          selected
-            ? "border-[var(--accent)]"
-            : "border-[#ccc]",
+          selected ? "border-[var(--accent)]" : "border-[#ccc]",
         )}
       >
         {selected && <span className="w-2 h-2 rounded-full bg-[var(--accent)]" />}

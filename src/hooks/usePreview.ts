@@ -149,10 +149,8 @@ export function usePreview(
       }
 
       case "googleDocs": {
-        console.log("[googleDocs] calling read_cloud_doc_id:", path, extension);
         invoke<string>("read_cloud_doc_id", { path, extension })
           .then((result) => {
-            console.log("[googleDocs] result:", result);
             if (cancelled) return;
             // resultは doc_id文字列、"url:https://..." 形式、または "hex:..." 形式
             let docId: string | null = null;
@@ -194,8 +192,7 @@ export function usePreview(
 
             setState((s) => ({ ...s, loading: false, googleDocsReadFailed: true }));
           })
-          .catch((err) => {
-            console.error("[googleDocs] error:", err);
+          .catch(() => {
             if (!cancelled) setState((s) => ({ ...s, loading: false, googleDocsReadFailed: true }));
           });
         break;

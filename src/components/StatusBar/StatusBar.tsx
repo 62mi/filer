@@ -29,7 +29,10 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
     () => applyFilters(entries, tab.filter, dirSizes),
     [entries, tab.filter, dirSizes],
   );
-  const isFiltered = tab.filter.types.length > 0 || tab.filter.sizeRange !== null || tab.filter.modifiedRange !== null;
+  const isFiltered =
+    tab.filter.types.length > 0 ||
+    tab.filter.sizeRange !== null ||
+    tab.filter.modifiedRange !== null;
   const selectedIndices = tab.selectedIndices;
 
   const displayEntries = isFiltered ? filteredEntries : entries;

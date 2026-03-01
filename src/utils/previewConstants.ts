@@ -89,7 +89,15 @@ export const TEXT_EXTENSIONS = new Set([
 export const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "ogv"]);
 
 /** FFmpegサムネイル抽出が必要な動画形式 */
-export const VIDEO_THUMBNAIL_EXTENSIONS = new Set(["mkv", "avi", "mov", "wmv", "flv", "m4v", "3gp"]);
+export const VIDEO_THUMBNAIL_EXTENSIONS = new Set([
+  "mkv",
+  "avi",
+  "mov",
+  "wmv",
+  "flv",
+  "m4v",
+  "3gp",
+]);
 
 export const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "flac", "ogg", "aac", "wma", "m4a", "opus"]);
 

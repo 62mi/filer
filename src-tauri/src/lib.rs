@@ -121,10 +121,16 @@ pub fn run() {
                 ],
             )?;
 
-            TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+            let mut tray_builder = TrayIconBuilder::new()
                 .tooltip("TomaFiler")
-                .menu(&tray_menu)
+                .menu(&tray_menu);
+
+            // アイコンがある場合のみ設定
+            if let Some(icon) = app.default_window_icon() {
+                tray_builder = tray_builder.icon(icon.clone());
+            }
+
+            tray_builder
                 .on_tray_icon_event(|tray, event| {
                     if let tauri::tray::TrayIconEvent::Click {
                         button: tauri::tray::MouseButton::Left,

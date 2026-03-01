@@ -124,7 +124,7 @@ export function HomeView() {
     if (file.is_dir) {
       loadDirectory(file.path);
     } else {
-      invoke("open_in_default_app", { path: file.path });
+      invoke("open_in_default_app", { path: file.path }).catch(() => {});
     }
   };
 

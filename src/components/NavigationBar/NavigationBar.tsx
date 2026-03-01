@@ -125,7 +125,11 @@ export function NavigationBar() {
       <NavButton onClick={navigateUp} title="Up (Alt+Up)" disabled={isHome}>
         <ArrowUp className="w-4 h-4" />
       </NavButton>
-      <NavButton onClick={() => loadDirectory(tab.path, false)} title="Refresh (F5)" disabled={isHome}>
+      <NavButton
+        onClick={() => loadDirectory(tab.path, false)}
+        title="Refresh (F5)"
+        disabled={isHome}
+      >
         <RotateCw className="w-3.5 h-3.5" />
       </NavButton>
 
@@ -177,28 +181,28 @@ export function NavigationBar() {
               {isHome ? (
                 <span className="text-[#666]">{t.sidebar.home}</span>
               ) : (
-              segments.map((segment, i) => {
-                const segmentPath = segments.slice(0, i + 1).join("\\");
-                const fullPath =
-                  segmentPath.length === 2 && segmentPath[1] === ":"
-                    ? `${segmentPath}\\`
-                    : segmentPath;
-                return (
-                  <span key={fullPath} className="flex items-center shrink-0">
-                    {i > 0 && <span className="mx-1 text-[#999] text-xs">{"\u203A"}</span>}
-                    <button
-                      className="hover:text-[var(--accent)] hover:underline transition-colors"
-                      data-mid-click-path={fullPath}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        loadDirectory(fullPath);
-                      }}
-                    >
-                      {segment}
-                    </button>
-                  </span>
-                );
-              })
+                segments.map((segment, i) => {
+                  const segmentPath = segments.slice(0, i + 1).join("\\");
+                  const fullPath =
+                    segmentPath.length === 2 && segmentPath[1] === ":"
+                      ? `${segmentPath}\\`
+                      : segmentPath;
+                  return (
+                    <span key={fullPath} className="flex items-center shrink-0">
+                      {i > 0 && <span className="mx-1 text-[#999] text-xs">{"\u203A"}</span>}
+                      <button
+                        className="hover:text-[var(--accent)] hover:underline transition-colors"
+                        data-mid-click-path={fullPath}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          loadDirectory(fullPath);
+                        }}
+                      >
+                        {segment}
+                      </button>
+                    </span>
+                  );
+                })
               )}
             </div>
             {/* Chrome風 星ボタン（アドレスバー右端） */}

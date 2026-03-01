@@ -2,7 +2,7 @@ import { Check, Folder } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { useIconStore } from "../../stores/iconStore";
 import { getGridCellHeight, getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
-import { PDF_EXTS, PSD_EXTS, VIDEO_EXTS, useThumbnailStore } from "../../stores/thumbnailStore";
+import { PDF_EXTS, PSD_EXTS, useThumbnailStore, VIDEO_EXTS } from "../../stores/thumbnailStore";
 import type { FileEntry } from "../../types";
 import { cn } from "../../utils/cn";
 import { GOOGLE_DOCS_EXTENSIONS } from "../../utils/previewConstants";
@@ -78,7 +78,9 @@ export const GridCell = memo(function GridCell({
   const fetchPsdThumbnail = useThumbnailStore((s) => s.fetchPsdThumbnail);
   const fetchGoogleDocsThumbnails = useThumbnailStore((s) => s.fetchGoogleDocsThumbnails);
   const removeThumbnail = useThumbnailStore((s) => s.removeThumbnail);
-  const hasThumbnail = useThumbnailStore((s) => (hasThumbnailMedia ? !!s.thumbnails[thumbKey] : false));
+  const hasThumbnail = useThumbnailStore((s) =>
+    hasThumbnailMedia ? !!s.thumbnails[thumbKey] : false,
+  );
   const isPending = useThumbnailStore((s) => (hasThumbnailMedia ? s.pending.has(thumbKey) : false));
 
   // IntersectionObserver: ビューポートに入ったらサムネイル取得
@@ -106,7 +108,19 @@ export const GridCell = memo(function GridCell({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasThumbnailMedia, isImage, isGoogleDocs, isPsd, hasThumbnail, isPending, entry.path, fetchThumbnails, fetchVideoThumbnail, fetchPsdThumbnail, fetchGoogleDocsThumbnails]);
+  }, [
+    hasThumbnailMedia,
+    isImage,
+    isGoogleDocs,
+    isPsd,
+    hasThumbnail,
+    isPending,
+    entry.path,
+    fetchThumbnails,
+    fetchVideoThumbnail,
+    fetchPsdThumbnail,
+    fetchGoogleDocsThumbnails,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -138,13 +152,13 @@ export const GridCell = memo(function GridCell({
     }
   };
 
-  const thumbnail = useThumbnailStore((s) => (hasThumbnailMedia ? s.thumbnails[thumbKey] : undefined));
+  const thumbnail = useThumbnailStore((s) =>
+    hasThumbnailMedia ? s.thumbnails[thumbKey] : undefined,
+  );
   const largeIcon = useIconStore(
     (s) => s.largeIcons[entry.is_dir ? "__directory__" : entry.extension],
   );
-  const smallIcon = useIconStore(
-    (s) => (hasThumbnailMedia ? s.icons[entry.extension] : undefined),
-  );
+  const smallIcon = useIconStore((s) => (hasThumbnailMedia ? s.icons[entry.extension] : undefined));
 
   // Icon size scales with gridIconSize
   const iconDisplaySize = Math.max(24, Math.min(gridIconSize * 0.75, 96));

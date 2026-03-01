@@ -1,6 +1,6 @@
-import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import {
   Check,
   Copy,
@@ -17,8 +17,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { type Language, useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { type PathStyle, useSettingsStore } from "../../stores/settingsStore";
-import { resetFfmpegCache } from "../../stores/thumbnailStore";
 import { COLOR_THEMES, useThemeStore } from "../../stores/themeStore";
+import { resetFfmpegCache } from "../../stores/thumbnailStore";
 import { cn } from "../../utils/cn";
 
 type SettingKey =
@@ -807,11 +807,7 @@ function FfmpegStatus() {
               onClick={handleCopy}
               title="Copy"
             >
-              {copied ? (
-                <Check className="w-3 h-3 text-green-600" />
-              ) : (
-                <Copy className="w-3 h-3" />
-              )}
+              {copied ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3" />}
             </button>
           </div>
           <p className="text-[10px] text-[#999] mt-1">{t.settingsDialog.ffmpegInstallGuide}</p>

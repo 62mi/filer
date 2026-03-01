@@ -13,9 +13,9 @@ import {
   X,
 } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
-import { useTranslation } from "../../i18n";
 import { useImageControls } from "../../hooks/useImageControls";
 import { usePreview } from "../../hooks/usePreview";
+import { useTranslation } from "../../i18n";
 import type { FileEntry } from "../../types";
 import { formatDate, formatFileSize } from "../../utils/format";
 import { CODE_EXTENSIONS } from "../../utils/previewConstants";
@@ -165,16 +165,32 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
                 Loading...
               </div>
             ) : preview.textContent !== null ? (
-              (e.extension === "md" || e.extension === "mdx") ? (
+              e.extension === "md" || e.extension === "mdx" ? (
                 <div className="flex-1 overflow-auto">
-                  <Suspense fallback={<pre className="text-xs font-mono whitespace-pre-wrap p-2">{preview.textContent}</pre>}>
+                  <Suspense
+                    fallback={
+                      <pre className="text-xs font-mono whitespace-pre-wrap p-2">
+                        {preview.textContent}
+                      </pre>
+                    }
+                  >
                     <MarkdownPreview content={preview.textContent} />
                   </Suspense>
                 </div>
               ) : CODE_EXTENSIONS.has(e.extension) ? (
                 <div className="flex-1 overflow-auto">
-                  <Suspense fallback={<pre className="text-xs font-mono whitespace-pre-wrap p-2">{preview.textContent}</pre>}>
-                    <CodePreview content={preview.textContent} extension={e.extension} fontSize={11} />
+                  <Suspense
+                    fallback={
+                      <pre className="text-xs font-mono whitespace-pre-wrap p-2">
+                        {preview.textContent}
+                      </pre>
+                    }
+                  >
+                    <CodePreview
+                      content={preview.textContent}
+                      extension={e.extension}
+                      fontSize={11}
+                    />
                   </Suspense>
                 </div>
               ) : (
@@ -207,7 +223,12 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
                   }
                 >
                   <div style={controls.transformStyle}>
-                    <PsdPreview url={preview.imageUrl} filePath={e.path} name={e.name} maxHeight="400px" />
+                    <PsdPreview
+                      url={preview.imageUrl}
+                      filePath={e.path}
+                      name={e.name}
+                      maxHeight="400px"
+                    />
                   </div>
                 </Suspense>
                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">

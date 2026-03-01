@@ -33,11 +33,38 @@ function getExtension(filePath: string): string {
 
 // フィルタチップ: カテゴリ判定マップ
 const FILE_TYPE_MAP: Record<Exclude<FileTypeCategory, "folder">, Set<string>> = {
-  image: new Set(["png","jpg","jpeg","gif","bmp","webp","svg","ico","tiff","tif","psd","psb","ai"]),
-  video: new Set(["mp4","avi","mkv","mov","wmv","flv","webm","m4v"]),
-  audio: new Set(["mp3","wav","flac","aac","ogg","wma","m4a"]),
-  document: new Set(["pdf","doc","docx","xls","xlsx","ppt","pptx","txt","md","csv","rtf","html"]),
-  archive: new Set(["zip","rar","7z","tar","gz","bz2","lzh"]),
+  image: new Set([
+    "png",
+    "jpg",
+    "jpeg",
+    "gif",
+    "bmp",
+    "webp",
+    "svg",
+    "ico",
+    "tiff",
+    "tif",
+    "psd",
+    "psb",
+    "ai",
+  ]),
+  video: new Set(["mp4", "avi", "mkv", "mov", "wmv", "flv", "webm", "m4v"]),
+  audio: new Set(["mp3", "wav", "flac", "aac", "ogg", "wma", "m4a"]),
+  document: new Set([
+    "pdf",
+    "doc",
+    "docx",
+    "xls",
+    "xlsx",
+    "ppt",
+    "pptx",
+    "txt",
+    "md",
+    "csv",
+    "rtf",
+    "html",
+  ]),
+  archive: new Set(["zip", "rar", "7z", "tar", "gz", "bz2", "lzh"]),
 };
 
 function matchesTypeFilter(entry: FileEntry, types: FileTypeCategory[]): boolean {
@@ -52,7 +79,11 @@ function matchesTypeFilter(entry: FileEntry, types: FileTypeCategory[]): boolean
   return false;
 }
 
-function matchesSizeFilter(entry: FileEntry, range: SizeRange, dirSizes: Record<string, number>): boolean {
+function matchesSizeFilter(
+  entry: FileEntry,
+  range: SizeRange,
+  dirSizes: Record<string, number>,
+): boolean {
   let size: number;
   if (entry.is_dir) {
     // フォルダ: 計算済みならサイズで判定、未計算なら非表示
@@ -64,10 +95,14 @@ function matchesSizeFilter(entry: FileEntry, range: SizeRange, dirSizes: Record<
   const MB = 1024 * 1024;
   const GB = 1024 * MB;
   switch (range) {
-    case "small": return size < MB;
-    case "medium": return size >= MB && size < 100 * MB;
-    case "large": return size >= 100 * MB && size < GB;
-    case "huge": return size >= GB;
+    case "small":
+      return size < MB;
+    case "medium":
+      return size >= MB && size < 100 * MB;
+    case "large":
+      return size >= 100 * MB && size < GB;
+    case "huge":
+      return size >= GB;
   }
 }
 
@@ -77,7 +112,8 @@ function matchesModifiedFilter(entry: FileEntry, range: ModifiedRange): boolean 
   const modifiedMs = entry.modified * 1000;
 
   switch (range) {
-    case "today": return modifiedMs >= today.getTime();
+    case "today":
+      return modifiedMs >= today.getTime();
     case "yesterday": {
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
@@ -103,7 +139,11 @@ function matchesModifiedFilter(entry: FileEntry, range: ModifiedRange): boolean 
   }
 }
 
-export function applyFilters(entries: FileEntry[], filter: FilterState, dirSizes?: Record<string, number>): FileEntry[] {
+export function applyFilters(
+  entries: FileEntry[],
+  filter: FilterState,
+  dirSizes?: Record<string, number>,
+): FileEntry[] {
   if (filter.types.length === 0 && !filter.sizeRange && !filter.modifiedRange) return entries;
   return entries.filter((e) => {
     if (!matchesTypeFilter(e, filter.types)) return false;
@@ -455,7 +495,6 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       // フォルダサイズ計算: ディレクトリのパスを抽出してリクエスト
       const dirPaths = sorted.filter((e) => e.is_dir).map((e) => e.path);
       useDirSizeStore.getState().requestSizes(dirPaths);
-
     } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({

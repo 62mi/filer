@@ -1,5 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import { GOOGLE_DOCS_EXTENSIONS } from "../utils/previewConstants";
 

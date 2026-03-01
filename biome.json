@@ -35,7 +35,7 @@
         "noArrayIndexKey": "warn"
       },
       "complexity": {
-        "noImportantStyles": "warn"
+        "noImportantStyles": "off"
       },
       "style": {
         "noNonNullAssertion": "off",

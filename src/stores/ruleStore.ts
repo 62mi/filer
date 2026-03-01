@@ -260,9 +260,7 @@ export const useRuleStore = create<RuleStore>((set, get) => ({
         ),
       }));
     } catch (err: unknown) {
-      toast.error(
-        `ルール作成に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      toast.error(`ルール作成に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
     }
   },
 

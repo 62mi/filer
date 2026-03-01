@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useIconStore } from "../../stores/iconStore";
 import { getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
-import { extractGoogleDocsPaths, extractImagePaths, extractPdfPaths, extractPsdPaths, extractVideoPaths, useThumbnailStore } from "../../stores/thumbnailStore";
+import {
+  extractGoogleDocsPaths,
+  extractImagePaths,
+  extractPdfPaths,
+  extractPsdPaths,
+  extractVideoPaths,
+  useThumbnailStore,
+} from "../../stores/thumbnailStore";
 import type { FileEntry } from "../../types";
 import { GridCell } from "./GridCell";
 

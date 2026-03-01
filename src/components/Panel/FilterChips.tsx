@@ -6,9 +6,23 @@ import type { FileTypeCategory, FilterState, ModifiedRange, SizeRange } from "..
 import { cn } from "../../utils/cn";
 import { DropdownCheckItem, DropdownRadioItem, FilterDropdown } from "./FilterDropdown";
 
-const TYPE_CATEGORIES: FileTypeCategory[] = ["folder", "image", "video", "audio", "document", "archive"];
+const TYPE_CATEGORIES: FileTypeCategory[] = [
+  "folder",
+  "image",
+  "video",
+  "audio",
+  "document",
+  "archive",
+];
 const SIZE_RANGES: SizeRange[] = ["small", "medium", "large", "huge"];
-const MODIFIED_RANGES: ModifiedRange[] = ["today", "yesterday", "thisWeek", "thisMonth", "thisYear", "older"];
+const MODIFIED_RANGES: ModifiedRange[] = [
+  "today",
+  "yesterday",
+  "thisWeek",
+  "thisMonth",
+  "thisYear",
+  "older",
+];
 
 interface FilterChipsProps {
   filter: FilterState;
@@ -28,15 +42,13 @@ export function FilterChips({ filter }: FilterChipsProps) {
   }, []);
   const closeDropdown = useCallback(() => setOpenDropdown(null), []);
 
-  const hasActiveFilter = filter.types.length > 0 || filter.sizeRange !== null || filter.modifiedRange !== null;
+  const hasActiveFilter =
+    filter.types.length > 0 || filter.sizeRange !== null || filter.modifiedRange !== null;
 
-  const typeLabel = filter.types.length > 0
-    ? `${t.filter.type}(${filter.types.length})`
-    : t.filter.type;
+  const typeLabel =
+    filter.types.length > 0 ? `${t.filter.type}(${filter.types.length})` : t.filter.type;
 
-  const sizeLabel = filter.sizeRange
-    ? t.filter.sizes[filter.sizeRange]
-    : t.filter.size;
+  const sizeLabel = filter.sizeRange ? t.filter.sizes[filter.sizeRange] : t.filter.size;
 
   const modifiedLabel = filter.modifiedRange
     ? t.filter.modifiedRanges[filter.modifiedRange]
@@ -50,9 +62,13 @@ export function FilterChips({ filter }: FilterChipsProps) {
           label={typeLabel}
           active={filter.types.length > 0}
           onClick={() => toggleDropdown("type")}
-          onClear={filter.types.length > 0 ? () => {
-            for (const t of filter.types) toggleTypeFilter(t);
-          } : undefined}
+          onClear={
+            filter.types.length > 0
+              ? () => {
+                  for (const t of filter.types) toggleTypeFilter(t);
+                }
+              : undefined
+          }
         />
         <FilterDropdown open={openDropdown === "type"} onClose={closeDropdown}>
           {TYPE_CATEGORIES.map((cat) => (
@@ -166,7 +182,13 @@ function ChipButton({ label, active, onClick, onClear }: ChipButtonProps) {
 
 function ChevronIcon() {
   return (
-    <svg viewBox="0 0 12 12" className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg
+      viewBox="0 0 12 12"
+      className="w-3 h-3 opacity-60"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
       <path d="M3 5l3 3 3-3" />
     </svg>
   );

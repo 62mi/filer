@@ -14,9 +14,9 @@ import {
   X,
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useTranslation } from "../../i18n";
 import { useImageControls } from "../../hooks/useImageControls";
 import { usePreview } from "../../hooks/usePreview";
+import { useTranslation } from "../../i18n";
 import type { FileEntry } from "../../types";
 import { formatDate, formatFileSize } from "../../utils/format";
 import { CODE_EXTENSIONS } from "../../utils/previewConstants";
@@ -232,7 +232,11 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
         if (entry.extension === "md" || entry.extension === "mdx") {
           return (
             <div className="w-full max-w-3xl max-h-[70vh] overflow-auto p-4">
-              <Suspense fallback={<pre className="text-xs font-mono whitespace-pre-wrap">{preview.textContent}</pre>}>
+              <Suspense
+                fallback={
+                  <pre className="text-xs font-mono whitespace-pre-wrap">{preview.textContent}</pre>
+                }
+              >
                 <MarkdownPreview content={preview.textContent} />
               </Suspense>
             </div>
@@ -241,7 +245,13 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
         if (CODE_EXTENSIONS.has(entry.extension)) {
           return (
             <div className="w-full max-w-4xl max-h-[70vh] overflow-auto">
-              <Suspense fallback={<pre className="text-xs font-mono whitespace-pre-wrap p-4">{preview.textContent}</pre>}>
+              <Suspense
+                fallback={
+                  <pre className="text-xs font-mono whitespace-pre-wrap p-4">
+                    {preview.textContent}
+                  </pre>
+                }
+              >
                 <CodePreview content={preview.textContent} extension={entry.extension} />
               </Suspense>
             </div>
