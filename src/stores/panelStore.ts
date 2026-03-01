@@ -210,6 +210,7 @@ interface ExplorerStore {
   // Shared state
   showHidden: boolean;
   clipboard: ClipboardData | null;
+  cursorVisible: boolean;
 
   // Tab actions
   addTab: (path?: string, background?: boolean) => void;
@@ -232,6 +233,7 @@ interface ExplorerStore {
 
   // Selection
   setCursor: (index: number) => void;
+  setCursorVisible: (visible: boolean) => void;
   toggleSelection: (index: number) => void;
   selectRange: (fromIndex: number, toIndex: number) => void;
   selectAll: () => void;
@@ -296,6 +298,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   activeTabId: initialTab.id,
   showHidden: false,
   clipboard: null,
+  cursorVisible: true,
   stackItems: [],
 
   getActiveTab: () => {
@@ -523,6 +526,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         cursorIndex: Math.max(0, Math.min(index, len - 1)),
       })),
     }));
+  },
+
+  setCursorVisible: (visible) => {
+    set({ cursorVisible: visible });
   },
 
   toggleSelection: (index) => {
