@@ -114,6 +114,8 @@ const iconMap: Record<string, React.ComponentType<LucideProps>> = {
   wma: FileAudio,
   m4a: FileAudio,
   opus: FileAudio,
+  // PSD
+  psd: FileImage,
   // フォント
   ttf: FileType,
   otf: FileType,

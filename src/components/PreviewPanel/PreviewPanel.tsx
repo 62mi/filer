@@ -23,6 +23,15 @@ import { FontPreview } from "../FontPreview";
 const PdfViewer = lazy(() =>
   import("../PdfViewer/PdfViewer").then((m) => ({ default: m.PdfViewer })),
 );
+const MarkdownPreview = lazy(() =>
+  import("../MarkdownPreview/MarkdownPreview").then((m) => ({ default: m.MarkdownPreview })),
+);
+const CodePreview = lazy(() =>
+  import("../CodePreview/CodePreview").then((m) => ({ default: m.CodePreview })),
+);
+const PsdPreview = lazy(() =>
+  import("../PsdPreview/PsdPreview").then((m) => ({ default: m.PsdPreview })),
+);
 
 interface PreviewPanelProps {
   entry: FileEntry | null;
@@ -50,6 +59,8 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
         return <FileAudio className="w-3.5 h-3.5 text-[#666]" />;
       case "font":
         return <FileType className="w-3.5 h-3.5 text-[#666]" />;
+      case "psd":
+        return <Image className="w-3.5 h-3.5 text-[#666]" />;
       case "text":
         return CODE_EXTENSIONS.has(e.extension) ? (
           <FileCode className="w-3.5 h-3.5 text-[#666]" />
@@ -117,14 +128,53 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
                 Loading...
               </div>
             ) : preview.textContent !== null ? (
-              <pre className="flex-1 text-xs text-[#333] bg-[#f8f8f8] rounded p-2 overflow-auto whitespace-pre-wrap break-all font-mono border border-[#e5e5e5]">
-                {preview.textContent}
-              </pre>
+              (e.extension === "md" || e.extension === "mdx") ? (
+                <div className="flex-1 overflow-auto">
+                  <Suspense fallback={<pre className="text-xs font-mono whitespace-pre-wrap p-2">{preview.textContent}</pre>}>
+                    <MarkdownPreview content={preview.textContent} />
+                  </Suspense>
+                </div>
+              ) : CODE_EXTENSIONS.has(e.extension) ? (
+                <div className="flex-1 overflow-auto">
+                  <Suspense fallback={<pre className="text-xs font-mono whitespace-pre-wrap p-2">{preview.textContent}</pre>}>
+                    <CodePreview content={preview.textContent} extension={e.extension} fontSize={11} />
+                  </Suspense>
+                </div>
+              ) : (
+                <pre className="flex-1 text-xs text-[#333] bg-[#f8f8f8] rounded p-2 overflow-auto whitespace-pre-wrap break-all font-mono border border-[#e5e5e5]">
+                  {preview.textContent}
+                </pre>
+              )
             ) : (
               <div className="flex-1 flex items-center justify-center text-xs text-[#999]">
                 Unable to preview
               </div>
             )}
+          </div>
+        );
+
+      case "psd":
+        return (
+          <div className="flex flex-col items-center">
+            {preview.imageUrl ? (
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center h-32 text-xs text-[#999]">
+                    Loading PSD...
+                  </div>
+                }
+              >
+                <PsdPreview url={preview.imageUrl} name={e.name} maxHeight="400px" />
+              </Suspense>
+            ) : (
+              <div className="flex items-center justify-center h-32 text-xs text-[#999]">
+                Unable to load PSD
+              </div>
+            )}
+            <div className="mt-3 text-xs text-[#666] text-center space-y-0.5">
+              <div className="font-medium text-[#1a1a1a]">{e.name}</div>
+              <div>{formatFileSize(e.size)}</div>
+            </div>
           </div>
         );
 

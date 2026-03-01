@@ -24,6 +24,15 @@ import { FontPreview } from "../FontPreview";
 const PdfViewer = lazy(() =>
   import("../PdfViewer/PdfViewer").then((m) => ({ default: m.PdfViewer })),
 );
+const MarkdownPreview = lazy(() =>
+  import("../MarkdownPreview/MarkdownPreview").then((m) => ({ default: m.MarkdownPreview })),
+);
+const CodePreview = lazy(() =>
+  import("../CodePreview/CodePreview").then((m) => ({ default: m.CodePreview })),
+);
+const PsdPreview = lazy(() =>
+  import("../PsdPreview/PsdPreview").then((m) => ({ default: m.PsdPreview })),
+);
 
 /** 長押しとみなす閾値(ms) */
 const LONG_PRESS_MS = 200;
@@ -135,6 +144,8 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
         return <FileAudio className="w-4 h-4 text-[#666] shrink-0" />;
       case "font":
         return <FileType className="w-4 h-4 text-[#666] shrink-0" />;
+      case "psd":
+        return <Image className="w-4 h-4 text-[#666] shrink-0" />;
       case "text":
         return CODE_EXTENSIONS.has(entry.extension) ? (
           <FileCode className="w-4 h-4 text-[#666] shrink-0" />
@@ -183,10 +194,43 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
         ) : null;
 
       case "text":
-        return preview.textContent !== null ? (
+        if (preview.textContent === null) return null;
+        if (entry.extension === "md" || entry.extension === "mdx") {
+          return (
+            <div className="w-full max-w-3xl max-h-[70vh] overflow-auto p-4">
+              <Suspense fallback={<pre className="text-xs font-mono whitespace-pre-wrap">{preview.textContent}</pre>}>
+                <MarkdownPreview content={preview.textContent} />
+              </Suspense>
+            </div>
+          );
+        }
+        if (CODE_EXTENSIONS.has(entry.extension)) {
+          return (
+            <div className="w-full max-w-4xl max-h-[70vh] overflow-auto">
+              <Suspense fallback={<pre className="text-xs font-mono whitespace-pre-wrap p-4">{preview.textContent}</pre>}>
+                <CodePreview content={preview.textContent} extension={entry.extension} />
+              </Suspense>
+            </div>
+          );
+        }
+        return (
           <pre className="w-full h-full text-xs text-[#333] bg-[#f8f8f8] rounded-lg p-4 overflow-auto whitespace-pre-wrap break-all font-mono border border-[#e5e5e5] leading-relaxed">
             {preview.textContent}
           </pre>
+        );
+
+      case "psd":
+        return preview.imageUrl ? (
+          <Suspense
+            fallback={
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-6 h-6 border-2 border-[#0078d4] border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-[#999]">Loading PSD...</span>
+              </div>
+            }
+          >
+            <PsdPreview url={preview.imageUrl} name={entry.name} />
+          </Suspense>
         ) : null;
 
       case "video":

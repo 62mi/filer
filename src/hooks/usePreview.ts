@@ -128,6 +128,16 @@ export function usePreview(
         break;
       }
 
+      case "psd": {
+        const url = convertFileSrc(path);
+        setState((s) => ({
+          ...s,
+          loading: false,
+          imageUrl: url,
+        }));
+        break;
+      }
+
       case "pdf": {
         const url = convertFileSrc(path);
         setState((s) => ({

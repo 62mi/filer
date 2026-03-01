@@ -96,6 +96,9 @@ export const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "flac", "ogg", "aac", "wm
 /** フォントファイル */
 export const FONT_EXTENSIONS = new Set(["ttf", "otf", "woff", "woff2"]);
 
+/** PSDファイル */
+export const PSD_EXTENSIONS = new Set(["psd"]);
+
 export const PDF_EXTENSIONS = new Set(["pdf"]);
 
 /** Google Docs系ショートカットファイル */
@@ -155,6 +158,7 @@ export type PreviewType =
   | "videoThumbnail"
   | "audio"
   | "font"
+  | "psd"
   | "pdf"
   | "googleDocs"
   | "unsupported";
@@ -167,6 +171,7 @@ export function getPreviewType(extension: string): PreviewType {
   if (VIDEO_THUMBNAIL_EXTENSIONS.has(ext)) return "videoThumbnail";
   if (AUDIO_EXTENSIONS.has(ext)) return "audio";
   if (FONT_EXTENSIONS.has(ext)) return "font";
+  if (PSD_EXTENSIONS.has(ext)) return "psd";
   if (PDF_EXTENSIONS.has(ext)) return "pdf";
   if (GOOGLE_DOCS_EXTENSIONS.has(ext)) return "googleDocs";
   return "unsupported";
