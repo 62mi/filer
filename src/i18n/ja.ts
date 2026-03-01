@@ -68,6 +68,38 @@ export const ja = {
     settingsTooltip: "設定 (Ctrl+,)",
   },
 
+  // ── フィルタチップ ──
+  filter: {
+    type: "種類",
+    size: "サイズ",
+    modified: "更新日",
+    clear: "クリア",
+    types: {
+      folder: "フォルダ",
+      image: "画像",
+      video: "動画",
+      audio: "音声",
+      document: "ドキュメント",
+      archive: "アーカイブ",
+    } as Record<string, string>,
+    sizes: {
+      small: "小 (1MB未満)",
+      medium: "中 (1MB〜100MB)",
+      large: "大 (100MB〜1GB)",
+      huge: "特大 (1GB以上)",
+    } as Record<string, string>,
+    modifiedRanges: {
+      today: "今日",
+      yesterday: "昨日",
+      thisWeek: "今週",
+      thisMonth: "今月",
+      thisYear: "今年",
+      older: "それ以前",
+    } as Record<string, string>,
+    filtered: "件中",
+    shown: "件表示",
+  },
+
   // ── ステータスバー ──
   statusBar: {
     items: "項目",

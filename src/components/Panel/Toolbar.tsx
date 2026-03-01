@@ -3,13 +3,14 @@ import { useTranslation } from "../../i18n";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { cn } from "../../utils/cn";
+import { FilterChips } from "./FilterChips";
 
 export function Toolbar() {
   const t = useTranslation();
-  const viewMode = useExplorerStore((s) => {
-    const tab = s.tabs.find((t) => t.id === s.activeTabId) || s.tabs[0];
-    return tab.viewMode;
-  });
+  const tab = useExplorerStore((s) => s.tabs.find((t) => t.id === s.activeTabId) || s.tabs[0]);
+  const viewMode = tab.viewMode;
+  const filter = tab.filter;
+  const isSearching = tab.searchResults !== null;
   const setViewMode = useExplorerStore((s) => s.setViewMode);
   const toolbarHeight = useSettingsStore((s) => s.toolbarHeight);
   const uiFontSize = useSettingsStore((s) => s.uiFontSize);
@@ -50,6 +51,13 @@ export function Toolbar() {
       >
         <LayoutGrid className="w-[18px] h-[18px]" />
       </button>
+      {/* フィルタチップ: 検索中は非表示 */}
+      {!isSearching && (
+        <>
+          <div className="w-px h-5 bg-[#d0d0d0] mx-1" />
+          <FilterChips filter={filter} />
+        </>
+      )}
       <div className="flex-1" />
       <button
         className="flex items-center justify-center w-8 h-8 rounded text-[#888] hover:bg-[#e8e8e8] transition-colors"
