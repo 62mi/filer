@@ -4,6 +4,7 @@ import {
   FileAudio,
   FileCode,
   FileText,
+  FileType,
   FileVideo,
   Globe,
   Image,
@@ -17,6 +18,7 @@ import { usePreview } from "../../hooks/usePreview";
 import type { FileEntry } from "../../types";
 import { formatDate, formatFileSize } from "../../utils/format";
 import { CODE_EXTENSIONS } from "../../utils/previewConstants";
+import { FontPreview } from "../FontPreview";
 
 const PdfViewer = lazy(() =>
   import("../PdfViewer/PdfViewer").then((m) => ({ default: m.PdfViewer })),
@@ -46,6 +48,8 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
         return <FileVideo className="w-3.5 h-3.5 text-[#666]" />;
       case "audio":
         return <FileAudio className="w-3.5 h-3.5 text-[#666]" />;
+      case "font":
+        return <FileType className="w-3.5 h-3.5 text-[#666]" />;
       case "text":
         return CODE_EXTENSIONS.has(e.extension) ? (
           <FileCode className="w-3.5 h-3.5 text-[#666]" />
@@ -187,6 +191,23 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
               <div className="font-medium text-[#1a1a1a]">{e.name}</div>
               <div>{formatFileSize(e.size)}</div>
             </div>
+          </div>
+        );
+
+      case "font":
+        return (
+          <div className="flex flex-col h-full overflow-auto">
+            <div className="flex items-center gap-1 mb-2">
+              <FileType className="w-3.5 h-3.5 text-[#666]" />
+              <span className="text-xs font-medium text-[#1a1a1a] truncate">{e.name}</span>
+            </div>
+            {preview.fontUrl ? (
+              <FontPreview url={preview.fontUrl} name={e.name} compact />
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-xs text-[#999]">
+                Unable to load font
+              </div>
+            )}
           </div>
         );
 

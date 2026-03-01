@@ -2,6 +2,8 @@ export const IMAGE_EXTENSIONS = new Set([
   "png",
   "jpg",
   "jpeg",
+  "jpe",
+  "jfif",
   "gif",
   "svg",
   "webp",
@@ -10,11 +12,14 @@ export const IMAGE_EXTENSIONS = new Set([
   "avif",
   "tiff",
   "tif",
+  "apng",
+  "cur",
 ]);
 
 export const TEXT_EXTENSIONS = new Set([
   "txt",
   "md",
+  "mdx",
   "log",
   "csv",
   "json",
@@ -24,6 +29,14 @@ export const TEXT_EXTENSIONS = new Set([
   "toml",
   "ini",
   "cfg",
+  "conf",
+  "properties",
+  "editorconfig",
+  "env",
+  "gitignore",
+  "gitattributes",
+  "dockerfile",
+  // 言語
   "ts",
   "tsx",
   "js",
@@ -47,18 +60,41 @@ export const TEXT_EXTENSIONS = new Set([
   "php",
   "sql",
   "graphql",
-  "env",
-  "gitignore",
-  "dockerfile",
+  "vue",
+  "svelte",
+  "astro",
+  "swift",
+  "kt",
+  "kts",
+  "dart",
+  "r",
+  "lua",
+  "zig",
+  "scala",
+  "ex",
+  "exs",
+  "clj",
+  "cs",
+  "fs",
+  "proto",
+  "makefile",
+  "cmake",
+  "diff",
+  "patch",
+  "tf",
+  "hcl",
 ]);
 
 /** HTML5 <video> で直接再生できる形式 */
 export const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "ogv"]);
 
 /** FFmpegサムネイル抽出が必要な動画形式 */
-export const VIDEO_THUMBNAIL_EXTENSIONS = new Set(["mkv", "avi", "mov"]);
+export const VIDEO_THUMBNAIL_EXTENSIONS = new Set(["mkv", "avi", "mov", "wmv", "flv", "m4v", "3gp"]);
 
-export const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "flac", "ogg", "aac", "wma"]);
+export const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "flac", "ogg", "aac", "wma", "m4a", "opus"]);
+
+/** フォントファイル */
+export const FONT_EXTENSIONS = new Set(["ttf", "otf", "woff", "woff2"]);
 
 export const PDF_EXTENSIONS = new Set(["pdf"]);
 
@@ -66,7 +102,51 @@ export const PDF_EXTENSIONS = new Set(["pdf"]);
 export const GOOGLE_DOCS_EXTENSIONS = new Set(["gdoc", "gsheet", "gslides"]);
 
 /** コードファイルかどうか判定する拡張子 */
-export const CODE_EXTENSIONS = new Set(["ts", "tsx", "js", "jsx", "rs", "py", "html", "css"]);
+export const CODE_EXTENSIONS = new Set([
+  "ts",
+  "tsx",
+  "js",
+  "jsx",
+  "rs",
+  "py",
+  "html",
+  "css",
+  "scss",
+  "less",
+  "sh",
+  "bat",
+  "ps1",
+  "c",
+  "cpp",
+  "h",
+  "hpp",
+  "java",
+  "go",
+  "rb",
+  "php",
+  "sql",
+  "graphql",
+  "vue",
+  "svelte",
+  "astro",
+  "swift",
+  "kt",
+  "kts",
+  "dart",
+  "r",
+  "lua",
+  "zig",
+  "scala",
+  "ex",
+  "exs",
+  "clj",
+  "cs",
+  "fs",
+  "proto",
+  "makefile",
+  "cmake",
+  "dockerfile",
+]);
 
 export type PreviewType =
   | "image"
@@ -74,6 +154,7 @@ export type PreviewType =
   | "video"
   | "videoThumbnail"
   | "audio"
+  | "font"
   | "pdf"
   | "googleDocs"
   | "unsupported";
@@ -85,6 +166,7 @@ export function getPreviewType(extension: string): PreviewType {
   if (VIDEO_EXTENSIONS.has(ext)) return "video";
   if (VIDEO_THUMBNAIL_EXTENSIONS.has(ext)) return "videoThumbnail";
   if (AUDIO_EXTENSIONS.has(ext)) return "audio";
+  if (FONT_EXTENSIONS.has(ext)) return "font";
   if (PDF_EXTENSIONS.has(ext)) return "pdf";
   if (GOOGLE_DOCS_EXTENSIONS.has(ext)) return "googleDocs";
   return "unsupported";

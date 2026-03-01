@@ -4,6 +4,7 @@ import {
   FileAudio,
   FileCode,
   FileText,
+  FileType,
   FileVideo,
   Folder,
   Globe,
@@ -18,6 +19,7 @@ import { usePreview } from "../../hooks/usePreview";
 import type { FileEntry } from "../../types";
 import { formatDate, formatFileSize } from "../../utils/format";
 import { CODE_EXTENSIONS } from "../../utils/previewConstants";
+import { FontPreview } from "../FontPreview";
 
 const PdfViewer = lazy(() =>
   import("../PdfViewer/PdfViewer").then((m) => ({ default: m.PdfViewer })),
@@ -131,6 +133,8 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
         return <FileVideo className="w-4 h-4 text-[#666] shrink-0" />;
       case "audio":
         return <FileAudio className="w-4 h-4 text-[#666] shrink-0" />;
+      case "font":
+        return <FileType className="w-4 h-4 text-[#666] shrink-0" />;
       case "text":
         return CODE_EXTENSIONS.has(entry.extension) ? (
           <FileCode className="w-4 h-4 text-[#666] shrink-0" />
@@ -226,6 +230,13 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
             <div className="text-xs mt-3 text-[#bbb]">FFmpeg required for preview</div>
           </div>
         );
+
+      case "font":
+        return preview.fontUrl ? (
+          <div className="w-full max-w-2xl overflow-auto max-h-[70vh] p-4">
+            <FontPreview url={preview.fontUrl} name={entry.name} />
+          </div>
+        ) : null;
 
       case "pdf":
         return preview.pdfUrl ? (

@@ -22,6 +22,8 @@ export interface PreviewState {
   googleDocsOriginalUrl: string | null;
   /** Google Docsファイルの読み込みに失敗したか（仮想FS等） */
   googleDocsReadFailed: boolean;
+  /** convertFileSrc URL（フォント） */
+  fontUrl: string | null;
 }
 
 const INITIAL_STATE: PreviewState = {
@@ -35,6 +37,7 @@ const INITIAL_STATE: PreviewState = {
   googleDocsUrl: null,
   googleDocsOriginalUrl: null,
   googleDocsReadFailed: false,
+  fontUrl: null,
 };
 
 export function usePreview(
@@ -112,6 +115,16 @@ export function usePreview(
           .catch(() => {
             if (!cancelled) setState((s) => ({ ...s, loading: false }));
           });
+        break;
+      }
+
+      case "font": {
+        const url = convertFileSrc(path);
+        setState((s) => ({
+          ...s,
+          loading: false,
+          fontUrl: url,
+        }));
         break;
       }
 
