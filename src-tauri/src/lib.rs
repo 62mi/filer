@@ -131,7 +131,7 @@ pub fn run() {
                     .unwrap_or_else(|_| {
                         app.default_window_icon()
                             .cloned()
-                            .unwrap_or_else(|| tauri::image::Image::new(vec![0; 4].as_slice(), 1, 1))
+                            .unwrap_or_else(|| tauri::image::Image::new(&[0u8, 0, 0, 0], 1, 1))
                     });
 
             TrayIconBuilder::new()
