@@ -100,26 +100,37 @@ async function renderPdfThumbnail(filePath: string, size: number): Promise<strin
   return dataUrl;
 }
 
-/** PSDをag-psdでパースしてサムネイルdataURLを返す。CMYK等はFFmpegフォールバック */
+/** canvasからサムネイルdataURLを生成 */
+function canvasToThumbnail(source: HTMLCanvasElement, size: number): string {
+  const scale = size / Math.max(source.width, source.height);
+  const w = Math.round(source.width * scale);
+  const h = Math.round(source.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context not available");
+  ctx.drawImage(source, 0, 0, w, h);
+  return canvas.toDataURL("image/png");
+}
+
+/** PSD/PSBをag-psdでパースしてサムネイルdataURLを返す。CMYK等はFFmpegフォールバック */
 async function renderPsdThumbnail(filePath: string, size: number): Promise<string> {
-  // 1) ag-psdで試す（RGB対応）
+  // 1) ag-psdで試す
   try {
     const { readPsd } = await import("ag-psd");
     const url = convertFileSrc(filePath);
     const res = await fetch(url);
     const buffer = await res.arrayBuffer();
     const psd = readPsd(new Uint8Array(buffer), { skipLayerImageData: true });
+    // composite image優先
     if (psd.canvas) {
-      const scale = size / Math.max(psd.canvas.width, psd.canvas.height);
-      const w = Math.round(psd.canvas.width * scale);
-      const h = Math.round(psd.canvas.height * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas context not available");
-      ctx.drawImage(psd.canvas, 0, 0, w, h);
-      return canvas.toDataURL("image/png");
+      return canvasToThumbnail(psd.canvas, size);
+    }
+    // 埋め込みサムネイルにフォールバック（PSBでcomposite生成失敗時など）
+    const thumb = psd.imageResources?.thumbnail;
+    if (thumb) {
+      return canvasToThumbnail(thumb, size);
     }
   } catch {
     // ag-psd失敗 → FFmpegフォールバック

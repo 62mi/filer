@@ -28,9 +28,11 @@ export function PsdPreview({ url, filePath, name, maxHeight = "70vh" }: PsdPrevi
         if (cancelled) return;
 
         const psd = readPsd(new Uint8Array(buffer), { skipLayerImageData: true });
-        if (psd.canvas) {
+        // composite image優先、なければ埋め込みサムネイル（PSBでcomposite生成失敗時など）
+        const canvas = psd.canvas ?? psd.imageResources?.thumbnail;
+        if (canvas) {
           await new Promise<void>((resolve, reject) => {
-            psd.canvas!.toBlob((blob) => {
+            canvas.toBlob((blob) => {
               if (cancelled || !blob) {
                 reject(new Error("toBlob failed"));
                 return;
