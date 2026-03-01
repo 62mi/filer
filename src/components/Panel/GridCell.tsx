@@ -145,7 +145,7 @@ export const GridCell = memo(function GridCell({
   );
 
   // Icon size scales with gridIconSize
-  const iconDisplaySize = Math.max(24, Math.min(gridIconSize * 0.6, 64));
+  const iconDisplaySize = Math.max(24, Math.min(gridIconSize * 0.75, 96));
 
   return (
     <div
