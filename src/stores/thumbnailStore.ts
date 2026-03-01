@@ -106,7 +106,7 @@ async function renderPsdThumbnail(filePath: string, size: number): Promise<strin
   const url = convertFileSrc(filePath);
   const res = await fetch(url);
   const buffer = await res.arrayBuffer();
-  const psd = readPsd(new Uint8Array(buffer));
+  const psd = readPsd(new Uint8Array(buffer), { skipLayerImageData: true });
   if (!psd.canvas) throw new Error("PSD has no merged image");
 
   // サイズ調整

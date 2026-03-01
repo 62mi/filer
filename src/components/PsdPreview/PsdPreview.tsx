@@ -8,7 +8,7 @@ interface PsdPreviewProps {
 
 export function PsdPreview({ url, name, maxHeight = "70vh" }: PsdPreviewProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,20 +19,32 @@ export function PsdPreview({ url, name, maxHeight = "70vh" }: PsdPreviewProps) {
       try {
         const { readPsd } = await import("ag-psd");
         const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`fetch failed: ${res.status}`);
+        }
         const buffer = await res.arrayBuffer();
         if (cancelled) return;
 
-        const psd = readPsd(new Uint8Array(buffer));
-        if (!psd.canvas || cancelled) {
-          setError(true);
-          setLoading(false);
-          return;
+        const psd = readPsd(new Uint8Array(buffer), {
+          skipLayerImageData: true,
+        });
+
+        if (!psd.canvas) {
+          // canvasが生成されなかった場合の詳細情報
+          const info = [
+            `colorMode: ${psd.colorMode}`,
+            `size: ${psd.width}x${psd.height}`,
+            `bitsPerChannel: ${psd.bitsPerChannel}`,
+            `channels: ${psd.channels}`,
+          ].join(", ");
+          throw new Error(`No composite image (${info})`);
         }
+        if (cancelled) return;
 
         psd.canvas.toBlob((blob) => {
           if (cancelled || !blob) {
             if (!cancelled) {
-              setError(true);
+              setError("Failed to convert canvas to blob");
               setLoading(false);
             }
             return;
@@ -41,9 +53,9 @@ export function PsdPreview({ url, name, maxHeight = "70vh" }: PsdPreviewProps) {
           setImageUrl(objectUrl);
           setLoading(false);
         });
-      } catch {
+      } catch (err: unknown) {
         if (!cancelled) {
-          setError(true);
+          setError(err instanceof Error ? err.message : String(err));
           setLoading(false);
         }
       }
@@ -65,7 +77,14 @@ export function PsdPreview({ url, name, maxHeight = "70vh" }: PsdPreviewProps) {
   }
 
   if (error || !imageUrl) {
-    return <div className="text-xs text-[#999] text-center">Unable to load PSD</div>;
+    return (
+      <div className="text-center">
+        <div className="text-xs text-[#999]">Unable to load PSD</div>
+        {error && (
+          <div className="text-[10px] text-[#bbb] mt-1 max-w-xs mx-auto break-all">{error}</div>
+        )}
+      </div>
+    );
   }
 
   return (
