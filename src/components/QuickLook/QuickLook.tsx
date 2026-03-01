@@ -231,7 +231,7 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
         if (preview.textContent === null) return null;
         if (entry.extension === "md" || entry.extension === "mdx") {
           return (
-            <div className="w-full max-w-3xl max-h-[70vh] overflow-auto p-4">
+            <div className="w-full max-w-5xl max-h-[70vh] overflow-auto p-4">
               <Suspense
                 fallback={
                   <pre className="text-xs font-mono whitespace-pre-wrap">{preview.textContent}</pre>
@@ -244,7 +244,7 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
         }
         if (CODE_EXTENSIONS.has(entry.extension)) {
           return (
-            <div className="w-full max-w-4xl max-h-[70vh] overflow-auto">
+            <div className="w-full max-w-6xl max-h-[70vh] overflow-auto">
               <Suspense
                 fallback={
                   <pre className="text-xs font-mono whitespace-pre-wrap p-4">
@@ -463,7 +463,7 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
       onClick={handleClose}
     >
       <div
-        className={`relative bg-white/95 backdrop-blur-sm rounded-xl shadow-2xl max-w-[80vw] max-h-[80vh] min-w-[420px] min-h-[320px] flex flex-col overflow-hidden ${
+        className={`relative bg-white/95 backdrop-blur-sm rounded-xl shadow-2xl max-w-[90vw] max-h-[85vh] min-w-[420px] min-h-[320px] flex flex-col overflow-hidden ${
           closing ? "animate-quicklook-spring-out" : "animate-quicklook-spring"
         }`}
         style={{ boxShadow: "0 25px 60px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)" }}

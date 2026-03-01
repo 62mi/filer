@@ -168,7 +168,7 @@ function App() {
       setSidebarWidth(newWidth);
     }
     if (previewDragging) {
-      const newWidth = Math.max(200, Math.min(500, window.innerWidth - e.clientX));
+      const newWidth = Math.max(200, Math.min(800, window.innerWidth - e.clientX));
       setPreviewWidth(newWidth);
     }
   };
