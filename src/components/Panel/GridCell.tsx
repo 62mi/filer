@@ -136,6 +136,9 @@ export const GridCell = memo(function GridCell({
   const largeIcon = useIconStore(
     (s) => s.largeIcons[entry.is_dir ? "__directory__" : entry.extension],
   );
+  const smallIcon = useIconStore(
+    (s) => (hasThumbnailMedia ? s.icons[entry.extension] : undefined),
+  );
 
   // Icon size scales with gridIconSize
   const iconDisplaySize = Math.max(24, Math.min(gridIconSize * 0.6, 64));
@@ -218,23 +221,34 @@ export const GridCell = memo(function GridCell({
       )}
       {/* Icon / Thumbnail area */}
       <div
-        className="flex items-center justify-center shrink-0"
+        className="relative flex items-center justify-center shrink-0"
         style={{ width: gridIconSize, height: gridIconSize }}
       >
         {hasThumbnailMedia && thumbnail ? (
-          <img
-            src={thumbnail}
-            alt=""
-            className="rounded-sm"
-            style={{
-              maxWidth: gridIconSize,
-              maxHeight: gridIconSize,
-              objectFit: "contain",
-              filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.2))",
-            }}
-            draggable={false}
-            onError={isGoogleDocs ? () => removeThumbnail(entry.path, THUMB_SIZE) : undefined}
-          />
+          <>
+            <img
+              src={thumbnail}
+              alt=""
+              className="rounded-sm"
+              style={{
+                maxWidth: gridIconSize,
+                maxHeight: gridIconSize,
+                objectFit: "contain",
+                filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.2))",
+              }}
+              draggable={false}
+              onError={isGoogleDocs ? () => removeThumbnail(entry.path, THUMB_SIZE) : undefined}
+            />
+            {smallIcon && (
+              <img
+                src={smallIcon}
+                alt=""
+                className="absolute bottom-0 right-0 w-4 h-4"
+                style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}
+                draggable={false}
+              />
+            )}
+          </>
         ) : largeIcon ? (
           <img
             src={largeIcon}
