@@ -1,6 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
-import type { FileEntry, SortKey, SortOrder, TidinessScore } from "../types";
+import type {
+  FileEntry,
+  FileTypeCategory,
+  FilterState,
+  ModifiedRange,
+  SizeRange,
+  SortKey,
+  SortOrder,
+  TidinessScore,
+} from "../types";
 import { useCopyQueueStore } from "./copyQueueStore";
 import { useDirSizeStore } from "./dirSizeStore";
 import { toast } from "./toastStore";
@@ -22,6 +31,90 @@ function getExtension(filePath: string): string {
   const sep = normalized.lastIndexOf("\\");
   return dot > sep ? normalized.substring(dot + 1).toLowerCase() : "";
 }
+
+// フィルタチップ: カテゴリ判定マップ
+const FILE_TYPE_MAP: Record<Exclude<FileTypeCategory, "folder">, Set<string>> = {
+  image: new Set(["png","jpg","jpeg","gif","bmp","webp","svg","ico","tiff","tif","psd","psb","ai"]),
+  video: new Set(["mp4","avi","mkv","mov","wmv","flv","webm","m4v"]),
+  audio: new Set(["mp3","wav","flac","aac","ogg","wma","m4a"]),
+  document: new Set(["pdf","doc","docx","xls","xlsx","ppt","pptx","txt","md","csv","rtf","html"]),
+  archive: new Set(["zip","rar","7z","tar","gz","bz2","lzh"]),
+};
+
+function matchesTypeFilter(entry: FileEntry, types: FileTypeCategory[]): boolean {
+  if (types.length === 0) return true;
+  for (const cat of types) {
+    if (cat === "folder") {
+      if (entry.is_dir) return true;
+    } else if (!entry.is_dir && FILE_TYPE_MAP[cat].has(entry.extension.toLowerCase())) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function matchesSizeFilter(entry: FileEntry, range: SizeRange, dirSizes: Record<string, number>): boolean {
+  let size: number;
+  if (entry.is_dir) {
+    // フォルダ: 計算済みならサイズで判定、未計算なら非表示
+    if (!(entry.path in dirSizes)) return false;
+    size = dirSizes[entry.path];
+  } else {
+    size = entry.size;
+  }
+  const MB = 1024 * 1024;
+  const GB = 1024 * MB;
+  switch (range) {
+    case "small": return size < MB;
+    case "medium": return size >= MB && size < 100 * MB;
+    case "large": return size >= 100 * MB && size < GB;
+    case "huge": return size >= GB;
+  }
+}
+
+function matchesModifiedFilter(entry: FileEntry, range: ModifiedRange): boolean {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const modifiedMs = entry.modified * 1000;
+
+  switch (range) {
+    case "today": return modifiedMs >= today.getTime();
+    case "yesterday": {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return modifiedMs >= yesterday.getTime() && modifiedMs < today.getTime();
+    }
+    case "thisWeek": {
+      const weekStart = new Date(today);
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+      return modifiedMs >= weekStart.getTime();
+    }
+    case "thisMonth": {
+      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      return modifiedMs >= monthStart.getTime();
+    }
+    case "thisYear": {
+      const yearStart = new Date(today.getFullYear(), 0, 1);
+      return modifiedMs >= yearStart.getTime();
+    }
+    case "older": {
+      const yearStart = new Date(today.getFullYear(), 0, 1);
+      return modifiedMs < yearStart.getTime();
+    }
+  }
+}
+
+export function applyFilters(entries: FileEntry[], filter: FilterState, dirSizes?: Record<string, number>): FileEntry[] {
+  if (filter.types.length === 0 && !filter.sizeRange && !filter.modifiedRange) return entries;
+  return entries.filter((e) => {
+    if (!matchesTypeFilter(e, filter.types)) return false;
+    if (filter.sizeRange && !matchesSizeFilter(e, filter.sizeRange, dirSizes ?? {})) return false;
+    if (filter.modifiedRange && !matchesModifiedFilter(e, filter.modifiedRange)) return false;
+    return true;
+  });
+}
+
+export const DEFAULT_FILTER: FilterState = { types: [], sizeRange: null, modifiedRange: null };
 
 function sortEntries(entries: FileEntry[], key: SortKey, order: SortOrder): FileEntry[] {
   const dirSizes = useDirSizeStore.getState().sizes;
@@ -85,6 +178,7 @@ interface TabState {
   searching: boolean;
   viewMode: "details" | "icons";
   tidinessScore: TidinessScore | null;
+  filter: FilterState;
 }
 
 function createTabState(path: string): TabState {
@@ -107,6 +201,7 @@ function createTabState(path: string): TabState {
     searching: false,
     viewMode: "details",
     tidinessScore: null,
+    filter: { ...DEFAULT_FILTER },
   };
 }
 
@@ -161,6 +256,12 @@ interface ExplorerStore {
 
   // View mode
   setViewMode: (mode: "details" | "icons") => void;
+
+  // Filter chips
+  toggleTypeFilter: (type: FileTypeCategory) => void;
+  setSizeFilter: (range: SizeRange | null) => void;
+  setModifiedFilter: (range: ModifiedRange | null) => void;
+  clearFilters: () => void;
 
   // Search
   search: (query: string) => Promise<void>;
@@ -767,6 +868,51 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     set((s) => ({
       tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
         renamingIndex: null,
+      })),
+    }));
+  },
+
+  // Filter chips
+  toggleTypeFilter: (type) => {
+    const tab = get().getActiveTab();
+    const types = tab.filter.types.includes(type)
+      ? tab.filter.types.filter((t) => t !== type)
+      : [...tab.filter.types, type];
+    set((s) => ({
+      tabs: updateActiveTab(s.tabs, s.activeTabId, (t) => ({
+        filter: { ...t.filter, types },
+        selectedIndices: new Set(),
+        cursorIndex: 0,
+      })),
+    }));
+  },
+
+  setSizeFilter: (range) => {
+    set((s) => ({
+      tabs: updateActiveTab(s.tabs, s.activeTabId, (t) => ({
+        filter: { ...t.filter, sizeRange: range },
+        selectedIndices: new Set(),
+        cursorIndex: 0,
+      })),
+    }));
+  },
+
+  setModifiedFilter: (range) => {
+    set((s) => ({
+      tabs: updateActiveTab(s.tabs, s.activeTabId, (t) => ({
+        filter: { ...t.filter, modifiedRange: range },
+        selectedIndices: new Set(),
+        cursorIndex: 0,
+      })),
+    }));
+  },
+
+  clearFilters: () => {
+    set((s) => ({
+      tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
+        filter: { ...DEFAULT_FILTER },
+        selectedIndices: new Set(),
+        cursorIndex: 0,
       })),
     }));
   },

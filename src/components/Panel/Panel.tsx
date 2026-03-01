@@ -14,7 +14,7 @@ import { useAiStore } from "../../stores/aiStore";
 import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
 import { useDirSizeStore } from "../../stores/dirSizeStore";
 import { useIconStore } from "../../stores/iconStore";
-import { useExplorerStore } from "../../stores/panelStore";
+import { applyFilters, useExplorerStore } from "../../stores/panelStore";
 import { useRuleStore } from "../../stores/ruleStore";
 import type { ColumnWidths } from "../../stores/settingsStore";
 import { getGridCellHeight, getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
@@ -95,11 +95,14 @@ export function Panel() {
   const [propertiesEntry, setPropertiesEntry] = useState<FileEntry | null>(null);
   const [quickLookOpen, setQuickLookOpen] = useState(false);
 
-  // The entries to display: search results or normal directory entries
-  const displayEntries = tab.searchResults ?? tab.entries;
-
-  // サイズバー用: ファイル＋フォルダの最大サイズを算出
+  // フォルダサイズ（フィルタ・サイズバー両方で使用）
   const dirSizes = useDirSizeStore((s) => s.sizes);
+
+  // The entries to display: search results or filtered directory entries
+  const displayEntries = useMemo(() => {
+    const base = tab.searchResults ?? tab.entries;
+    return tab.searchResults ? base : applyFilters(base, tab.filter, dirSizes);
+  }, [tab.entries, tab.searchResults, tab.filter, dirSizes]);
   const maxFileSize = useMemo(() => {
     let max = 0;
     for (const e of displayEntries) {

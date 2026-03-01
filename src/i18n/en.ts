@@ -67,6 +67,37 @@ export const en: Translations = {
     settingsTooltip: "Settings (Ctrl+,)",
   },
 
+  filter: {
+    type: "Type",
+    size: "Size",
+    modified: "Modified",
+    clear: "Clear",
+    types: {
+      folder: "Folders",
+      image: "Images",
+      video: "Videos",
+      audio: "Audio",
+      document: "Documents",
+      archive: "Archives",
+    },
+    sizes: {
+      small: "Small (<1MB)",
+      medium: "Medium (1MB–100MB)",
+      large: "Large (100MB–1GB)",
+      huge: "Huge (1GB+)",
+    },
+    modifiedRanges: {
+      today: "Today",
+      yesterday: "Yesterday",
+      thisWeek: "This week",
+      thisMonth: "This month",
+      thisYear: "This year",
+      older: "Older",
+    },
+    filtered: "of",
+    shown: "shown",
+  },
+
   statusBar: {
     items: "items",
     folders: "folders",

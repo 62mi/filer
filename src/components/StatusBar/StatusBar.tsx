@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { useDirSizeStore } from "../../stores/dirSizeStore";
-import { useExplorerStore } from "../../stores/panelStore";
+import { applyFilters, useExplorerStore } from "../../stores/panelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 
 import { formatFileSize } from "../../utils/format";
@@ -25,20 +25,25 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
   const openSettings = useSettingsStore((s) => s.openSettings);
 
   const entries = tab.entries;
+  const dirSizes = useDirSizeStore((s) => s.sizes);
+  const filteredEntries = useMemo(
+    () => applyFilters(entries, tab.filter, dirSizes),
+    [entries, tab.filter, dirSizes],
+  );
+  const isFiltered = tab.filter.types.length > 0 || tab.filter.sizeRange !== null || tab.filter.modifiedRange !== null;
   const selectedIndices = tab.selectedIndices;
 
-  const totalFiles = entries.filter((e) => !e.is_dir).length;
-  const totalDirs = entries.filter((e) => e.is_dir).length;
+  const displayEntries = isFiltered ? filteredEntries : entries;
+  const totalFiles = displayEntries.filter((e) => !e.is_dir).length;
+  const totalDirs = displayEntries.filter((e) => e.is_dir).length;
   const selectedCount = selectedIndices.size;
-
-  const dirSizes = useDirSizeStore((s) => s.sizes);
   const selectedSize = Array.from(selectedIndices).reduce((acc, idx) => {
-    const entry = entries[idx];
+    const entry = displayEntries[idx];
     if (!entry) return acc;
     return acc + (entry.is_dir ? (dirSizes[entry.path] ?? 0) : entry.size);
   }, 0);
 
-  const totalItems = entries.length;
+  const totalItems = displayEntries.length;
 
   // 煩雑度スコア: Rust結果があればそれを使用、なければフロントエンド即時計算
   const tidiness = useMemo(() => {
@@ -71,6 +76,11 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
         </div>
       )}
       <span>
+        {isFiltered && (
+          <span className="text-[var(--accent)]">
+            {entries.length} {t.filter.filtered}{" "}
+          </span>
+        )}
         {totalItems} {t.statusBar.items} ({totalDirs} {t.statusBar.folders}, {totalFiles}{" "}
         {t.statusBar.files})
       </span>

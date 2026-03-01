@@ -29,6 +29,17 @@ export interface RecentFile {
 export type SortKey = "name" | "size" | "modified" | "extension";
 export type SortOrder = "asc" | "desc";
 
+// フィルタチップ
+export type FileTypeCategory = "folder" | "image" | "video" | "audio" | "document" | "archive";
+export type SizeRange = "small" | "medium" | "large" | "huge";
+export type ModifiedRange = "today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" | "older";
+
+export interface FilterState {
+  types: FileTypeCategory[];
+  sizeRange: SizeRange | null;
+  modifiedRange: ModifiedRange | null;
+}
+
 export interface TidinessScore {
   total: number;
   ext_score: number;
