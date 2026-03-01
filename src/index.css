@@ -25,6 +25,10 @@
   --folder-fill: #f2c55c;
 }
 
+html, body, #root {
+  height: 100%;
+}
+
 body {
   margin: 0;
   padding: 0;

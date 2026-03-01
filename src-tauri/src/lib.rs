@@ -44,7 +44,11 @@ fn show_error_dialog(_title: &str, message: &str) {
 /// メインウィンドウを表示・フォーカスする
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
-        w.show().ok();
+        // 非表示の場合のみshow()を呼ぶ（タスクバーアイコン重複防止）
+        let is_visible = w.is_visible().unwrap_or(true);
+        if !is_visible {
+            w.show().ok();
+        }
         w.unminimize().ok();
         w.set_focus().ok();
     }
@@ -121,16 +125,19 @@ pub fn run() {
                 ],
             )?;
 
-            let mut tray_builder = TrayIconBuilder::new()
+            // アイコンをバイナリに埋め込み（default_window_icon()がNoneの場合に備える）
+            let app_icon =
+                tauri::image::Image::from_bytes(include_bytes!("../icons/icon.png"))
+                    .unwrap_or_else(|_| {
+                        app.default_window_icon()
+                            .cloned()
+                            .unwrap_or_else(|| tauri::image::Image::new(vec![0; 4].as_slice(), 1, 1))
+                    });
+
+            TrayIconBuilder::new()
                 .tooltip("TomaFiler")
-                .menu(&tray_menu);
-
-            // アイコンがある場合のみ設定
-            if let Some(icon) = app.default_window_icon() {
-                tray_builder = tray_builder.icon(icon.clone());
-            }
-
-            tray_builder
+                .menu(&tray_menu)
+                .icon(app_icon.clone())
                 .on_tray_icon_event(|tray, event| {
                     if let tauri::tray::TrayIconEvent::Click {
                         button: tauri::tray::MouseButton::Left,
@@ -153,6 +160,21 @@ pub fn run() {
                     _ => {}
                 })
                 .build(app)?;
+
+            // ── AUMID設定（ピン留めショートカットとの統合） ──
+            #[cfg(windows)]
+            {
+                let aumid: Vec<u16> = "com.filer.app\0".encode_utf16().collect();
+                unsafe {
+                    windows_sys::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
+                        aumid.as_ptr(),
+                    );
+                }
+                // AUMID設定後、ウィンドウアイコンを明示的に再適用
+                if let Some(window) = app.get_webview_window("main") {
+                    window.set_icon(app_icon.clone()).ok();
+                }
+            }
 
             // ── --hidden 起動対応 ──
             let args: Vec<String> = std::env::args().collect();
