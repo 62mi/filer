@@ -7,7 +7,6 @@ import { applyFilters, useExplorerStore } from "../../stores/panelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 
 import { formatFileSize } from "../../utils/format";
-import { calculateQuickTidiness, getScoreColor, getStars } from "../../utils/tidiness";
 import { CopyQueueMiniIndicator } from "../CopyQueue";
 
 interface StatusBarProps {
@@ -44,12 +43,6 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
   }, 0);
 
   const totalItems = displayEntries.length;
-
-  // 煩雑度スコア: Rust結果があればそれを使用、なければフロントエンド即時計算
-  const tidiness = useMemo(() => {
-    if (tab.path === "home:" || entries.length === 0) return null;
-    return tab.tidinessScore ?? calculateQuickTidiness(entries);
-  }, [tab.path, entries, tab.tidinessScore]);
 
   // バジェットインジケータの色
   const getBudgetColor = () => {
@@ -90,18 +83,6 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
           <span className="mx-2 text-[var(--chrome-border)]">|</span>
           <span className="text-[var(--accent)]">
             {selectedCount} {t.statusBar.selected} ({formatFileSize(selectedSize)})
-          </span>
-        </span>
-      )}
-
-      {tidiness && (
-        <span className="animate-fade-in flex items-center">
-          <span className="mx-2 text-[var(--chrome-border)]">|</span>
-          <span
-            className={`${getScoreColor(tidiness.total)} cursor-default`}
-            title={`${t.statusBar.tidiness.score}: ${tidiness.total}/100\n${getStars(tidiness.total)}\n\n${t.statusBar.tidiness.extTypes}: ${tidiness.ext_score} (${tidiness.ext_count}${t.statusBar.tidiness.types})\n${t.statusBar.tidiness.oldFiles}: ${tidiness.age_score}\n${t.statusBar.tidiness.fileCount}: ${tidiness.count_score} (${tidiness.file_count}${t.statusBar.tidiness.count})\n${t.statusBar.tidiness.nestDepth}: ${tidiness.nest_score}${tidiness.max_depth > 0 ? ` (${t.statusBar.tidiness.depth}${tidiness.max_depth})` : ""}`}
-          >
-            {getStars(tidiness.total)} {tidiness.total}
           </span>
         </span>
       )}

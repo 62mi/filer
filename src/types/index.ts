@@ -39,16 +39,3 @@ export interface FilterState {
   sizeRange: SizeRange | null;
   modifiedRange: ModifiedRange | null;
 }
-
-export interface TidinessScore {
-  total: number;
-  ext_score: number;
-  age_score: number;
-  count_score: number;
-  nest_score: number;
-  ext_count: number;
-  file_count: number;
-  dir_count: number;
-  max_depth: number;
-  old_file_count: number;
-}
