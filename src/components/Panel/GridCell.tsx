@@ -147,7 +147,7 @@ export const GridCell = memo(function GridCell({
     <div
       ref={cellRef}
       className={cn(
-        "flex flex-col items-center justify-center p-1 rounded-lg cursor-default select-none relative",
+        "flex flex-col items-center justify-center gap-1 p-1 rounded-lg cursor-default select-none relative",
         "transition-[background-color,opacity] duration-100 ease-out",
         isCursor && !isSelected && "bg-[#e8e8e8]",
         isSelected && !isCursor && "bg-[rgba(var(--accent-rgb),0.15)]",
@@ -239,11 +239,11 @@ export const GridCell = memo(function GridCell({
               draggable={false}
               onError={isGoogleDocs ? () => removeThumbnail(entry.path, THUMB_SIZE) : undefined}
             />
-            {smallIcon && (
+            {smallIcon && !isImage && (
               <img
                 src={smallIcon}
                 alt=""
-                className="absolute bottom-0 right-0 w-4 h-4"
+                className="absolute bottom-0 right-0 w-5 h-5"
                 style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}
                 draggable={false}
               />
