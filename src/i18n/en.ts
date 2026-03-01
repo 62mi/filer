@@ -105,16 +105,6 @@ export const en: Translations = {
     selected: "selected",
     aiUsageTooltip: "AI Usage (click to configure)",
     togglePreview: "Toggle preview (Alt+P)",
-    tidiness: {
-      score: "Tidiness score",
-      extTypes: "Extension types",
-      oldFiles: "Old files",
-      fileCount: "File count",
-      nestDepth: "Nesting",
-      depth: "depth",
-      types: "types",
-      count: "items",
-    },
     copyInProgress: "copy operation(s) in progress",
   },
 
@@ -449,6 +439,7 @@ export const en: Translations = {
   },
 
   sidebar: {
+    home: "Home",
     quickAccess: "Quick access",
     thisPC: "This PC",
     stack: "Stack",

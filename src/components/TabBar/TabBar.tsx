@@ -1,6 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Folder, Plus, Sparkles, X } from "lucide-react";
+import { Folder, Home, Plus, Sparkles, X } from "lucide-react";
 import { useTabDrag } from "../../hooks/useTabDrag";
+import { useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -13,6 +14,7 @@ function DropIndicator() {
 }
 
 export function TabBar() {
+  const t = useTranslation();
   const tabs = useExplorerStore((s) => s.tabs);
   const activeTabId = useExplorerStore((s) => s.activeTabId);
   const setActiveTab = useExplorerStore((s) => s.setActiveTab);
@@ -63,7 +65,8 @@ export function TabBar() {
         {tabs.map((tab, index) => {
           const isActive = tab.id === activeTabId;
           const isDragging = tab.id === draggingTabId;
-          const label = tab.path.split(/[\\/]/).filter(Boolean).pop() || tab.path;
+          const isHome = tab.path === "home:";
+          const label = isHome ? t.sidebar.home : (tab.path.split(/[\\/]/).filter(Boolean).pop() || tab.path);
           const hasAi = aiDialogOpen && aiDialogTabId === tab.id;
           return (
             <div key={tab.id} className="flex items-end h-full">
@@ -92,7 +95,11 @@ export function TabBar() {
                 }}
                 title={tab.path}
               >
-                <Folder className="w-3.5 h-3.5 text-[var(--folder-color)] shrink-0 fill-[var(--folder-fill)]" />
+                {isHome ? (
+                  <Home className="w-3.5 h-3.5 text-[var(--chrome-text-dim)] shrink-0" />
+                ) : (
+                  <Folder className="w-3.5 h-3.5 text-[var(--folder-color)] shrink-0 fill-[var(--folder-fill)]" />
+                )}
                 {hasAi && (
                   <Sparkles
                     className={cn("w-3 h-3 text-purple-500 shrink-0", aiLoading && "animate-pulse")}

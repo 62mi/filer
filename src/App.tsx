@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { BookmarkBar } from "./components/BookmarkBar";
 import { CommandPalette } from "./components/CommandPalette";
 import { CopyQueuePanel } from "./components/CopyQueue";
+import { HomeView } from "./components/HomeView";
 import { NavigationBar } from "./components/NavigationBar";
 import { Panel } from "./components/Panel";
 import { PreviewPanel } from "./components/PreviewPanel";
@@ -217,7 +218,7 @@ function App() {
 
         {/* File list panel */}
         <div className="flex-1 min-w-0">
-          <Panel />
+          {tab.path === "home:" ? <HomeView /> : <Panel />}
         </div>
 
         {/* Preview panel */}

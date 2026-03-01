@@ -49,6 +49,7 @@ export const Globe = icon("Globe");
 export const GripVertical = icon("GripVertical");
 export const HardDrive = icon("HardDrive");
 export const History = icon("History");
+export const Home = icon("Home");
 export const Image = icon("Image");
 export const Info = icon("Info");
 export const Key = icon("Key");

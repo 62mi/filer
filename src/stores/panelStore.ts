@@ -8,7 +8,6 @@ import type {
   SizeRange,
   SortKey,
   SortOrder,
-  TidinessScore,
 } from "../types";
 import { useCopyQueueStore } from "./copyQueueStore";
 import { useDirSizeStore } from "./dirSizeStore";
@@ -177,7 +176,6 @@ interface TabState {
   searchResults: FileEntry[] | null;
   searching: boolean;
   viewMode: "details" | "icons";
-  tidinessScore: TidinessScore | null;
   filter: FilterState;
 }
 
@@ -200,7 +198,6 @@ function createTabState(path: string): TabState {
     searchResults: null,
     searching: false,
     viewMode: "details",
-    tidinessScore: null,
     filter: { ...DEFAULT_FILTER },
   };
 }
@@ -294,9 +291,6 @@ function updateActiveTab(
 
 const initialTab = createTabState("C:\\");
 
-// 煩雑度スコアのデバウンスタイマー
-let tidyTimerId: number | null = null;
-
 export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   tabs: [initialTab],
   activeTabId: initialTab.id,
@@ -372,7 +366,37 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   // Directory
   // smooth=true: 既存entriesを保持したままバックグラウンド更新（Undo/Redo時のチカチカ防止）
   loadDirectory: async (path, addToHistory = true, smooth = false) => {
-    const { activeTabId, showHidden } = get();
+    const { activeTabId } = get();
+
+    // ホーム画面: バックエンド呼び出し不要
+    if (path === "home:") {
+      const tab = get().getActiveTab();
+      let history = tab.history;
+      let historyIndex = tab.historyIndex;
+      if (addToHistory) {
+        history = [...tab.history.slice(0, tab.historyIndex + 1), path];
+        historyIndex = history.length - 1;
+      }
+      set((s) => ({
+        tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+          path,
+          entries: [],
+          selectedIndices: new Set<number>(),
+          cursorIndex: 0,
+          loading: false,
+          error: null,
+          history,
+          historyIndex,
+          renamingIndex: null,
+          searchResults: null,
+          searchQuery: "",
+          searching: false,
+        })),
+      }));
+      return;
+    }
+
+    const { showHidden } = get();
     if (!smooth) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({
@@ -408,7 +432,6 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           history,
           historyIndex,
           renamingIndex: null,
-          tidinessScore: null,
           ...(smooth ? {} : { searchResults: null, searchQuery: "", searching: false }),
         })),
       }));
@@ -430,27 +453,6 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       const dirPaths = sorted.filter((e) => e.is_dir).map((e) => e.path);
       useDirSizeStore.getState().requestSizes(dirPaths);
 
-      // 煩雑度スコア Phase B: 非同期でRust側の詳細計算を発火（300msデバウンス）
-      if (tidyTimerId) clearTimeout(tidyTimerId);
-      const scorePath = path;
-      tidyTimerId = window.setTimeout(() => {
-        tidyTimerId = null;
-        invoke<TidinessScore>("calculate_tidiness_score", { path: scorePath })
-          .then((score) => {
-            // パスが一致する場合のみ反映（高速フォルダ切替時の古い結果を破棄）
-            const current = get().tabs.find((t) => t.id === activeTabId);
-            if (current?.path === scorePath) {
-              set((s) => ({
-                tabs: updateActiveTab(s.tabs, activeTabId, () => ({
-                  tidinessScore: score,
-                })),
-              }));
-            }
-          })
-          .catch(() => {
-            // 煩雑度スコアは表示補助のため通知不要
-          });
-      }, 300);
     } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({
