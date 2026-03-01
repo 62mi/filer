@@ -174,7 +174,7 @@ export function FileRow({
           className={cn("w-4 h-4", entry.is_dir ? "text-amber-500" : "text-[#666]")}
         />
         {isSelected && (
-          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[rgb(var(--accent-rgb))] rounded-full flex items-center justify-center animate-[checkPop_150ms_ease-out]">
+          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[rgb(var(--accent-rgb))] rounded-full flex items-center justify-center check-pop">
             <Check className="w-2 h-2 text-white" strokeWidth={3} />
           </span>
         )}

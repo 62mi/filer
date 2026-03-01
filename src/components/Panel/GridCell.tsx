@@ -211,7 +211,7 @@ export const GridCell = memo(function GridCell({
     >
       {/* Selection checkmark */}
       {isSelected && (
-        <span className="absolute top-1 right-1 w-4 h-4 bg-[rgb(var(--accent-rgb))] rounded-full flex items-center justify-center animate-[checkPop_150ms_ease-out] z-10">
+        <span className="absolute top-1 right-1 w-4 h-4 bg-[rgb(var(--accent-rgb))] rounded-full flex items-center justify-center check-pop z-10">
           <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
         </span>
       )}

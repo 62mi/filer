@@ -867,8 +867,8 @@ export function Panel() {
         data-drop-zone="panel-bg"
         data-panel-path={tab.path}
         onClick={(e) => {
-          // 背景（ファイル行以外）をクリックしたら選択解除
-          if (e.target === e.currentTarget) {
+          // ファイル行以外（空白エリア・グリッドgap等）をクリックしたら選択解除
+          if (!(e.target as HTMLElement).closest?.("[data-file-path]")) {
             clearSelection();
           }
         }}

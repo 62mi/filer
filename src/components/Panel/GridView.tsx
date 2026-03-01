@@ -115,9 +115,6 @@ export function GridView({
         gap: `${gridGap}px`,
         alignContent: "start",
       }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClearSelection();
-      }}
     >
       {entries.map((entry, index) => (
         <GridCell
