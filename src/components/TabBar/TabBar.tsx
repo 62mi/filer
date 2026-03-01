@@ -46,7 +46,7 @@ export function TabBar() {
 
   return (
     <div
-      className="flex items-end select-none shrink-0 relative"
+      className="flex select-none shrink-0 relative overflow-hidden"
       style={{
         height: tabBarHeight,
         fontSize: uiFontSize,
@@ -61,7 +61,11 @@ export function TabBar() {
       {/* タブバー下端のセパレータライン（アクティブタブが覆う） */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-[var(--tab-bg)] z-0" />
 
-      <div ref={tabBarRef} className="flex items-end h-full overflow-x-auto pl-3 gap-px pt-1.5">
+      <div
+        ref={tabBarRef}
+        className="flex overflow-x-auto pl-3 gap-px"
+        style={{ height: tabBarHeight }}
+      >
         {tabs.map((tab, index) => {
           const isActive = tab.id === activeTabId;
           const isDragging = tab.id === draggingTabId;
@@ -70,8 +74,9 @@ export function TabBar() {
             ? t.sidebar.home
             : tab.path.split(/[\\/]/).filter(Boolean).pop() || tab.path;
           const hasAi = aiDialogOpen && aiDialogTabId === tab.id;
+          const tabHeight = isActive ? tabBarHeight - 2 : tabBarHeight - 4;
           return (
-            <div key={tab.id} className="flex items-end h-full">
+            <div key={tab.id} className="flex shrink-0" style={{ height: tabBarHeight }}>
               {/* ドロップインジケーター: タブの前に表示 */}
               {indicatorIndex === index && <DropIndicator />}
               <div
@@ -80,10 +85,11 @@ export function TabBar() {
                   "group flex items-center gap-1.5 px-3 cursor-grab max-w-52 min-w-0 rounded-t-[6px]",
                   "transition-[background-color,color,opacity] duration-100 ease-out",
                   isActive
-                    ? "bg-white text-[#1a1a1a] relative z-10 h-full"
-                    : "bg-transparent text-[var(--tab-text)] hover:bg-[var(--tab-hover)] h-[calc(100%-2px)]",
+                    ? "bg-white text-[#1a1a1a] relative z-10"
+                    : "bg-transparent text-[var(--tab-text)] hover:bg-[var(--tab-hover)]",
                   isDragging && "opacity-30",
                 )}
+                style={{ height: tabHeight, marginTop: tabBarHeight - tabHeight }}
                 onClick={() => {
                   if (!draggingTabId) setActiveTab(tab.id);
                 }}
@@ -133,7 +139,8 @@ export function TabBar() {
         {indicatorIndex === tabs.length && <DropIndicator />}
       </div>
       <button
-        className="p-1 mx-0.5 mb-1 rounded hover:bg-[var(--tab-hover)] text-[var(--tab-text)] transition-colors shrink-0"
+        className="p-1 mx-0.5 rounded hover:bg-[var(--tab-hover)] text-[var(--tab-text)] transition-colors shrink-0"
+        style={{ marginTop: "auto", marginBottom: 4 }}
         onClick={() => addTab()}
         title="New tab (Ctrl+T)"
       >
@@ -142,7 +149,8 @@ export function TabBar() {
 
       {/* ドラッグ領域: ドラッグで移動、ダブルクリックで最大化トグル */}
       <div
-        className="flex-1 h-full"
+        className="flex-1"
+        style={{ height: tabBarHeight }}
         onMouseDown={(e) => {
           if (e.button === 0) {
             getCurrentWindow().startDragging();
@@ -151,7 +159,7 @@ export function TabBar() {
         onDoubleClick={() => getCurrentWindow().toggleMaximize()}
       />
 
-      <WindowControls />
+      <WindowControls height={tabBarHeight} />
 
       {/* ドラッグ中のゴーストタブ（カーソル追従） */}
       {draggingTabId && (

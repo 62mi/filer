@@ -86,7 +86,7 @@ const DEFAULT_COLUMN_WIDTHS: ColumnWidths = {
 };
 
 const DEFAULTS: SettingsData = {
-  tabBarHeight: 46,
+  tabBarHeight: 36,
   bookmarkBarHeight: 36,
   bookmarkItemHeight: 28,
   toolbarHeight: 40,
