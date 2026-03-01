@@ -108,16 +108,6 @@ export const ja = {
     selected: "選択中",
     aiUsageTooltip: "AI使用量 (クリックで設定)",
     togglePreview: "プレビュー切替 (Alt+P)",
-    tidiness: {
-      score: "整理スコア",
-      extTypes: "拡張子の種類",
-      oldFiles: "古いファイル",
-      fileCount: "ファイル数",
-      nestDepth: "ネスト構造",
-      depth: "深さ",
-      types: "種類",
-      count: "件",
-    },
     copyInProgress: "件のコピー進行中",
   },
 
@@ -471,6 +461,7 @@ export const ja = {
 
   // ── サイドバー ──
   sidebar: {
+    home: "ホーム",
     quickAccess: "クイック アクセス",
     thisPC: "PC",
     stack: "スタック",

@@ -106,6 +106,7 @@ export function NavigationBar() {
     }
   };
 
+  const isHome = tab.path === "home:";
   const segments = tab.path.split(/[\\/]/).filter(Boolean);
 
   return (
@@ -121,10 +122,10 @@ export function NavigationBar() {
       >
         <ArrowRight className="w-4 h-4" />
       </NavButton>
-      <NavButton onClick={navigateUp} title="Up (Alt+Up)">
+      <NavButton onClick={navigateUp} title="Up (Alt+Up)" disabled={isHome}>
         <ArrowUp className="w-4 h-4" />
       </NavButton>
-      <NavButton onClick={() => loadDirectory(tab.path, false)} title="Refresh (F5)">
+      <NavButton onClick={() => loadDirectory(tab.path, false)} title="Refresh (F5)" disabled={isHome}>
         <RotateCw className="w-3.5 h-3.5" />
       </NavButton>
 
@@ -173,7 +174,10 @@ export function NavigationBar() {
             onClick={() => setEditing(true)}
           >
             <div className="flex items-center flex-1 min-w-0 overflow-hidden">
-              {segments.map((segment, i) => {
+              {isHome ? (
+                <span className="text-[#666]">{t.sidebar.home}</span>
+              ) : (
+              segments.map((segment, i) => {
                 const segmentPath = segments.slice(0, i + 1).join("\\");
                 const fullPath =
                   segmentPath.length === 2 && segmentPath[1] === ":"
@@ -194,7 +198,8 @@ export function NavigationBar() {
                     </button>
                   </span>
                 );
-              })}
+              })
+              )}
             </div>
             {/* Chrome風 星ボタン（アドレスバー右端） */}
             <button

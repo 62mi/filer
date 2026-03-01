@@ -8,6 +8,7 @@ import {
   FileText,
   Folder,
   HardDrive,
+  Home,
   Image,
   Layers,
   Monitor,
@@ -222,6 +223,18 @@ export function Sidebar() {
 
   return (
     <div className="flex flex-col h-full w-full overflow-y-auto overflow-x-hidden py-1 text-[13px]">
+      {/* ホーム */}
+      <button
+        className={cn(
+          "flex items-center gap-2 px-2 py-1 hover:bg-[var(--chrome-hover)] text-left w-full font-semibold transition-colors duration-100",
+          currentPath === "home:" && "bg-[var(--chrome-active)]",
+        )}
+        onClick={() => loadDirectory("home:")}
+      >
+        <Home className="w-4 h-4" />
+        {t.sidebar.home}
+      </button>
+
       {/* クイックアクセス */}
       <button
         className="flex items-center gap-1 px-2 py-1 hover:bg-[var(--chrome-hover)] text-left w-full font-semibold transition-colors duration-100"
