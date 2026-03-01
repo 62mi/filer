@@ -114,29 +114,36 @@ function canvasToThumbnail(source: HTMLCanvasElement, size: number): string {
   return canvas.toDataURL("image/png");
 }
 
-/** PSD/PSBをag-psdでパースしてサムネイルdataURLを返す。CMYK等はFFmpegフォールバック */
+/** PSD/PSBを@webtoon/psdでパースしてサムネイルdataURLを返す。CMYK等はFFmpegフォールバック */
 async function renderPsdThumbnail(filePath: string, size: number): Promise<string> {
-  // 1) ag-psdで試す
+  // 1) @webtoon/psdで試す
   try {
-    const { readPsd } = await import("ag-psd");
+    const PsdParser = (await import("@webtoon/psd")).default;
+    const { ColorMode } = await import("@webtoon/psd");
     const url = convertFileSrc(filePath);
     const res = await fetch(url);
     const buffer = await res.arrayBuffer();
-    const psd = readPsd(new Uint8Array(buffer), { skipLayerImageData: true });
-    // composite image優先
-    if (psd.canvas) {
-      return canvasToThumbnail(psd.canvas, size);
+    const psd = PsdParser.parse(buffer);
+
+    // CMYK等の非RGB/Grayscaleは即FFmpegフォールバック
+    if (psd.colorMode !== ColorMode.Rgb && psd.colorMode !== ColorMode.Grayscale) {
+      return invoke<string>("extract_video_thumbnail", { path: filePath, size });
     }
-    // 埋め込みサムネイルにフォールバック（PSBでcomposite生成失敗時など）
-    const thumb = psd.imageResources?.thumbnail;
-    if (thumb) {
-      return canvasToThumbnail(thumb, size);
-    }
+
+    const compositeData = await psd.composite();
+    const imageData = new ImageData(compositeData, psd.width, psd.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = psd.width;
+    canvas.height = psd.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context not available");
+    ctx.putImageData(imageData, 0, 0);
+    return canvasToThumbnail(canvas, size);
   } catch {
-    // ag-psd失敗 → FFmpegフォールバック
+    // @webtoon/psd失敗 → FFmpegフォールバック
   }
 
-  // 2) FFmpegフォールバック（CMYK等）
+  // 2) FFmpegフォールバック
   return invoke<string>("extract_video_thumbnail", { path: filePath, size });
 }
 
