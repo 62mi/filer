@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import { toast } from "./toastStore";
 
 /** Windowsパスから親ディレクトリを取得（"/"と"\\"の両方に対応） */
 function getParentDir(filePath: string): string {
@@ -254,7 +255,8 @@ export const useUndoStore = create<UndoStore>((set, get) => ({
         undoStack: [...s.undoStack, action],
       }));
       return action;
-    } catch (_e: unknown) {
+    } catch (e: unknown) {
+      toast.error(`やり直し失敗: ${e instanceof Error ? e.message : String(e)}`);
       return null;
     }
   },

@@ -24,9 +24,9 @@ impl Database {
         let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
         let now = chrono::Utc::now();
         let month_start = chrono::NaiveDate::from_ymd_opt(now.year(), now.month(), 1)
-            .expect("day=1 is always valid")
+            .ok_or_else(|| "Invalid date: day=1".to_string())?
             .and_hms_opt(0, 0, 0)
-            .expect("midnight is always valid")
+            .ok_or_else(|| "Invalid time: midnight".to_string())?
             .and_utc()
             .timestamp();
 

@@ -225,7 +225,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
             ),
           }));
         })
-        .catch(() => {});
+        .catch((err: unknown) => {
+          toast.error(
+            `ディレクトリ読み込み失敗: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
     } else {
       set((s) => ({
         tabs: [...s.tabs, newTab],
@@ -342,7 +346,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
               }));
             }
           })
-          .catch(() => {});
+          .catch(() => {
+            // 煩雑度スコアは表示補助のため通知不要
+          });
       }, 300);
     } catch (e: unknown) {
       set((s) => ({
@@ -492,7 +498,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
     if (paths.length > 0) {
       set({ clipboard: { paths, operation: "copy" } });
-      invoke("clipboard_write_files", { paths, operation: "copy" }).catch(() => {});
+      invoke("clipboard_write_files", { paths, operation: "copy" }).catch((err: unknown) => {
+        toast.error(
+          `クリップボード書き込み失敗: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
     }
   },
 
@@ -504,7 +514,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
     if (paths.length > 0) {
       set({ clipboard: { paths, operation: "cut" } });
-      invoke("clipboard_write_files", { paths, operation: "cut" }).catch(() => {});
+      invoke("clipboard_write_files", { paths, operation: "cut" }).catch((err: unknown) => {
+        toast.error(
+          `クリップボード書き込み失敗: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
     }
   },
 
@@ -873,7 +887,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           ),
         }));
       })
-      .catch(() => {});
+      .catch((err: unknown) => {
+        toast.error(
+          `ディレクトリ読み込み失敗: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
   },
 
   removeTabForTransfer: (id) => {

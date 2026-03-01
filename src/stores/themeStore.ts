@@ -17,7 +17,7 @@ const DEFAULT_VARS: Record<string, string> = {
   "--chrome-bg": "#f3f3f3",
   "--chrome-text": "#1a1a1a",
   "--chrome-text-dim": "#666",
-  "--chrome-hover": "rgba(var(--accent-rgb), 0.10)",
+  "--chrome-hover": "rgba(var(--accent-rgb), 0.1)",
   "--chrome-active": "rgba(var(--accent-rgb), 0.15)",
   "--chrome-border": "#e5e5e5",
   "--folder-color": "#e8a520",

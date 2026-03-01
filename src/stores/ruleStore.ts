@@ -220,7 +220,9 @@ export const useRuleStore = create<RuleStore>((set, get) => ({
   refreshWatcher: async () => {
     try {
       await invoke("refresh_watcher");
-    } catch (_err) {}
+    } catch {
+      // watcher更新は内部処理のため通知不要
+    }
   },
 
   checkForPatterns: async (folderPath) => {
@@ -231,7 +233,9 @@ export const useRuleStore = create<RuleStore>((set, get) => ({
       if (patterns.length > 0) {
         set({ suggestedPatterns: patterns, showPatternSuggestion: true });
       }
-    } catch (_err) {}
+    } catch {
+      // パターン検出は内部処理のため通知不要
+    }
   },
 
   dismissPatternSuggestion: () => {
@@ -255,7 +259,11 @@ export const useRuleStore = create<RuleStore>((set, get) => ({
           (p) => !(p.extension === pattern.extension && p.dest_dir === pattern.dest_dir),
         ),
       }));
-    } catch (_err) {}
+    } catch (err: unknown) {
+      toast.error(
+        `ルール作成に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   },
 
   openDialog: (folderPath, editRule) => {

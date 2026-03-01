@@ -48,7 +48,12 @@ export function TabBar() {
       style={{
         height: tabBarHeight,
         fontSize: uiFontSize,
-        background: `linear-gradient(180deg, rgba(var(--accent-rgb), 0.18) 0%, rgba(var(--accent-rgb), 0.10) 100%), var(--tab-bg)`,
+        background: [
+          "linear-gradient(180deg,",
+          "rgba(var(--accent-rgb), 0.18) 0%,",
+          "rgba(var(--accent-rgb), 0.1) 100%),",
+          "var(--tab-bg)",
+        ].join(" "),
       }}
     >
       {/* タブバー下端のセパレータライン（アクティブタブが覆う） */}

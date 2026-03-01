@@ -372,7 +372,21 @@ export function Sidebar() {
                         ghostEl.style.left = `${me.clientX + 12}px`;
                         ghostEl.style.top = `${me.clientY + 12}px`;
                         const name = dragPaths[0].substring(dragPaths[0].lastIndexOf("\\") + 1);
-                        ghostEl.innerHTML = `<div class="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#d0d0d0] rounded-md shadow-md max-w-[180px] text-xs"><span class="truncate">${name}</span></div>${dragPaths.length > 1 ? `<span class="absolute -top-2 right-0 text-[11px] bg-[var(--accent)] text-white rounded-full px-1.5 min-w-[20px] text-center font-semibold leading-[18px] shadow-sm">+${dragPaths.length}</span>` : ""}`;
+                        const inner = document.createElement("div");
+                        inner.className =
+                          "flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#d0d0d0] rounded-md shadow-md max-w-[180px] text-xs";
+                        const span = document.createElement("span");
+                        span.className = "truncate";
+                        span.textContent = name;
+                        inner.appendChild(span);
+                        ghostEl.appendChild(inner);
+                        if (dragPaths.length > 1) {
+                          const badge = document.createElement("span");
+                          badge.className =
+                            "absolute -top-2 right-0 text-[11px] bg-[var(--accent)] text-white rounded-full px-1.5 min-w-[20px] text-center font-semibold leading-[18px] shadow-sm";
+                          badge.textContent = `+${dragPaths.length}`;
+                          ghostEl.appendChild(badge);
+                        }
                         document.body.appendChild(ghostEl);
                         return;
                       }
@@ -406,7 +420,9 @@ export function Sidebar() {
                         if (payload.result === "Dropped") {
                           useExplorerStore.getState().refreshDirectory();
                         }
-                      }).catch(() => {});
+                      }).catch(() => {
+                        // ネイティブドラッグ開始失敗は通知不要
+                      });
                     };
 
                     window.addEventListener("mousemove", onMove);

@@ -104,7 +104,19 @@ pub fn get_parent_dir(path: String) -> Result<String, String> {
 
 #[tauri::command]
 pub fn open_in_default_app(path: String) -> Result<(), String> {
-    open::that(&path).map_err(|e| format!("Failed to open: {}", e))
+    let p = std::path::Path::new(&path);
+    if !p.exists() {
+        return Err(format!("Path does not exist: {}", path));
+    }
+    // ディレクトリトラバーサル防止: 正規化パスが元パスと一貫しているか確認
+    let canonical = p
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve path: {}", e))?;
+    if !canonical.exists() {
+        return Err(format!("Resolved path does not exist: {}", path));
+    }
+    open::that(canonical.to_string_lossy().as_ref())
+        .map_err(|e| format!("Failed to open: {}", e))
 }
 
 #[tauri::command]
