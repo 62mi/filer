@@ -93,7 +93,7 @@ const DEFAULTS: SettingsData = {
   detailRowHeight: 32,
   columnHeaderHeight: 32,
   statusBarHeight: 24,
-  gridIconSize: 96,
+  gridIconSize: 112,
   gridGap: 4,
   fontSize: 14,
   gridFontSize: 12,
@@ -192,10 +192,9 @@ export function getTotalColumnWidth(cw: ColumnWidths) {
 
 // Computed helpers (not in store to avoid re-renders)
 export function getGridCellWidth(state: { gridIconSize: number }) {
-  return state.gridIconSize + 24;
+  return state.gridIconSize + 50;
 }
 
 export function getGridCellHeight(state: { gridIconSize: number }) {
-  // アイコン + ファイル名テキスト領域（3〜4行分）
   return state.gridIconSize + 50;
 }

@@ -19,32 +19,48 @@ export function PsdPreview({ url, filePath, name, maxHeight = "70vh" }: PsdPrevi
     let objectUrl: string | null = null;
 
     (async () => {
-      // 1) ag-psdでパース（RGB対応）
+      // 1) @webtoon/psdでパース（RGB/Grayscale対応）
       try {
-        const { readPsd } = await import("ag-psd");
+        const PsdParser = (await import("@webtoon/psd")).default;
+        const { ColorMode } = await import("@webtoon/psd");
         const res = await fetch(url);
         if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
         const buffer = await res.arrayBuffer();
         if (cancelled) return;
 
-        const psd = readPsd(new Uint8Array(buffer), { skipLayerImageData: true });
-        if (psd.canvas) {
-          await new Promise<void>((resolve, reject) => {
-            psd.canvas!.toBlob((blob) => {
-              if (cancelled || !blob) {
-                reject(new Error("toBlob failed"));
-                return;
-              }
-              objectUrl = URL.createObjectURL(blob);
-              setImageUrl(objectUrl);
-              setLoading(false);
-              resolve();
-            });
-          });
-          return;
+        const psd = PsdParser.parse(buffer);
+
+        // CMYK等の非RGB/Grayscaleは即FFmpegフォールバック
+        if (psd.colorMode !== ColorMode.Rgb && psd.colorMode !== ColorMode.Grayscale) {
+          throw new Error("Unsupported color mode, fallback to FFmpeg");
         }
+
+        const compositeData = await psd.composite();
+        if (cancelled) return;
+
+        const imageData = new ImageData(compositeData, psd.width, psd.height);
+        const canvas = document.createElement("canvas");
+        canvas.width = psd.width;
+        canvas.height = psd.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas context not available");
+        ctx.putImageData(imageData, 0, 0);
+
+        await new Promise<void>((resolve, reject) => {
+          canvas.toBlob((blob) => {
+            if (cancelled || !blob) {
+              reject(new Error("toBlob failed"));
+              return;
+            }
+            objectUrl = URL.createObjectURL(blob);
+            setImageUrl(objectUrl);
+            setLoading(false);
+            resolve();
+          });
+        });
+        return;
       } catch {
-        // ag-psd失敗 → FFmpegフォールバック
+        // @webtoon/psd失敗 → FFmpegフォールバック
       }
 
       // 2) FFmpegフォールバック（CMYK等）

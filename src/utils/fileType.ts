@@ -56,6 +56,7 @@ const typeMap: Record<string, string> = {
   ps1: "PowerShell スクリプト",
   clip: "CLIP STUDIO ファイル",
   psd: "Photoshop ファイル",
+  psb: "Photoshop Large ファイル",
 };
 
 export function getFileType(entry: FileEntry): string {

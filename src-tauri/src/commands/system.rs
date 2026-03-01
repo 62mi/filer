@@ -146,6 +146,33 @@ pub fn get_accent_color() -> String {
 }
 
 #[tauri::command]
+pub fn open_with_dialog(path: String) -> Result<(), String> {
+    let p = std::path::Path::new(&path);
+    if !p.exists() {
+        return Err(format!("Path does not exist: {}", path));
+    }
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        use std::process::Command;
+        const DETACHED_PROCESS: u32 = 0x00000008;
+
+        Command::new("rundll32")
+            .args(["shell32.dll,OpenAs_RunDLL", &path])
+            .creation_flags(DETACHED_PROCESS)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| format!("Failed to open dialog: {}", e))
+    }
+
+    #[cfg(not(windows))]
+    {
+        Err("Open With dialog is only supported on Windows".to_string())
+    }
+}
+
+#[tauri::command]
 pub fn open_terminal(terminal: String, cwd: String) -> Result<(), String> {
     let cwd_path = std::path::Path::new(&cwd);
     if !cwd_path.exists() {

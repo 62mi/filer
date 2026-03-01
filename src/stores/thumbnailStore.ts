@@ -11,7 +11,7 @@ function cacheKey(path: string, size: number) {
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp"]);
 const VIDEO_EXTS = new Set(["mp4", "webm", "mkv", "avi", "mov", "wmv", "flv", "m4v"]);
 const PDF_EXTS = new Set(["pdf"]);
-const PSD_EXTS = new Set(["psd"]);
+const PSD_EXTS = new Set(["psd", "psb"]);
 
 // FFmpeg利用可否キャッシュ
 let ffmpegAvailable: boolean | null = null;
@@ -100,32 +100,50 @@ async function renderPdfThumbnail(filePath: string, size: number): Promise<strin
   return dataUrl;
 }
 
-/** PSDをag-psdでパースしてサムネイルdataURLを返す。CMYK等はFFmpegフォールバック */
+/** canvasからサムネイルdataURLを生成 */
+function canvasToThumbnail(source: HTMLCanvasElement, size: number): string {
+  const scale = size / Math.max(source.width, source.height);
+  const w = Math.round(source.width * scale);
+  const h = Math.round(source.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context not available");
+  ctx.drawImage(source, 0, 0, w, h);
+  return canvas.toDataURL("image/png");
+}
+
+/** PSD/PSBを@webtoon/psdでパースしてサムネイルdataURLを返す。CMYK等はFFmpegフォールバック */
 async function renderPsdThumbnail(filePath: string, size: number): Promise<string> {
-  // 1) ag-psdで試す（RGB対応）
+  // 1) @webtoon/psdで試す
   try {
-    const { readPsd } = await import("ag-psd");
+    const PsdParser = (await import("@webtoon/psd")).default;
+    const { ColorMode } = await import("@webtoon/psd");
     const url = convertFileSrc(filePath);
     const res = await fetch(url);
     const buffer = await res.arrayBuffer();
-    const psd = readPsd(new Uint8Array(buffer), { skipLayerImageData: true });
-    if (psd.canvas) {
-      const scale = size / Math.max(psd.canvas.width, psd.canvas.height);
-      const w = Math.round(psd.canvas.width * scale);
-      const h = Math.round(psd.canvas.height * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas context not available");
-      ctx.drawImage(psd.canvas, 0, 0, w, h);
-      return canvas.toDataURL("image/png");
+    const psd = PsdParser.parse(buffer);
+
+    // CMYK等の非RGB/Grayscaleは即FFmpegフォールバック
+    if (psd.colorMode !== ColorMode.Rgb && psd.colorMode !== ColorMode.Grayscale) {
+      return invoke<string>("extract_video_thumbnail", { path: filePath, size });
     }
+
+    const compositeData = await psd.composite();
+    const imageData = new ImageData(compositeData, psd.width, psd.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = psd.width;
+    canvas.height = psd.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context not available");
+    ctx.putImageData(imageData, 0, 0);
+    return canvasToThumbnail(canvas, size);
   } catch {
-    // ag-psd失敗 → FFmpegフォールバック
+    // @webtoon/psd失敗 → FFmpegフォールバック
   }
 
-  // 2) FFmpegフォールバック（CMYK等）
+  // 2) FFmpegフォールバック
   return invoke<string>("extract_video_thumbnail", { path: filePath, size });
 }
 
