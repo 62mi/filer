@@ -1,5 +1,5 @@
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { resolveResource } from "@tauri-apps/api/path";
 import { Loader } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -19,9 +19,11 @@ import { useRuleStore } from "../../stores/ruleStore";
 import type { ColumnWidths } from "../../stores/settingsStore";
 import { getGridCellHeight, getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
 import { useSuggestionStore } from "../../stores/suggestionStore";
+import { useThumbnailStore } from "../../stores/thumbnailStore";
 import { toast } from "../../stores/toastStore";
 import { useUndoStore } from "../../stores/undoStore";
 import type { FileEntry } from "../../types";
+import { generateDragIcon } from "../../utils/dragIcon";
 import { getFileType } from "../../utils/fileType";
 import { formatDate, formatFileSize } from "../../utils/format";
 import { AiOrganizer } from "../AiOrganizer";
@@ -284,8 +286,11 @@ export function Panel() {
     paths: string[];
     names: string[];
     isDirs: boolean[];
+    extensions: string[];
   } | null>(null);
   const dragGhostRef = useRef<HTMLDivElement>(null);
+  const edgeIndicatorRef = useRef<HTMLDivElement>(null);
+  const externalDragIconRef = useRef<string | null>(null);
 
   // 起動時にドラッグアイコンのパスを解決
   useEffect(() => {
@@ -310,6 +315,7 @@ export function Panel() {
   const cleanupDrag = useCallback(() => {
     draggingRef.current = false;
     dragPathsRef.current = [];
+    externalDragIconRef.current = null;
     setDragGhostPaths(null);
     clearHighlight();
     document.body.classList.remove("file-dragging");
@@ -321,15 +327,49 @@ export function Panel() {
 
   useEffect(() => {
     const DRAG_THRESHOLD = 5;
+    const EDGE_MARGIN = 40; // ウィンドウ端フィードバック開始マージン (px)
 
     const handleMouseMove = (e: MouseEvent) => {
       const start = dragStartRef.current;
 
-      // カスタムドラッグ中: ゴースト追従 + ハイライト更新
+      // カスタムドラッグ中: ゴースト追従 + ハイライト更新 + ウィンドウ外検出
       if (draggingRef.current) {
+        // ウィンドウ外判定（座標ベース — mouseleaveより確実）
+        const isOutside =
+          e.clientX <= 2 ||
+          e.clientY <= 2 ||
+          e.clientX >= window.innerWidth - 2 ||
+          e.clientY >= window.innerHeight - 2;
+
+        if (isOutside && dragPathsRef.current.length > 0) {
+          // ネイティブドラッグに切り替え
+          const paths = [...dragPathsRef.current];
+          const icon = externalDragIconRef.current || dragIconRef.current || "";
+          cleanupDrag();
+          useSuggestionStore.getState().hide();
+
+          startDrag({ item: paths, icon }, (payload) => {
+            if (payload.result === "Dropped") {
+              useExplorerStore.getState().refreshDirectory();
+            }
+          }).catch(() => {});
+          return;
+        }
+
+        // ウィンドウ端に近づいたらフィードバック
+        const isNearEdge =
+          e.clientX <= EDGE_MARGIN ||
+          e.clientY <= EDGE_MARGIN ||
+          e.clientX >= window.innerWidth - EDGE_MARGIN ||
+          e.clientY >= window.innerHeight - EDGE_MARGIN;
+
         if (dragGhostRef.current) {
-          dragGhostRef.current.style.left = `${e.clientX + 12}px`;
-          dragGhostRef.current.style.top = `${e.clientY + 12}px`;
+          dragGhostRef.current.style.left = `${e.clientX}px`;
+          dragGhostRef.current.style.top = `${e.clientY}px`;
+          dragGhostRef.current.classList.toggle("drag-ghost-near-edge", isNearEdge);
+        }
+        if (edgeIndicatorRef.current) {
+          edgeIndicatorRef.current.style.opacity = isNearEdge ? "1" : "0";
         }
         const zone = findDropZone(e.clientX, e.clientY);
         setHighlight(zone);
@@ -370,6 +410,26 @@ export function Panel() {
         paths,
         names: dragEntries.map((de) => de.name),
         isDirs: dragEntries.map((de) => de.is_dir),
+        extensions: dragEntries.map((de) => de.extension),
+      });
+
+      // 外部ドラッグ用アイコンをバックグラウンド生成
+      externalDragIconRef.current = null;
+      const firstEntry = dragEntries[0];
+      const PREVIEW_IMG_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"]);
+      const thumbStore = useThumbnailStore.getState();
+      const iconStore = useIconStore.getState();
+      const cachedThumb = thumbStore.getThumbnail(firstEntry.path, 128);
+      const previewSrc = cachedThumb || (!firstEntry.is_dir && PREVIEW_IMG_EXTS.has(firstEntry.extension)
+        ? convertFileSrc(firstEntry.path) : null);
+      const iconKey = firstEntry.is_dir ? "__directory__" : firstEntry.extension;
+      const iconSrc = iconStore.largeIcons[iconKey] || iconStore.icons[iconKey] || null;
+      generateDragIcon({
+        previewSrc,
+        iconSrc,
+        count: paths.length,
+      }).then((p) => {
+        externalDragIconRef.current = p;
       });
 
       // サジェスト表示（300ms後）
@@ -399,27 +459,11 @@ export function Panel() {
       dragStartRef.current = null;
     };
 
-    // ウィンドウ外にカーソルが出たらネイティブドラッグに切り替え
-    const handleMouseLeave = () => {
-      if (!draggingRef.current || dragPathsRef.current.length === 0) return;
-      const paths = [...dragPathsRef.current];
-      cleanupDrag();
-      useSuggestionStore.getState().hide();
-
-      startDrag({ item: paths, icon: dragIconRef.current || "" }, (payload) => {
-        if (payload.result === "Dropped") {
-          useExplorerStore.getState().refreshDirectory();
-        }
-      }).catch(() => {});
-    };
-
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
-    document.documentElement.addEventListener("mouseleave", handleMouseLeave);
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
-      document.documentElement.removeEventListener("mouseleave", handleMouseLeave);
     };
   }, [cleanupDrag]);
 
@@ -995,39 +1039,121 @@ export function Panel() {
       {/* 移動先サジェストポップアップ */}
       <DragSuggestion onSelectDestination={handleSuggestionSelect} />
 
-      {/* カスタムドラッグゴースト */}
-      {dragGhostPaths && (
-        <div
-          ref={dragGhostRef}
-          className="fixed z-[9999] pointer-events-none"
-          style={{ left: -9999, top: -9999 }}
-        >
-          <div className="relative">
-            {dragGhostPaths.names.slice(0, 3).map((name, i) => (
-              <div
-                key={dragGhostPaths.paths[i]}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#d0d0d0] rounded-md shadow-md max-w-[220px] absolute left-0 top-0 text-xs"
-                style={{
-                  transform: `translate(${i * 4}px, ${i * 2}px) rotate(${i * 3}deg)`,
-                  transformOrigin: "bottom left",
-                  opacity: i > 0 ? 0.7 : 1,
-                  zIndex: 3 - i,
-                }}
-              >
-                <span className={dragGhostPaths.isDirs[i] ? "text-amber-500" : "text-[#666]"}>
-                  {dragGhostPaths.isDirs[i] ? "\uD83D\uDCC1" : "\uD83D\uDCC4"}
-                </span>
-                <span className="truncate">{name}</span>
+      {/* カスタムドラッグゴースト（Explorer風） */}
+      {dragGhostPaths &&
+        (() => {
+          const ext = dragGhostPaths.extensions[0];
+          const isDir = dragGhostPaths.isDirs[0];
+          const path = dragGhostPaths.paths[0];
+          const count = dragGhostPaths.paths.length;
+
+          // プレビュー可能な画像拡張子
+          const PREVIEW_EXTS = new Set([
+            "png",
+            "jpg",
+            "jpeg",
+            "gif",
+            "webp",
+            "bmp",
+            "svg",
+            "avif",
+            "ico",
+          ]);
+          // サムネイルキャッシュ or ブラウザ表示可能画像
+          const cachedThumb = useThumbnailStore.getState().getThumbnail(path, 128);
+          const previewSrc =
+            cachedThumb || (!isDir && PREVIEW_EXTS.has(ext) ? convertFileSrc(path) : null);
+
+          return (
+            <div
+              ref={dragGhostRef}
+              className="fixed z-[9999] pointer-events-none"
+              style={{ left: -9999, top: -9999, transform: "translate(-50%, -55%)" }}
+            >
+              <div className="relative inline-block">
+                {previewSrc ? (
+                  <>
+                    {/* サムネイルプレビュー + スタック */}
+                    {count > 2 && (
+                      <div
+                        className="drag-ghost-card absolute inset-0 translate-x-1.5 translate-y-1.5 bg-white border border-[#d0d0d0] rounded shadow-sm transition-[border-color,box-shadow] duration-150"
+                        style={{ zIndex: 1 }}
+                      />
+                    )}
+                    {count > 1 && (
+                      <div
+                        className="drag-ghost-card absolute inset-0 translate-x-[3px] translate-y-[3px] bg-white border border-[#d0d0d0] rounded shadow-sm transition-[border-color,box-shadow] duration-150"
+                        style={{ zIndex: 2 }}
+                      />
+                    )}
+                    <div
+                      className="drag-ghost-card relative bg-white border border-[#d0d0d0] rounded shadow p-1 transition-[border-color,box-shadow] duration-150"
+                      style={{ zIndex: 3 }}
+                    >
+                      <img
+                        src={previewSrc}
+                        alt=""
+                        className="block rounded-sm"
+                        style={{ maxWidth: 120, maxHeight: 120, objectFit: "contain" }}
+                        draggable={false}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* アイコン表示 + スタック */}
+                    {count > 2 && (
+                      <div
+                        className="drag-ghost-card absolute w-12 h-12 bg-white border border-[#d0d0d0] rounded-lg shadow-sm transition-[border-color,box-shadow] duration-150"
+                        style={{ left: 8, top: 8 }}
+                      />
+                    )}
+                    {count > 1 && (
+                      <div
+                        className="drag-ghost-card absolute w-12 h-12 bg-white border border-[#d0d0d0] rounded-lg shadow-sm transition-[border-color,box-shadow] duration-150"
+                        style={{ left: 4, top: 4 }}
+                      />
+                    )}
+                    <div className="drag-ghost-card relative w-12 h-12 flex items-center justify-center bg-white border border-[#d0d0d0] rounded-lg shadow transition-[border-color,box-shadow] duration-150">
+                      {(() => {
+                        const iconKey = isDir ? "__directory__" : ext;
+                        const store = useIconStore.getState();
+                        const iconUrl = store.largeIcons[iconKey] || store.icons[iconKey];
+                        if (iconUrl)
+                          return (
+                            <img src={iconUrl} alt="" className="w-8 h-8" draggable={false} />
+                          );
+                        return (
+                          <span className="text-2xl leading-none">
+                            {isDir ? "\uD83D\uDCC1" : "\uD83D\uDCC4"}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </>
+                )}
+                {/* 個数バッジ */}
+                {count > 1 && (
+                  <span
+                    className="absolute -top-2 -right-2 text-[10px] bg-[var(--accent)] text-white rounded-full w-[18px] h-[18px] flex items-center justify-center font-semibold shadow-sm"
+                    style={{ zIndex: 10 }}
+                  >
+                    {count}
+                  </span>
+                )}
+                {/* ウィンドウ外ドラッグインジケーター */}
+                <div
+                  ref={edgeIndicatorRef}
+                  className="absolute -bottom-7 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-1 bg-[var(--accent)] text-white text-xs font-medium rounded shadow-md whitespace-nowrap opacity-0 transition-opacity duration-150"
+                  style={{ zIndex: 10 }}
+                >
+                  <span>↗</span>
+                  <span>外部へドロップ</span>
+                </div>
               </div>
-            ))}
-            {dragGhostPaths.paths.length > 1 && (
-              <span className="absolute -top-2 right-0 text-[11px] bg-[var(--accent)] text-white rounded-full px-1.5 min-w-[20px] text-center font-semibold leading-[18px] shadow-sm z-10">
-                +{dragGhostPaths.paths.length}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+            </div>
+          );
+        })()}
     </div>
   );
 }
