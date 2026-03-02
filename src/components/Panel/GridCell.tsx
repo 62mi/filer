@@ -271,6 +271,8 @@ export const GridCell = memo(function GridCell({
               />
             )}
           </>
+        ) : hasThumbnailMedia && isPending ? (
+          <Loader className="text-[#aaa] animate-spin" style={{ width: iconDisplaySize * 0.35, height: iconDisplaySize * 0.35 }} />
         ) : largeIcon ? (
           <img
             src={largeIcon}
@@ -284,14 +286,7 @@ export const GridCell = memo(function GridCell({
             style={{ width: iconDisplaySize, height: iconDisplaySize }}
           />
         ) : (
-          <div
-            className="flex items-center justify-center"
-            style={{ width: iconDisplaySize, height: iconDisplaySize }}
-          >
-            {isPending && (
-              <Loader className="text-[#aaa] animate-spin" style={{ width: iconDisplaySize * 0.35, height: iconDisplaySize * 0.35 }} />
-            )}
-          </div>
+          <div style={{ width: iconDisplaySize, height: iconDisplaySize }} />
         )}
       </div>
 
