@@ -174,6 +174,77 @@ fn generate_thumbnail(path: &str, size: u32) -> Result<String, String> {
 #[cfg(windows)]
 fn get_shell_icon_large(ext: &str) -> Result<String, String> {
     use std::mem;
+    use std::ptr;
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL,
+    };
+    use windows_sys::Win32::UI::Controls::ImageList_GetIcon;
+    use windows_sys::Win32::UI::Shell::{
+        SHGetFileInfoW, SHGetImageList, SHFILEINFOW, SHGFI_SYSICONINDEX,
+        SHGFI_USEFILEATTRIBUTES,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::DestroyIcon;
+
+    // SHIL_JUMBO = 256×256 アイコン
+    const SHIL_JUMBO: i32 = 0x4;
+    // IID_IImageList: {46EB5926-582E-4017-9FDF-E8998DAA0950}
+    const IID_IIMAGELIST: windows_sys::core::GUID = windows_sys::core::GUID {
+        data1: 0x46EB5926,
+        data2: 0x582E,
+        data3: 0x4017,
+        data4: [0x9F, 0xDF, 0xE8, 0x99, 0x8D, 0xAA, 0x09, 0x50],
+    };
+
+    let is_dir = ext == "__directory__";
+    let dummy: Vec<u16> = if is_dir {
+        "directory\0".encode_utf16().collect()
+    } else {
+        format!("dummy.{}\0", ext).encode_utf16().collect()
+    };
+    let file_attrs = if is_dir {
+        FILE_ATTRIBUTE_DIRECTORY
+    } else {
+        FILE_ATTRIBUTE_NORMAL
+    };
+
+    // アイコンインデックスを取得
+    let mut shfi: SHFILEINFOW = unsafe { mem::zeroed() };
+    let result = unsafe {
+        SHGetFileInfoW(
+            dummy.as_ptr(),
+            file_attrs,
+            &mut shfi as *mut SHFILEINFOW,
+            mem::size_of::<SHFILEINFOW>() as u32,
+            SHGFI_SYSICONINDEX | SHGFI_USEFILEATTRIBUTES,
+        )
+    };
+    if result == 0 {
+        return get_shell_icon_large_32(ext);
+    }
+    let icon_index = shfi.iIcon;
+
+    // Jumbo (256×256) イメージリストからアイコン取得
+    let mut pimgl: *mut std::ffi::c_void = ptr::null_mut();
+    let hr = unsafe { SHGetImageList(SHIL_JUMBO, &IID_IIMAGELIST, &mut pimgl) };
+    if hr < 0 || pimgl.is_null() {
+        return get_shell_icon_large_32(ext);
+    }
+
+    let himl = pimgl as isize;
+    let hicon = unsafe { ImageList_GetIcon(himl, icon_index, 0) };
+    if hicon.is_null() {
+        return get_shell_icon_large_32(ext);
+    }
+
+    let data_url = hicon_to_data_url_sized(hicon, 256);
+    unsafe { DestroyIcon(hicon) };
+    data_url
+}
+
+/// フォールバック: 従来の32×32アイコン取得
+#[cfg(windows)]
+fn get_shell_icon_large_32(ext: &str) -> Result<String, String> {
+    use std::mem;
     use windows_sys::Win32::Storage::FileSystem::{
         FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL,
     };
@@ -183,13 +254,11 @@ fn get_shell_icon_large(ext: &str) -> Result<String, String> {
     use windows_sys::Win32::UI::WindowsAndMessaging::DestroyIcon;
 
     let is_dir = ext == "__directory__";
-
     let dummy: Vec<u16> = if is_dir {
         "directory\0".encode_utf16().collect()
     } else {
         format!("dummy.{}\0", ext).encode_utf16().collect()
     };
-
     let file_attrs = if is_dir {
         FILE_ATTRIBUTE_DIRECTORY
     } else {
@@ -206,7 +275,6 @@ fn get_shell_icon_large(ext: &str) -> Result<String, String> {
             SHGFI_ICON | SHGFI_LARGEICON | SHGFI_USEFILEATTRIBUTES,
         )
     };
-
     if result == 0 || shfi.hIcon.is_null() {
         return Err("SHGetFileInfoW failed".into());
     }
