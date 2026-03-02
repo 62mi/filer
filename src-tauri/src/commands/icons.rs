@@ -232,7 +232,7 @@ fn get_shell_icon_large(ext: &str) -> Result<String, String> {
 
     let himl = pimgl as isize;
     let hicon = unsafe { ImageList_GetIcon(himl, icon_index, 0) };
-    if hicon == 0 {
+    if hicon.is_null() {
         return get_shell_icon_large_32(ext);
     }
 
@@ -275,7 +275,7 @@ fn get_shell_icon_large_32(ext: &str) -> Result<String, String> {
             SHGFI_ICON | SHGFI_LARGEICON | SHGFI_USEFILEATTRIBUTES,
         )
     };
-    if result == 0 || shfi.hIcon == 0 {
+    if result == 0 || shfi.hIcon.is_null() {
         return Err("SHGetFileInfoW failed".into());
     }
 
