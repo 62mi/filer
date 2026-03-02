@@ -447,6 +447,7 @@ export const en: Translations = {
     dragFilesHere: "Drag files here",
     remove: "Remove",
     clearAll: "Clear all",
+    trash: "Trash",
   },
 
   imageControls: {

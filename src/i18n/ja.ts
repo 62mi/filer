@@ -469,6 +469,7 @@ export const ja = {
     dragFilesHere: "ここにファイルをドラッグ",
     remove: "削除",
     clearAll: "すべてクリア",
+    trash: "ゴミ箱",
   },
 
   // ── 画像操作 ──

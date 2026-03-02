@@ -217,3 +217,25 @@ pub fn open_terminal(terminal: String, cwd: String) -> Result<(), String> {
         Err("Terminal launch is only supported on Windows".to_string())
     }
 }
+
+#[tauri::command]
+pub fn open_recycle_bin() -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        use std::process::Command;
+        const DETACHED_PROCESS: u32 = 0x00000008;
+
+        Command::new("explorer.exe")
+            .arg("shell:RecycleBinFolder")
+            .creation_flags(DETACHED_PROCESS)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| format!("Failed to open Recycle Bin: {}", e))
+    }
+
+    #[cfg(not(windows))]
+    {
+        Err("Recycle Bin is only supported on Windows".to_string())
+    }
+}

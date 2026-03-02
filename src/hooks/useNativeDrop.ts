@@ -34,6 +34,7 @@ const ZONE_STYLES: Record<string, { bg: string; shadow: string }> = {
   "sidebar-stack": { bg: "rgba(0,120,212,0.18)", shadow: "inset 0 0 0 1.5px #0078d4" },
   "bookmark-bar": { bg: "rgba(0,120,212,0.20)", shadow: "" },
   "bookmark-folder": { bg: "rgba(0,120,212,0.20)", shadow: "" },
+  "sidebar-trash": { bg: "rgba(220,38,38,0.15)", shadow: "inset 0 0 0 1.5px #dc2626" },
   suggestion: { bg: "#cce8ff", shadow: "" },
 };
 
@@ -129,6 +130,11 @@ export async function handleNativeDrop(paths: string[], x: number, y: number) {
       break;
     }
 
+    case "sidebar-trash": {
+      await handleTrashDrop(paths);
+      break;
+    }
+
     case "bookmark-bar": {
       for (const p of paths) {
         useBookmarkStore.getState().addBookmark(p);
@@ -159,6 +165,30 @@ export async function handleNativeDrop(paths: string[], x: number, y: number) {
       // 不明なゾーン: パネル背景扱い
       await handlePanelBgDrop(paths);
       break;
+  }
+}
+
+/** ゴミ箱ドロップ: ファイルをゴミ箱に送る */
+async function handleTrashDrop(paths: string[]) {
+  try {
+    const result = await invoke<{ succeeded: string[]; failed: [string, string][] }>(
+      "delete_files",
+      { paths, toTrash: true },
+    );
+    if (result.succeeded.length > 0) {
+      useUndoStore.getState().pushAction({
+        type: "delete",
+        entries: result.succeeded.map((p) => ({ sourcePath: p, destPath: "" })),
+      });
+    }
+    if (result.failed.length > 0) {
+      toast.error(
+        `${result.failed.length}件の削除に失敗: ${result.failed[0][1]}`,
+      );
+    }
+    useExplorerStore.getState().refreshDirectory();
+  } catch (err: unknown) {
+    toast.error(`ゴミ箱への移動に失敗: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 

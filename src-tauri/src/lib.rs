@@ -255,6 +255,7 @@ pub fn run() {
             get_copy_queue,
             clear_completed_copies,
             get_accent_color,
+            open_recycle_bin,
             commands::window::create_new_window,
             commands::window::get_window_label,
             commands::tab_drag::start_tab_transfer,

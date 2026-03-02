@@ -482,6 +482,18 @@ export function Sidebar() {
         </div>
       )}
 
+      {/* ゴミ箱ドロップゾーン */}
+      <div className="mt-auto border-t border-[var(--chrome-border)]">
+        <button
+          className="flex items-center gap-2 px-3 py-2 w-full text-left text-[var(--chrome-text-dim)] hover:bg-[var(--chrome-hover)] transition-colors duration-150"
+          data-drop-zone="sidebar-trash"
+          onDoubleClick={() => invoke("open_recycle_bin")}
+        >
+          <Trash2 className="w-4 h-4 shrink-0" />
+          <span className="text-[12px]">{t.sidebar.trash}</span>
+        </button>
+      </div>
+
       {/* Stack context menu */}
       {stackContextMenu && (
         <div
