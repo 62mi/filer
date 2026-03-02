@@ -2,7 +2,7 @@ use crate::db::Database;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tauri::{Emitter, Manager};
 use walkdir::WalkDir;
@@ -10,6 +10,41 @@ use walkdir::WalkDir;
 const DEFAULT_SEARCH_MAX_RESULTS: usize = 200;
 const DEFAULT_SEARCH_MAX_DEPTH: usize = 5;
 const DEFAULT_READ_MAX_BYTES: usize = 50_000;
+
+/// 宛先に同名ファイル/フォルダが存在する場合、「name (N).ext」形式のユニークなパスを生成
+/// is_dir=true の場合は拡張子を分離せず名前全体をステムとして扱う
+pub fn generate_unique_path(dest_dir: &Path, file_name: &std::ffi::OsStr, is_dir: bool) -> PathBuf {
+    let target = dest_dir.join(file_name);
+    if !target.exists() {
+        return target;
+    }
+
+    let name_str = file_name.to_string_lossy();
+
+    // ディレクトリ: 名前全体をステムとして扱う（"folder.bak" → "folder.bak (1)"）
+    // ファイル: ステムと拡張子を分離（"file.txt" → "file (1).txt"）
+    let (stem, ext): (&str, Option<&str>) = if is_dir {
+        (&name_str, None)
+    } else {
+        match name_str.rfind('.') {
+            Some(dot_pos) if dot_pos > 0 => (&name_str[..dot_pos], Some(&name_str[dot_pos..])),
+            _ => (&name_str, None),
+        }
+    };
+
+    let mut counter = 1;
+    loop {
+        let new_name = match ext {
+            Some(ext) => format!("{} ({}){}", stem, counter, ext),
+            None => format!("{} ({})", stem, counter),
+        };
+        let new_target = dest_dir.join(&new_name);
+        if !new_target.exists() {
+            return new_target;
+        }
+        counter += 1;
+    }
+}
 
 /// ファイル名にパス区切り文字やトラバーサル文字列が含まれていないか検証
 fn validate_name(name: &str) -> Result<(), String> {
@@ -126,15 +161,16 @@ pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
 }
 
 #[tauri::command]
-pub async fn copy_files(sources: Vec<String>, dest: String) -> Result<(), String> {
+pub async fn copy_files(sources: Vec<String>, dest: String) -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let dest_path = Path::new(&dest);
+        let mut actual_paths = Vec::with_capacity(sources.len());
         for source in &sources {
             let src_path = Path::new(source);
             let file_name = src_path
                 .file_name()
                 .ok_or_else(|| "Invalid source path".to_string())?;
-            let target = dest_path.join(file_name);
+            let target = generate_unique_path(dest_path, file_name, src_path.is_dir());
 
             if src_path.is_dir() {
                 copy_dir_recursive(src_path, &target)?;
@@ -142,8 +178,9 @@ pub async fn copy_files(sources: Vec<String>, dest: String) -> Result<(), String
                 fs::copy(src_path, &target)
                     .map_err(|e| format!("Failed to copy {}: {}", source, e))?;
             }
+            actual_paths.push(target.to_string_lossy().to_string());
         }
-        Ok(())
+        Ok(actual_paths)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -166,18 +203,20 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn move_files(sources: Vec<String>, dest: String) -> Result<(), String> {
+pub async fn move_files(sources: Vec<String>, dest: String) -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let dest_path = Path::new(&dest);
+        let mut actual_paths = Vec::with_capacity(sources.len());
         for source in &sources {
             let src_path = Path::new(source);
             let file_name = src_path
                 .file_name()
                 .ok_or_else(|| "Invalid source path".to_string())?;
-            let target = dest_path.join(file_name);
+            let target = generate_unique_path(dest_path, file_name, src_path.is_dir());
             fs::rename(src_path, &target).map_err(|e| format!("Failed to move {}: {}", source, e))?;
+            actual_paths.push(target.to_string_lossy().to_string());
         }
-        Ok(())
+        Ok(actual_paths)
     })
     .await
     .map_err(|e| e.to_string())?

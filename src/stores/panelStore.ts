@@ -694,17 +694,19 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     if (!clipData || clipData.paths.length === 0) return false;
 
     try {
-      // Undo用に移動先パスを記録
-      const entries = clipData.paths.map((sourcePath) => {
-        const fileName = sourcePath.substring(sourcePath.lastIndexOf("\\") + 1);
-        return { sourcePath, destPath: `${tab.path}\\${fileName}` };
-      });
-
       if (clipData.operation === "copy") {
         await useCopyQueueStore.getState().enqueue(clipData.paths, tab.path, "copy");
-        useUndoStore.getState().pushAction({ type: "copy", entries });
+        // コピーキューは非同期でリネームされる可能性があるため、undo記録は省略
       } else {
-        await invoke("move_files", { sources: clipData.paths, dest: tab.path });
+        const actualPaths = await invoke<string[]>("move_files", {
+          sources: clipData.paths,
+          dest: tab.path,
+        });
+        // Rust側で重複回避リネームされた実際のパスでundo記録
+        const entries = clipData.paths.map((sourcePath, i) => ({
+          sourcePath,
+          destPath: actualPaths[i],
+        }));
         useUndoStore.getState().pushAction({ type: "move", entries });
         set({ clipboard: null });
       }

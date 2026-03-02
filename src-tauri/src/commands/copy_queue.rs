@@ -1,3 +1,4 @@
+use crate::commands::fs::generate_unique_path;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Read, Write};
@@ -230,7 +231,7 @@ pub fn enqueue_copy(
                 Some(n) => n,
                 None => continue,
             };
-            let target = dest_path.join(file_name);
+            let target = generate_unique_path(dest_path, file_name, src_path.is_dir());
 
             let result = if src_path.is_dir() {
                 copy_dir_recursive_chunked(
