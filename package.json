@@ -1,7 +1,7 @@
 {
   "name": "filer",
   "private": true,
-  "version": "1.4.0",
+  "version": "1.4.2",
   "author": "Tomako",
   "license": "UNLICENSED",
   "type": "module",
@@ -16,7 +16,8 @@
     "lint:fix": "biome check --write src",
     "format": "biome format --write src",
     "check": "biome check --write src && tsc --noEmit",
-    "prepare": "husky"
+    "prepare": "husky",
+    "bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
     "@crabnebula/tauri-plugin-drag": "^2.1.0",
