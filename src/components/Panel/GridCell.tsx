@@ -77,15 +77,16 @@ export const GridCell = memo(function GridCell({
   const fetchVideoThumbnail = useThumbnailStore((s) => s.fetchVideoThumbnail);
   const fetchPsdThumbnail = useThumbnailStore((s) => s.fetchPsdThumbnail);
   const fetchGoogleDocsThumbnails = useThumbnailStore((s) => s.fetchGoogleDocsThumbnails);
-  const removeThumbnail = useThumbnailStore((s) => s.removeThumbnail);
+  const markFailed = useThumbnailStore((s) => s.markFailed);
   const hasThumbnail = useThumbnailStore((s) =>
     hasThumbnailMedia ? !!s.thumbnails[thumbKey] : false,
   );
   const isPending = useThumbnailStore((s) => (hasThumbnailMedia ? s.pending.has(thumbKey) : false));
+  const isFailed = useThumbnailStore((s) => (hasThumbnailMedia ? s.failed.has(thumbKey) : false));
 
   // IntersectionObserver: ビューポートに入ったらサムネイル取得
   useEffect(() => {
-    if (!hasThumbnailMedia || hasThumbnail || isPending) return;
+    if (!hasThumbnailMedia || hasThumbnail || isPending || isFailed) return;
     const el = cellRef.current;
     if (!el) return;
 
@@ -115,6 +116,7 @@ export const GridCell = memo(function GridCell({
     isPsd,
     hasThumbnail,
     isPending,
+    isFailed,
     entry.path,
     fetchThumbnails,
     fetchVideoThumbnail,
@@ -249,7 +251,7 @@ export const GridCell = memo(function GridCell({
             <img
               src={thumbnail}
               alt=""
-              className="rounded-sm"
+              className="rounded-sm animate-fade-in"
               style={{
                 maxWidth: gridIconSize,
                 maxHeight: gridIconSize,
@@ -257,7 +259,7 @@ export const GridCell = memo(function GridCell({
                 filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.2))",
               }}
               draggable={false}
-              onError={isGoogleDocs ? () => removeThumbnail(entry.path, THUMB_SIZE) : undefined}
+              onError={isGoogleDocs ? () => markFailed(entry.path, THUMB_SIZE) : undefined}
             />
             {smallIcon && !isImage && (
               <img
@@ -283,7 +285,7 @@ export const GridCell = memo(function GridCell({
           />
         ) : (
           <div
-            className="bg-[#e8e8e8] rounded"
+            className={cn("bg-[#e8e8e8] rounded", isPending && "animate-pulse")}
             style={{ width: iconDisplaySize, height: iconDisplaySize }}
           />
         )}

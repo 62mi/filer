@@ -32,6 +32,7 @@ export function resetFfmpegCache() {
 interface ThumbnailStore {
   thumbnails: Record<string, string>; // cacheKey → dataURL or HTTP URL
   pending: Set<string>; // cacheKey
+  failed: Set<string>; // cacheKey — サムネイル取得不可（再試行しない）
 
   fetchThumbnails: (paths: string[], size: number) => Promise<void>;
   fetchVideoThumbnail: (path: string, size: number) => Promise<void>;
@@ -51,6 +52,8 @@ interface ThumbnailStore {
   getThumbnail: (path: string, size: number) => string | undefined;
   hasThumbnail: (path: string, size: number) => boolean;
   isPending: (path: string, size: number) => boolean;
+  isFailed: (path: string, size: number) => boolean;
+  markFailed: (path: string, size: number) => void;
   removeThumbnail: (path: string, size: number) => void;
   clearThumbnails: () => void;
 }
@@ -149,9 +152,10 @@ async function renderPsdThumbnail(filePath: string, size: number): Promise<strin
 export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
   thumbnails: {},
   pending: new Set(),
+  failed: new Set(),
 
   clearThumbnails: () => {
-    set({ thumbnails: {}, pending: new Set() });
+    set({ thumbnails: {}, pending: new Set(), failed: new Set() });
   },
 
   getThumbnail: (path, size) => {
@@ -164,6 +168,21 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
 
   isPending: (path, size) => {
     return get().pending.has(cacheKey(path, size));
+  },
+
+  isFailed: (path, size) => {
+    return get().failed.has(cacheKey(path, size));
+  },
+
+  markFailed: (path, size) => {
+    const k = cacheKey(path, size);
+    set((s) => {
+      const next = { ...s.thumbnails };
+      delete next[k];
+      const nextFailed = new Set(s.failed);
+      nextFailed.add(k);
+      return { thumbnails: next, failed: nextFailed };
+    });
   },
 
   fetchThumbnails: async (paths: string[], size: number) => {
@@ -335,10 +354,10 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
 
   // Google Docs サムネイルURL取得（バッチ）
   fetchGoogleDocsThumbnails: async (paths: string[], size: number) => {
-    const { thumbnails, pending } = get();
+    const { thumbnails, pending, failed } = get();
     const needed = paths.filter((p) => {
       const k = cacheKey(p, size);
-      return !thumbnails[k] && !pending.has(k);
+      return !thumbnails[k] && !pending.has(k) && !failed.has(k);
     });
     if (needed.length === 0) return;
 
@@ -356,12 +375,18 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
       });
       set((s) => {
         const next = new Set(s.pending);
+        const nextFailed = new Set(s.failed);
         for (const k of keys) next.delete(k);
         const merged = { ...s.thumbnails };
-        for (const [path, url] of Object.entries(result)) {
-          merged[cacheKey(path, size)] = url;
+        for (let i = 0; i < needed.length; i++) {
+          if (result[needed[i]]) {
+            merged[keys[i]] = result[needed[i]];
+          } else {
+            // DB検索でdoc_idが見つからなかった → 再試行しない
+            nextFailed.add(keys[i]);
+          }
         }
-        return { thumbnails: merged, pending: next };
+        return { thumbnails: merged, pending: next, failed: nextFailed };
       });
     } catch {
       set((s) => {
@@ -627,10 +652,10 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
     const controller = new AbortController();
     gdocsPrefetchAbort = controller;
 
-    const { thumbnails, pending } = get();
+    const { thumbnails, pending, failed } = get();
     const needed = paths.filter((p) => {
       const k = cacheKey(p, size);
-      return !thumbnails[k] && !pending.has(k);
+      return !thumbnails[k] && !pending.has(k) && !failed.has(k);
     });
     if (needed.length === 0) return;
 
@@ -643,7 +668,7 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
       const current = get();
       const todo = needed.filter((p) => {
         const k = cacheKey(p, size);
-        return !current.thumbnails[k] && !current.pending.has(k);
+        return !current.thumbnails[k] && !current.pending.has(k) && !current.failed.has(k);
       });
       if (todo.length === 0) return;
 
@@ -662,12 +687,17 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
         if (controller.signal.aborted) return;
         set((s) => {
           const next = new Set(s.pending);
+          const nextFailed = new Set(s.failed);
           for (const k of keys) next.delete(k);
           const merged = { ...s.thumbnails };
-          for (const [path, url] of Object.entries(result)) {
-            merged[cacheKey(path, size)] = url;
+          for (let i = 0; i < todo.length; i++) {
+            if (result[todo[i]]) {
+              merged[keys[i]] = result[todo[i]];
+            } else {
+              nextFailed.add(keys[i]);
+            }
           }
-          return { thumbnails: merged, pending: next };
+          return { thumbnails: merged, pending: next, failed: nextFailed };
         });
       } catch {
         if (controller.signal.aborted) return;
