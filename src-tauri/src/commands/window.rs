@@ -14,7 +14,7 @@ pub fn apply_taskbar_icon(window: &tauri::WebviewWindow) {
     const ICON_SMALL: usize = 0;
 
     let hwnd = match window.hwnd() {
-        Ok(h) => h.0 as isize,
+        Ok(h) => h.0 as windows_sys::Win32::Foundation::HWND,
         Err(_) => return,
     };
 
@@ -30,7 +30,7 @@ pub fn apply_taskbar_icon(window: &tauri::WebviewWindow) {
             0, // 0,0 → SM_CXICON x SM_CYICON（通常32x32）
             LR_DEFAULTSIZE,
         );
-        if hicon_big != 0 {
+        if !hicon_big.is_null() {
             SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon_big as isize);
         }
 
@@ -43,7 +43,7 @@ pub fn apply_taskbar_icon(window: &tauri::WebviewWindow) {
             16,
             0,
         );
-        if hicon_small != 0 {
+        if !hicon_small.is_null() {
             SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_small as isize);
         }
     }
