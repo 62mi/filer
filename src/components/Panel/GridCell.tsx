@@ -161,7 +161,7 @@ export const GridCell = memo(function GridCell({
   const smallIcon = useIconStore((s) => (hasThumbnailMedia ? s.icons[entry.extension] : undefined));
 
   // Icon size scales with gridIconSize
-  const iconDisplaySize = Math.max(24, Math.min(gridIconSize * 0.75, 96));
+  const iconDisplaySize = Math.max(24, Math.round(gridIconSize * 0.9));
 
   return (
     <div
