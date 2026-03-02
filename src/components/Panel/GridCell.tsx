@@ -273,7 +273,7 @@ export const GridCell = memo(function GridCell({
           <img
             src={largeIcon}
             alt=""
-            style={{ width: iconDisplaySize, height: iconDisplaySize, imageRendering: "pixelated" }}
+            style={{ width: iconDisplaySize, height: iconDisplaySize }}
             draggable={false}
           />
         ) : entry.is_dir ? (
