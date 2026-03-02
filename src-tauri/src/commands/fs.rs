@@ -53,92 +53,100 @@ fn is_hidden(path: &Path) -> bool {
 }
 
 #[tauri::command]
-pub fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
-    let dir_path = Path::new(&path);
-    if !dir_path.exists() {
-        return Err(format!("Directory not found: {}", path));
-    }
-    if !dir_path.is_dir() {
-        return Err(format!("Not a directory: {}", path));
-    }
+pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir_path = Path::new(&path);
+        if !dir_path.exists() {
+            return Err(format!("Directory not found: {}", path));
+        }
+        if !dir_path.is_dir() {
+            return Err(format!("Not a directory: {}", path));
+        }
 
-    let mut entries = Vec::new();
+        let mut entries = Vec::new();
 
-    let read_dir = fs::read_dir(dir_path).map_err(|e| format!("Failed to read directory: {}", e))?;
+        let read_dir = fs::read_dir(dir_path).map_err(|e| format!("Failed to read directory: {}", e))?;
 
-    for entry in read_dir {
-        let entry = match entry {
-            Ok(e) => e,
-            Err(e) => {
-                eprintln!("[fs] Error reading directory entry: {}", e);
-                continue;
-            }
-        };
+        for entry in read_dir {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    eprintln!("[fs] Error reading directory entry: {}", e);
+                    continue;
+                }
+            };
 
-        let metadata = match entry.metadata() {
-            Ok(m) => m,
-            Err(e) => {
-                eprintln!("[fs] Error reading metadata for {:?}: {}", entry.file_name(), e);
-                continue;
-            }
-        };
+            let metadata = match entry.metadata() {
+                Ok(m) => m,
+                Err(e) => {
+                    eprintln!("[fs] Error reading metadata for {:?}: {}", entry.file_name(), e);
+                    continue;
+                }
+            };
 
-        let file_path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_string();
+            let file_path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
 
-        let modified = metadata
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-            .map(|d| d.as_secs_f64())
-            .unwrap_or(0.0);
+            let modified = metadata
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_secs_f64())
+                .unwrap_or(0.0);
 
-        let extension = file_path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
-            .to_lowercase();
+            let extension = file_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
 
-        entries.push(FileEntry {
-            name,
-            path: file_path.to_string_lossy().to_string(),
-            size: if metadata.is_dir() { 0 } else { metadata.len() },
-            modified,
-            is_dir: metadata.is_dir(),
-            is_hidden: is_hidden(&file_path),
-            is_symlink: metadata.is_symlink(),
-            extension,
+            entries.push(FileEntry {
+                name,
+                path: file_path.to_string_lossy().to_string(),
+                size: if metadata.is_dir() { 0 } else { metadata.len() },
+                modified,
+                is_dir: metadata.is_dir(),
+                is_hidden: is_hidden(&file_path),
+                is_symlink: metadata.is_symlink(),
+                extension,
+            });
+        }
+
+        // ディレクトリを先に、次にファイルをソート
+        entries.sort_by(|a, b| {
+            b.is_dir.cmp(&a.is_dir).then(
+                a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            )
         });
-    }
 
-    // ディレクトリを先に、次にファイルをソート
-    entries.sort_by(|a, b| {
-        b.is_dir.cmp(&a.is_dir).then(
-            a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        )
-    });
-
-    Ok(entries)
+        Ok(entries)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn copy_files(sources: Vec<String>, dest: String) -> Result<(), String> {
-    let dest_path = Path::new(&dest);
-    for source in &sources {
-        let src_path = Path::new(source);
-        let file_name = src_path
-            .file_name()
-            .ok_or_else(|| "Invalid source path".to_string())?;
-        let target = dest_path.join(file_name);
+pub async fn copy_files(sources: Vec<String>, dest: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dest_path = Path::new(&dest);
+        for source in &sources {
+            let src_path = Path::new(source);
+            let file_name = src_path
+                .file_name()
+                .ok_or_else(|| "Invalid source path".to_string())?;
+            let target = dest_path.join(file_name);
 
-        if src_path.is_dir() {
-            copy_dir_recursive(src_path, &target)?;
-        } else {
-            fs::copy(src_path, &target)
-                .map_err(|e| format!("Failed to copy {}: {}", source, e))?;
+            if src_path.is_dir() {
+                copy_dir_recursive(src_path, &target)?;
+            } else {
+                fs::copy(src_path, &target)
+                    .map_err(|e| format!("Failed to copy {}: {}", source, e))?;
+            }
         }
-    }
-    Ok(())
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
@@ -158,17 +166,21 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn move_files(sources: Vec<String>, dest: String) -> Result<(), String> {
-    let dest_path = Path::new(&dest);
-    for source in &sources {
-        let src_path = Path::new(source);
-        let file_name = src_path
-            .file_name()
-            .ok_or_else(|| "Invalid source path".to_string())?;
-        let target = dest_path.join(file_name);
-        fs::rename(src_path, &target).map_err(|e| format!("Failed to move {}: {}", source, e))?;
-    }
-    Ok(())
+pub async fn move_files(sources: Vec<String>, dest: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dest_path = Path::new(&dest);
+        for source in &sources {
+            let src_path = Path::new(source);
+            let file_name = src_path
+                .file_name()
+                .ok_or_else(|| "Invalid source path".to_string())?;
+            let target = dest_path.join(file_name);
+            fs::rename(src_path, &target).map_err(|e| format!("Failed to move {}: {}", source, e))?;
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[derive(Debug, Serialize)]
@@ -327,50 +339,54 @@ fn find_common_prefix(names: &[String]) -> Option<String> {
 }
 
 #[tauri::command]
-pub fn search_files(path: String, query: String, max_results: Option<usize>, max_depth: Option<usize>) -> Result<Vec<FileEntry>, String> {
-    let max = max_results.unwrap_or(DEFAULT_SEARCH_MAX_RESULTS);
-    let depth = max_depth.unwrap_or(DEFAULT_SEARCH_MAX_DEPTH);
-    let query_lower = query.to_lowercase();
-    let mut results = Vec::new();
+pub async fn search_files(path: String, query: String, max_results: Option<usize>, max_depth: Option<usize>) -> Result<Vec<FileEntry>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let max = max_results.unwrap_or(DEFAULT_SEARCH_MAX_RESULTS);
+        let depth = max_depth.unwrap_or(DEFAULT_SEARCH_MAX_DEPTH);
+        let query_lower = query.to_lowercase();
+        let mut results = Vec::new();
 
-    for entry in WalkDir::new(&path).max_depth(depth).into_iter().filter_map(|e| e.ok()) {
-        if results.len() >= max {
-            break;
+        for entry in WalkDir::new(&path).max_depth(depth).into_iter().filter_map(|e| e.ok()) {
+            if results.len() >= max {
+                break;
+            }
+            let name = entry.file_name().to_string_lossy().to_string();
+            if !name.to_lowercase().contains(&query_lower) {
+                continue;
+            }
+            let file_path = entry.path().to_path_buf();
+            let metadata = match entry.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            let modified = metadata
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_secs_f64())
+                .unwrap_or(0.0);
+            let extension = file_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+
+            results.push(FileEntry {
+                name,
+                path: file_path.to_string_lossy().to_string(),
+                size: if metadata.is_dir() { 0 } else { metadata.len() },
+                modified,
+                is_dir: metadata.is_dir(),
+                is_hidden: is_hidden(&file_path),
+                is_symlink: metadata.is_symlink(),
+                extension,
+            });
         }
-        let name = entry.file_name().to_string_lossy().to_string();
-        if !name.to_lowercase().contains(&query_lower) {
-            continue;
-        }
-        let file_path = entry.path().to_path_buf();
-        let metadata = match entry.metadata() {
-            Ok(m) => m,
-            Err(_) => continue,
-        };
-        let modified = metadata
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-            .map(|d| d.as_secs_f64())
-            .unwrap_or(0.0);
-        let extension = file_path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
-            .to_lowercase();
 
-        results.push(FileEntry {
-            name,
-            path: file_path.to_string_lossy().to_string(),
-            size: if metadata.is_dir() { 0 } else { metadata.len() },
-            modified,
-            is_dir: metadata.is_dir(),
-            is_hidden: is_hidden(&file_path),
-            is_symlink: metadata.is_symlink(),
-            extension,
-        });
-    }
-
-    Ok(results)
+        Ok(results)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -551,10 +567,14 @@ pub async fn get_google_docs_thumbnails(
 }
 
 #[tauri::command]
-pub fn read_image_base64(path: String) -> Result<String, String> {
-    use base64::Engine;
-    let data = fs::read(&path).map_err(|e| format!("Failed to read file: {}", e))?;
-    Ok(base64::engine::general_purpose::STANDARD.encode(&data))
+pub async fn read_image_base64(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use base64::Engine;
+        let data = fs::read(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+        Ok(base64::engine::general_purpose::STANDARD.encode(&data))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[derive(Debug, Serialize)]
@@ -574,85 +594,89 @@ pub struct FileProperties {
 }
 
 #[tauri::command]
-pub fn get_file_properties(path: String) -> Result<FileProperties, String> {
-    let p = Path::new(&path);
-    let metadata = fs::metadata(p).map_err(|e| format!("Failed to get metadata: {}", e))?;
+pub async fn get_file_properties(path: String) -> Result<FileProperties, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let p = Path::new(&path);
+        let metadata = fs::metadata(p).map_err(|e| format!("Failed to get metadata: {}", e))?;
 
-    let name = p.file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| path.clone());
+        let name = p.file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.clone());
 
-    let created = metadata.created()
-        .ok()
-        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_secs_f64())
-        .unwrap_or(0.0);
+        let created = metadata.created()
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_secs_f64())
+            .unwrap_or(0.0);
 
-    let modified = metadata.modified()
-        .ok()
-        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_secs_f64())
-        .unwrap_or(0.0);
+        let modified = metadata.modified()
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_secs_f64())
+            .unwrap_or(0.0);
 
-    let accessed = metadata.accessed()
-        .ok()
-        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_secs_f64())
-        .unwrap_or(0.0);
+        let accessed = metadata.accessed()
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_secs_f64())
+            .unwrap_or(0.0);
 
-    let (is_readonly, is_hidden_flag, is_system);
+        let (is_readonly, is_hidden_flag, is_system);
 
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        let attrs = metadata.file_attributes();
-        is_readonly = attrs & 0x1 != 0;
-        is_hidden_flag = attrs & 0x2 != 0;
-        is_system = attrs & 0x4 != 0;
-    }
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::MetadataExt;
+            let attrs = metadata.file_attributes();
+            is_readonly = attrs & 0x1 != 0;
+            is_hidden_flag = attrs & 0x2 != 0;
+            is_system = attrs & 0x4 != 0;
+        }
 
-    #[cfg(not(windows))]
-    {
-        is_readonly = metadata.permissions().readonly();
-        is_hidden_flag = name.starts_with('.');
-        is_system = false;
-    }
+        #[cfg(not(windows))]
+        {
+            is_readonly = metadata.permissions().readonly();
+            is_hidden_flag = name.starts_with('.');
+            is_system = false;
+        }
 
-    let (mut size, mut file_count, mut dir_count) = (0u64, 0u64, 0u64);
+        let (mut size, mut file_count, mut dir_count) = (0u64, 0u64, 0u64);
 
-    if metadata.is_dir() {
-        // Calculate total size and counts for directories
-        for entry in WalkDir::new(p).into_iter().filter_map(|e| e.ok()) {
-            if entry.path() == p {
-                continue;
-            }
-            if let Ok(m) = entry.metadata() {
-                if m.is_dir() {
-                    dir_count += 1;
-                } else {
-                    file_count += 1;
-                    size += m.len();
+        if metadata.is_dir() {
+            // Calculate total size and counts for directories
+            for entry in WalkDir::new(p).into_iter().filter_map(|e| e.ok()) {
+                if entry.path() == p {
+                    continue;
+                }
+                if let Ok(m) = entry.metadata() {
+                    if m.is_dir() {
+                        dir_count += 1;
+                    } else {
+                        file_count += 1;
+                        size += m.len();
+                    }
                 }
             }
+        } else {
+            size = metadata.len();
         }
-    } else {
-        size = metadata.len();
-    }
 
-    Ok(FileProperties {
-        name,
-        path: path.clone(),
-        size,
-        created,
-        modified,
-        accessed,
-        is_dir: metadata.is_dir(),
-        is_readonly,
-        is_hidden: is_hidden_flag,
-        is_system,
-        file_count,
-        dir_count,
+        Ok(FileProperties {
+            name,
+            path: path.clone(),
+            size,
+            created,
+            modified,
+            accessed,
+            is_dir: metadata.is_dir(),
+            is_readonly,
+            is_hidden: is_hidden_flag,
+            is_system,
+            file_count,
+            dir_count,
+        })
     })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// テンプレートノード
@@ -711,59 +735,63 @@ fn create_nodes_recursive(
 
 /// 画像を回転・反転して上書き保存する
 #[tauri::command]
-pub fn transform_image(
+pub async fn transform_image(
     path: String,
     rotation: u32,
     flip_h: bool,
     flip_v: bool,
 ) -> Result<(), String> {
-    let img_path = Path::new(&path);
-    let ext = img_path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
+    tauri::async_runtime::spawn_blocking(move || {
+        let img_path = Path::new(&path);
+        let ext = img_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
 
-    // 対応フォーマットの確認（image crateでエンコード可能な形式のみ）
-    let is_jpeg = matches!(ext.as_str(), "jpg" | "jpeg" | "jpe" | "jfif");
-    if !is_jpeg && !matches!(ext.as_str(), "png" | "gif" | "webp") {
-        return Err(format!("この形式は保存に対応していません: {}", ext));
-    }
+        // 対応フォーマットの確認（image crateでエンコード可能な形式のみ）
+        let is_jpeg = matches!(ext.as_str(), "jpg" | "jpeg" | "jpe" | "jfif");
+        if !is_jpeg && !matches!(ext.as_str(), "png" | "gif" | "webp") {
+            return Err(format!("この形式は保存に対応していません: {}", ext));
+        }
 
-    let mut img = image::open(&path)
-        .map_err(|e| format!("画像のデコードに失敗: {}", e))?;
+        let mut img = image::open(&path)
+            .map_err(|e| format!("画像のデコードに失敗: {}", e))?;
 
-    // 回転（時計回り）
-    img = match rotation % 360 {
-        90 => img.rotate90(),
-        180 => img.rotate180(),
-        270 => img.rotate270(),
-        _ => img,
-    };
+        // 回転（時計回り）
+        img = match rotation % 360 {
+            90 => img.rotate90(),
+            180 => img.rotate180(),
+            270 => img.rotate270(),
+            _ => img,
+        };
 
-    // 反転
-    if flip_h {
-        img = img.fliph();
-    }
-    if flip_v {
-        img = img.flipv();
-    }
+        // 反転
+        if flip_h {
+            img = img.fliph();
+        }
+        if flip_v {
+            img = img.flipv();
+        }
 
-    // 保存
-    if is_jpeg {
-        use std::io::BufWriter;
-        let file = fs::File::create(&path)
-            .map_err(|e| format!("ファイルを作成できませんでした: {}", e))?;
-        let writer = BufWriter::new(file);
-        let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(writer, 90);
-        img.write_with_encoder(encoder)
-            .map_err(|e| format!("画像の保存に失敗: {}", e))?;
-    } else {
-        img.save(&path)
-            .map_err(|e| format!("画像の保存に失敗: {}", e))?;
-    }
+        // 保存
+        if is_jpeg {
+            use std::io::BufWriter;
+            let file = fs::File::create(&path)
+                .map_err(|e| format!("ファイルを作成できませんでした: {}", e))?;
+            let writer = BufWriter::new(file);
+            let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(writer, 90);
+            img.write_with_encoder(encoder)
+                .map_err(|e| format!("画像の保存に失敗: {}", e))?;
+        } else {
+            img.save(&path)
+                .map_err(|e| format!("画像の保存に失敗: {}", e))?;
+        }
 
-    Ok(())
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// フォルダサイズ計算結果
