@@ -45,7 +45,6 @@ interface SettingField {
 
 type TabMode = "general" | "simple" | "advanced" | "ai" | "about";
 
-const APP_VERSION = "1.2.0";
 
 export function SettingsDialog() {
   const t = useTranslation();
@@ -329,7 +328,7 @@ export function SettingsDialog() {
                 <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
                   {t.settingsDialog.aboutVersion}
                 </div>
-                <div className="text-xs text-[#555]">v{APP_VERSION}</div>
+                <div className="text-xs text-[#555]">v{__APP_VERSION__}</div>
               </div>
               <div className="border-t border-[#f0f0f0] pt-3">
                 <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
