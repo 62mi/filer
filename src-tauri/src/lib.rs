@@ -137,6 +137,10 @@ pub fn run() {
             // ウィンドウアイコン設定
             if let Some(window) = app.get_webview_window("main") {
                 window.set_icon(app_icon.clone()).ok();
+                // Tauriのset_icon()はICON_SMALLのみ設定するため、
+                // ICON_BIG(タスクバー用)をWin32 APIで直接設定する
+                #[cfg(windows)]
+                commands::window::apply_taskbar_icon(&window);
             }
 
             // ── トレイアイコン構築 ──
