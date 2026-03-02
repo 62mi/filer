@@ -75,6 +75,7 @@ export const GridCell = memo(function GridCell({
   const thumbKey = hasThumbnailMedia ? `${entry.path}\0${THUMB_SIZE}` : "";
   const fetchThumbnails = useThumbnailStore((s) => s.fetchThumbnails);
   const fetchVideoThumbnail = useThumbnailStore((s) => s.fetchVideoThumbnail);
+  const fetchPdfThumbnail = useThumbnailStore((s) => s.fetchPdfThumbnail);
   const fetchPsdThumbnail = useThumbnailStore((s) => s.fetchPsdThumbnail);
   const fetchGoogleDocsThumbnails = useThumbnailStore((s) => s.fetchGoogleDocsThumbnails);
   const markFailed = useThumbnailStore((s) => s.markFailed);
@@ -97,6 +98,8 @@ export const GridCell = memo(function GridCell({
             fetchThumbnails([entry.path], THUMB_SIZE);
           } else if (isGoogleDocs) {
             fetchGoogleDocsThumbnails([entry.path], THUMB_SIZE);
+          } else if (isPdf) {
+            fetchPdfThumbnail(entry.path, THUMB_SIZE);
           } else if (isPsd) {
             fetchPsdThumbnail(entry.path, THUMB_SIZE);
           } else {
@@ -113,6 +116,7 @@ export const GridCell = memo(function GridCell({
     hasThumbnailMedia,
     isImage,
     isGoogleDocs,
+    isPdf,
     isPsd,
     hasThumbnail,
     isPending,
@@ -120,6 +124,7 @@ export const GridCell = memo(function GridCell({
     entry.path,
     fetchThumbnails,
     fetchVideoThumbnail,
+    fetchPdfThumbnail,
     fetchPsdThumbnail,
     fetchGoogleDocsThumbnails,
   ]);

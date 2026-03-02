@@ -226,8 +226,8 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
   // 動画サムネイル取得（1ファイルずつ、FFmpeg経由）
   fetchVideoThumbnail: async (path: string, size: number) => {
     const k = cacheKey(path, size);
-    const { thumbnails, pending } = get();
-    if (thumbnails[k] || pending.has(k)) return;
+    const { thumbnails, pending, failed } = get();
+    if (thumbnails[k] || pending.has(k) || failed.has(k)) return;
     if (!(await checkFfmpeg())) return;
 
     set((s) => {
@@ -247,7 +247,9 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
       set((s) => {
         const next = new Set(s.pending);
         next.delete(k);
-        return { pending: next };
+        const nextFailed = new Set(s.failed);
+        nextFailed.add(k);
+        return { pending: next, failed: nextFailed };
       });
     }
   },
@@ -255,8 +257,8 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
   // PDFサムネイル取得（1ファイルずつ、pdfjs経由）
   fetchPdfThumbnail: async (path: string, size: number) => {
     const k = cacheKey(path, size);
-    const { thumbnails, pending } = get();
-    if (thumbnails[k] || pending.has(k)) return;
+    const { thumbnails, pending, failed } = get();
+    if (thumbnails[k] || pending.has(k) || failed.has(k)) return;
 
     set((s) => {
       const next = new Set(s.pending);
@@ -275,7 +277,9 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
       set((s) => {
         const next = new Set(s.pending);
         next.delete(k);
-        return { pending: next };
+        const nextFailed = new Set(s.failed);
+        nextFailed.add(k);
+        return { pending: next, failed: nextFailed };
       });
     }
   },
@@ -283,8 +287,8 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
   // PSDサムネイル取得（1ファイルずつ、ag-psd経由）
   fetchPsdThumbnail: async (path: string, size: number) => {
     const k = cacheKey(path, size);
-    const { thumbnails, pending } = get();
-    if (thumbnails[k] || pending.has(k)) return;
+    const { thumbnails, pending, failed } = get();
+    if (thumbnails[k] || pending.has(k) || failed.has(k)) return;
 
     set((s) => {
       const next = new Set(s.pending);
@@ -303,7 +307,9 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
       set((s) => {
         const next = new Set(s.pending);
         next.delete(k);
-        return { pending: next };
+        const nextFailed = new Set(s.failed);
+        nextFailed.add(k);
+        return { pending: next, failed: nextFailed };
       });
     }
   },
