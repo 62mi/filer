@@ -114,6 +114,31 @@ pub fn run() {
             #[cfg(windows)]
             jumplist::setup_jump_list();
 
+            // ── AUMID設定（アイコン設定より前に行う） ──
+            #[cfg(windows)]
+            {
+                let aumid: Vec<u16> = "com.filer.app\0".encode_utf16().collect();
+                unsafe {
+                    windows_sys::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
+                        aumid.as_ptr(),
+                    );
+                }
+            }
+
+            // ── アイコン読み込み（ICOをバイナリ埋め込み） ──
+            let app_icon =
+                tauri::image::Image::from_bytes(include_bytes!("../icons/icon.ico"))
+                    .unwrap_or_else(|_| {
+                        app.default_window_icon()
+                            .cloned()
+                            .unwrap_or_else(|| tauri::image::Image::new(&[0u8, 0, 0, 0], 1, 1))
+                    });
+
+            // ウィンドウアイコン設定
+            if let Some(window) = app.get_webview_window("main") {
+                window.set_icon(app_icon.clone()).ok();
+            }
+
             // ── トレイアイコン構築 ──
             let tray_menu = Menu::with_items(
                 app,
@@ -125,19 +150,10 @@ pub fn run() {
                 ],
             )?;
 
-            // アイコンをバイナリに埋め込み（default_window_icon()がNoneの場合に備える）
-            let app_icon =
-                tauri::image::Image::from_bytes(include_bytes!("../icons/icon.png"))
-                    .unwrap_or_else(|_| {
-                        app.default_window_icon()
-                            .cloned()
-                            .unwrap_or_else(|| tauri::image::Image::new(&[0u8, 0, 0, 0], 1, 1))
-                    });
-
             TrayIconBuilder::new()
                 .tooltip("TomaFiler")
                 .menu(&tray_menu)
-                .icon(app_icon.clone())
+                .icon(app_icon)
                 .on_tray_icon_event(|tray, event| {
                     if let tauri::tray::TrayIconEvent::Click {
                         button: tauri::tray::MouseButton::Left,
@@ -160,21 +176,6 @@ pub fn run() {
                     _ => {}
                 })
                 .build(app)?;
-
-            // ── AUMID設定（ピン留めショートカットとの統合） ──
-            #[cfg(windows)]
-            {
-                let aumid: Vec<u16> = "com.filer.app\0".encode_utf16().collect();
-                unsafe {
-                    windows_sys::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
-                        aumid.as_ptr(),
-                    );
-                }
-                // AUMID設定後、ウィンドウアイコンを明示的に再適用
-                if let Some(window) = app.get_webview_window("main") {
-                    window.set_icon(app_icon.clone()).ok();
-                }
-            }
 
             // ── --hidden 起動対応 ──
             let args: Vec<String> = std::env::args().collect();
