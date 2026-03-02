@@ -1,4 +1,4 @@
-import { Check, Folder } from "lucide-react";
+import { Check, Folder, Loader } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { useIconStore } from "../../stores/iconStore";
 import { getGridCellHeight, getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
@@ -285,9 +285,13 @@ export const GridCell = memo(function GridCell({
           />
         ) : (
           <div
-            className={cn("bg-[#e8e8e8] rounded", isPending && "animate-pulse")}
+            className="flex items-center justify-center"
             style={{ width: iconDisplaySize, height: iconDisplaySize }}
-          />
+          >
+            {isPending && (
+              <Loader className="text-[#aaa] animate-spin" style={{ width: iconDisplaySize * 0.35, height: iconDisplaySize * 0.35 }} />
+            )}
+          </div>
         )}
       </div>
 
