@@ -244,7 +244,9 @@ export function Panel() {
       if (entry.is_dir) {
         loadDirectory(entry.path);
       } else {
-        invoke("open_in_default_app", { path: entry.path }).catch(() => {});
+        invoke("open_in_default_app", { path: entry.path }).catch(() => {
+          toast.error("ファイルを開けませんでした");
+        });
       }
     },
     [loadDirectory],

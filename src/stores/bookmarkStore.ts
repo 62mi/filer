@@ -317,7 +317,8 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
 
       set({ bookmarks, folders, loaded: true });
       if (needsSave) get().saveBookmarks();
-    } catch {
+    } catch (err) {
+      console.warn("ブックマークの読み込みに失敗しました:", err);
       set({ loaded: true });
     }
   },
@@ -327,8 +328,8 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
       localStorage.setItem(FOLDER_STORAGE_KEY, JSON.stringify(folders));
-    } catch {
-      // ストレージフル等は無視
+    } catch (err) {
+      console.warn("ブックマークの保存に失敗しました:", err);
     }
   },
 }));

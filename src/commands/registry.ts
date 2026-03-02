@@ -4,6 +4,7 @@ import { useExplorerStore } from "../stores/panelStore";
 import { useRuleStore } from "../stores/ruleStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useTemplateStore } from "../stores/templateStore";
+import { toast } from "../stores/toastStore";
 
 export interface Command {
   id: string;
@@ -108,7 +109,9 @@ export function getCommands(): Command[] {
       label: "新しいウィンドウ",
       shortcut: "Ctrl+Shift+N",
       action: () => {
-        invoke("create_new_window").catch(() => {});
+        invoke("create_new_window").catch(() => {
+          toast.error("新しいウィンドウの作成に失敗しました");
+        });
       },
     },
   ];

@@ -143,7 +143,8 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
       const savedIds = new Set(saved.map((t) => t.id));
       const merged = [...BUILTIN_TEMPLATES.filter((bt) => !savedIds.has(bt.id)), ...saved];
       set({ templates: merged, loaded: true });
-    } catch {
+    } catch (err) {
+      console.warn("テンプレートの読み込みに失敗しました:", err);
       set({ templates: [...BUILTIN_TEMPLATES], loaded: true });
     }
   },
@@ -152,8 +153,8 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
     const { templates } = get();
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
-    } catch {
-      // storage full
+    } catch (err) {
+      console.warn("テンプレートの保存に失敗しました:", err);
     }
   },
 }));

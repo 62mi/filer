@@ -109,7 +109,8 @@ function loadSettings(): Partial<SettingsData> {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     return data ? JSON.parse(data) : {};
-  } catch {
+  } catch (err) {
+    console.warn("設定の読み込みに失敗しました:", err);
     return {};
   }
 }
@@ -136,8 +137,8 @@ function saveSettings(state: SettingsState) {
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch {
-    // storage full
+  } catch (err) {
+    console.warn("設定の保存に失敗しました:", err);
   }
 }
 
