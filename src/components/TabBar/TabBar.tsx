@@ -139,7 +139,7 @@ export function TabBar() {
         {indicatorIndex === tabs.length && <DropIndicator />}
       </div>
       <button
-        className="p-1 mx-0.5 rounded hover:bg-[var(--tab-hover)] text-[var(--tab-text)] transition-colors shrink-0"
+        className="p-1 ml-1.5 mr-0.5 rounded hover:bg-[var(--tab-hover)] text-[var(--tab-text)] transition-colors shrink-0"
         style={{ marginTop: "auto", marginBottom: "auto" }}
         onClick={() => addTab()}
         title="New tab (Ctrl+T)"
