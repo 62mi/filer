@@ -887,3 +887,11 @@ pub async fn calculate_directory_sizes(
     Ok(())
 }
 
+/// ドラッグアイコン用の一時PNGファイルを保存し、パスを返す
+#[tauri::command]
+pub fn save_temp_drag_icon(data: Vec<u8>) -> Result<String, String> {
+    let path = std::env::temp_dir().join("filer_drag_icon.png");
+    fs::write(&path, &data).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
+

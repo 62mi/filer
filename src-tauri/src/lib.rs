@@ -269,6 +269,7 @@ pub fn run() {
             check_ffmpeg_available,
             get_google_docs_thumbnails,
             check_google_drive_status,
+            save_temp_drag_icon,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
