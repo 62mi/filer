@@ -64,8 +64,19 @@ async function buildFileMenu(
         },
       }),
     );
-    items.push(await PredefinedMenuItem.new({ item: "Separator" }));
   }
+
+  // ── エクスプローラーで開く ──
+  items.push(
+    await MenuItem.new({
+      text: t.contextMenu.openInExplorer,
+      action: () => {
+        invoke("open_in_explorer", { path: entry.path }).catch(() => {});
+      },
+    }),
+  );
+
+  items.push(await PredefinedMenuItem.new({ item: "Separator" }));
 
   // ── スタック操作 ──
   if (hasSelection) {
@@ -394,6 +405,16 @@ async function buildBackgroundMenu(
             },
           );
         });
+      },
+    }),
+  );
+
+  // ── エクスプローラーで開く ──
+  items.push(
+    await MenuItem.new({
+      text: t.contextMenu.openInExplorer,
+      action: () => {
+        invoke("open_in_explorer", { path: tab.path }).catch(() => {});
       },
     }),
   );

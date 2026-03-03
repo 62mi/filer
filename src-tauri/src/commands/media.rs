@@ -3,13 +3,23 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::OnceLock;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// コンソールウィンドウを表示しない
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 /// FFmpegのパスを検出してキャッシュ
 static FFMPEG_PATH: OnceLock<Option<PathBuf>> = OnceLock::new();
 
 fn find_ffmpeg() -> Option<PathBuf> {
     // 1. PATH上のffmpeg
-    if Command::new("ffmpeg")
-        .arg("-version")
+    let mut cmd = Command::new("ffmpeg");
+    cmd.arg("-version");
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    if cmd
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
@@ -27,9 +37,12 @@ fn find_ffmpeg() -> Option<PathBuf> {
 
     for path in &candidates {
         let p = PathBuf::from(path);
+        let mut cmd = Command::new(&p);
+        cmd.arg("-version");
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
         if p.exists()
-            && Command::new(&p)
-                .arg("-version")
+            && cmd
                 .output()
                 .map(|o| o.status.success())
                 .unwrap_or(false)
@@ -99,20 +112,23 @@ pub async fn extract_video_thumbnail(path: String, size: u32) -> Result<String, 
     let ffmpeg = ffmpeg.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
-        let output = Command::new(&ffmpeg)
-            .args([
-                "-i",
-                &path,
-                "-vframes",
-                "1",
-                "-vf",
-                &format!("scale={}:-1", size),
-                "-f",
-                "image2pipe",
-                "-vcodec",
-                "png",
-                "pipe:1",
-            ])
+        let mut cmd = Command::new(&ffmpeg);
+        cmd.args([
+            "-i",
+            &path,
+            "-vframes",
+            "1",
+            "-vf",
+            &format!("scale={}:-1", size),
+            "-f",
+            "image2pipe",
+            "-vcodec",
+            "png",
+            "pipe:1",
+        ]);
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        let output = cmd
             .output()
             .map_err(|e| format!("FFmpeg実行エラー: {}", e))?;
 

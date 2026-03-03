@@ -73,6 +73,8 @@ export function Panel() {
   const pasteFromStack = useExplorerStore((s) => s.pasteFromStack);
 
   const listRef = useRef<HTMLDivElement>(null);
+  const prevPathRef = useRef(tab.path);
+  const prevLoadingRef = useRef(tab.loading);
   const suggestionTimerRef = useRef<number | null>(null);
 
   const aiDialogOpen = useAiStore((s) => s.dialogOpen);
@@ -207,39 +209,67 @@ export function Panel() {
     fetchIcons(Array.from(exts));
   }, [displayEntries, tab.loading, fetchIcons]);
 
-  // Scroll to keep cursor visible
+  // Scroll to keep cursor visible (パス変更・ロード完了時はカーソルを中心にスクロール)
   useEffect(() => {
-    if (!listRef.current) return;
+    const wasLoading = prevLoadingRef.current;
+    prevLoadingRef.current = tab.loading;
+
+    // loading中はスクロールしない
+    if (tab.loading || !listRef.current) return;
+
     const container = listRef.current;
-    const settings = useSettingsStore.getState();
+    const justFinishedLoading = wasLoading;
+    const isPathChange = prevPathRef.current !== tab.path;
+    prevPathRef.current = tab.path;
 
-    if (viewMode === "icons") {
-      const cellW = getGridCellWidth(settings) + settings.gridGap;
-      const cellH = getGridCellHeight(settings) + settings.gridGap;
-      const cols = Math.max(1, Math.floor(container.clientWidth / cellW));
-      const row = Math.floor(tab.cursorIndex / cols);
-      const cursorTop = row * cellH;
-      const cursorBottom = cursorTop + cellH;
+    // パス変更 or ロード完了 → カーソルを中心にスクロール
+    // (navigateBackで2回loadDirectoryが呼ばれる問題を回避: 最後のロード完了時にスクロール)
+    const shouldCenter = isPathChange || justFinishedLoading;
 
-      if (cursorTop < container.scrollTop) {
-        container.scrollTop = cursorTop;
-      } else if (cursorBottom > container.scrollTop + container.clientHeight) {
-        container.scrollTop = cursorBottom - container.clientHeight;
+    const doScroll = () => {
+      const settings = useSettingsStore.getState();
+
+      if (viewMode === "icons") {
+        const cellW = getGridCellWidth(settings) + settings.gridGap;
+        const cellH = getGridCellHeight(settings) + settings.gridGap;
+        const cols = Math.max(1, Math.floor(container.clientWidth / cellW));
+        const row = Math.floor(tab.cursorIndex / cols);
+        const cursorTop = row * cellH;
+        const cursorBottom = cursorTop + cellH;
+
+        if (shouldCenter && tab.cursorIndex > 0) {
+          const cursorCenter = cursorTop + cellH / 2;
+          container.scrollTop = Math.max(0, cursorCenter - container.clientHeight / 2);
+        } else if (cursorTop < container.scrollTop) {
+          container.scrollTop = cursorTop;
+        } else if (cursorBottom > container.scrollTop + container.clientHeight) {
+          container.scrollTop = cursorBottom - container.clientHeight;
+        }
+      } else {
+        const rowHeight = settings.detailRowHeight;
+        const headerOffset = settings.columnHeaderHeight;
+        const cursorTop = headerOffset + tab.cursorIndex * rowHeight;
+        const cursorBottom = cursorTop + rowHeight;
+
+        if (shouldCenter && tab.cursorIndex > 0) {
+          const cursorCenter = cursorTop + rowHeight / 2;
+          container.scrollTop = Math.max(0, cursorCenter - container.clientHeight / 2);
+        } else if (cursorTop < container.scrollTop + headerOffset) {
+          container.scrollTop = cursorTop - headerOffset;
+        } else if (cursorBottom > container.scrollTop + container.clientHeight) {
+          container.scrollTop = cursorBottom - container.clientHeight;
+        }
       }
-    } else {
-      const rowHeight = settings.detailRowHeight;
-      // ColumnHeader がスクロールコンテナ内に sticky 配置されているためオフセット加算
-      const headerOffset = settings.columnHeaderHeight;
-      const cursorTop = headerOffset + tab.cursorIndex * rowHeight;
-      const cursorBottom = cursorTop + rowHeight;
+    };
 
-      if (cursorTop < container.scrollTop + headerOffset) {
-        container.scrollTop = cursorTop - headerOffset;
-      } else if (cursorBottom > container.scrollTop + container.clientHeight) {
-        container.scrollTop = cursorBottom - container.clientHeight;
-      }
+    if (shouldCenter) {
+      // ロード完了後: DOMレンダリング完了を待ってからスクロール
+      // クリーンアップで2回目のloadDirectoryが始まった場合にキャンセル
+      const rafId = requestAnimationFrame(doScroll);
+      return () => cancelAnimationFrame(rafId);
     }
-  }, [tab.cursorIndex, viewMode]);
+    doScroll();
+  }, [tab.cursorIndex, tab.path, tab.loading, viewMode]);
 
   const handleNavigate = useCallback(
     (entry: FileEntry) => {

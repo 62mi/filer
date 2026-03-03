@@ -419,6 +419,8 @@ export function Sidebar() {
                       if (mode === "custom") {
                         handleNativeDrop(dragPaths, me.clientX, me.clientY);
                         cleanupCustom();
+                        // ドラッグ元がスタックなのでスタックから除去
+                        useExplorerStore.getState().removeFromStack(dragPaths);
                       }
                     };
 
@@ -431,6 +433,7 @@ export function Sidebar() {
                       document.documentElement.removeEventListener("mouseleave", onLeave);
                       startDrag({ item: dragPaths, icon: dragIconRef.current || "" }, (payload) => {
                         if (payload.result === "Dropped") {
+                          useExplorerStore.getState().removeFromStack(dragPaths);
                           useExplorerStore.getState().refreshDirectory();
                         }
                       }).catch(() => {

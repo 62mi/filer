@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
+import { useExplorerStore } from "./panelStore";
 
 export interface CopyQueueItem {
   id: string;
@@ -113,6 +114,19 @@ export const useCopyQueueStore = create<CopyQueueStore>((set, get) => ({
       // enqueue側で後から補完される
       return { items: [...s.items, progress] };
     });
+
+    // コピー完了時: コピー先が現在のアクティブタブならリロード
+    if (progress.status === "completed") {
+      const item = get().items.find((i) => i.id === progress.id);
+      const dest = item?.dest || progress.dest;
+      if (dest) {
+        const explorerState = useExplorerStore.getState();
+        const activeTab = explorerState.getActiveTab();
+        if (activeTab.path === dest) {
+          explorerState.refreshDirectory();
+        }
+      }
+    }
   },
 
   initListener: async () => {

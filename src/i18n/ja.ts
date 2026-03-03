@@ -31,6 +31,7 @@ export const ja = {
   contextMenu: {
     open: "開く(&O)",
     openWith: "プログラムから開く(&H)",
+    openInExplorer: "エクスプローラーで開く(&E)",
     openTerminal: "ターミナルで開く(&T)",
     copy: "コピー(&C)",
     cut: "切り取り(&T)",

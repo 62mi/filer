@@ -197,6 +197,12 @@ interface ClipboardData {
   operation: "copy" | "cut";
 }
 
+/** ディレクトリ移動時に保存する表示状態 */
+interface DisplayState {
+  cursorIndex: number;
+  selectedIndices: number[];
+}
+
 // Per-tab state
 interface TabState {
   id: string;
@@ -217,6 +223,7 @@ interface TabState {
   searching: boolean;
   viewMode: "details" | "icons";
   filter: FilterState;
+  displayStateCache: Map<string, DisplayState>;
 }
 
 function createTabState(path: string): TabState {
@@ -239,6 +246,7 @@ function createTabState(path: string): TabState {
     searching: false,
     viewMode: "details",
     filter: { ...DEFAULT_FILTER },
+    displayStateCache: new Map(),
   };
 }
 
@@ -440,6 +448,24 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }
 
     const { showHidden } = get();
+
+    // 遷移前に現在の表示状態をキャッシュに保存（パスが変わる場合のみ）
+    {
+      const currentTab = get().getActiveTab();
+      if (currentTab.path !== path && currentTab.path !== "home:") {
+        const cache = new Map(currentTab.displayStateCache);
+        cache.set(currentTab.path, {
+          cursorIndex: currentTab.cursorIndex,
+          selectedIndices: Array.from(currentTab.selectedIndices),
+        });
+        set((s) => ({
+          tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+            displayStateCache: cache,
+          })),
+        }));
+      }
+    }
+
     if (!smooth) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({
@@ -464,12 +490,19 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         historyIndex = history.length - 1;
       }
 
+      // キャッシュから表示状態を復元（戻る/進む・クリック操作共通）
+      const cached = tab.displayStateCache.get(path);
+      const restoredCursor = cached ? Math.min(cached.cursorIndex, sorted.length - 1) : 0;
+      const restoredSelection = cached
+        ? new Set(cached.selectedIndices.filter((i) => i < sorted.length))
+        : new Set<number>();
+
       set((s) => ({
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({
           path,
           entries: sorted,
-          selectedIndices: new Set<number>(),
-          cursorIndex: smooth ? Math.min(tab.cursorIndex, sorted.length - 1) : 0,
+          selectedIndices: smooth ? tab.selectedIndices : restoredSelection,
+          cursorIndex: smooth ? Math.min(tab.cursorIndex, sorted.length - 1) : restoredCursor,
           loading: false,
           error: null,
           history,
@@ -487,7 +520,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         set((s) => ({
           tabs: updateActiveTab(s.tabs, activeTabId, () => ({
             pendingRenamePath: null,
-            ...(renameIdx >= 0 ? { renamingIndex: renameIdx, cursorIndex: renameIdx } : {}),
+            ...(renameIdx >= 0
+              ? { renamingIndex: renameIdx, cursorIndex: renameIdx, selectedIndices: new Set([renameIdx]) }
+              : {}),
           })),
         }));
       }
@@ -1145,8 +1180,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         await invoke("copy_files", { sources: stackItems, dest: tab.path });
       } else {
         await invoke("move_files", { sources: stackItems, dest: tab.path });
-        set({ stackItems: [] });
       }
+      set({ stackItems: [] });
       // 移動履歴記録
       const exts = stackItems.map((p) => getExtension(p)).filter((v, i, a) => a.indexOf(v) === i);
       invoke("record_move_operation", {
@@ -1158,11 +1193,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       }).catch((_err) => {});
       await get().loadDirectory(tab.path, false);
     } catch (e: unknown) {
-      set((s) => ({
-        tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
-          error: e instanceof Error ? e.message : String(e),
-        })),
-      }));
+      toast.error(
+        `スタック${operation === "copy" ? "コピー" : "移動"}に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   },
 }));

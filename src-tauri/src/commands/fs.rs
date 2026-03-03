@@ -213,7 +213,23 @@ pub async fn move_files(sources: Vec<String>, dest: String) -> Result<Vec<String
                 .file_name()
                 .ok_or_else(|| "Invalid source path".to_string())?;
             let target = generate_unique_path(dest_path, file_name, src_path.is_dir());
-            fs::rename(src_path, &target).map_err(|e| format!("Failed to move {}: {}", source, e))?;
+            match fs::rename(src_path, &target) {
+                Ok(()) => {}
+                Err(_) => {
+                    // rename失敗（クロスドライブ等）: コピー→削除でフォールバック
+                    if src_path.is_dir() {
+                        copy_dir_recursive(src_path, &target)
+                            .map_err(|e| format!("Failed to move {}: {}", source, e))?;
+                        fs::remove_dir_all(src_path)
+                            .map_err(|e| format!("Failed to remove source dir {}: {}", source, e))?;
+                    } else {
+                        fs::copy(src_path, &target)
+                            .map_err(|e| format!("Failed to move {}: {}", source, e))?;
+                        fs::remove_file(src_path)
+                            .map_err(|e| format!("Failed to remove source {}: {}", source, e))?;
+                    }
+                }
+            }
             actual_paths.push(target.to_string_lossy().to_string());
         }
         Ok(actual_paths)

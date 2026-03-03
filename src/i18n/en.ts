@@ -31,6 +31,7 @@ export const en: Translations = {
   contextMenu: {
     open: "&Open",
     openWith: "Open wit&h",
+    openInExplorer: "Open in E&xplorer",
     openTerminal: "Open in &Terminal",
     copy: "&Copy",
     cut: "Cu&t",

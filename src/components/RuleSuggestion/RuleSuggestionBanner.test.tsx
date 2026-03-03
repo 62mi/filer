@@ -47,6 +47,7 @@ function setTabPath(path: string) {
         renamingIndex: null,
         pendingRenamePath: null,
         filter: { types: [], sizeRange: null, modifiedRange: null },
+        displayStateCache: new Map(),
       },
     ],
   });

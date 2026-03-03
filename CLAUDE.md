@@ -133,6 +133,9 @@ pnpm lint                    # チェックのみ
 pnpm lint:fix                # 自動修正
 pnpm format                  # フォーマット
 pnpm check                   # lint:fix + tsc --noEmit
+
+# バージョン更新（3ファイル一括 + CHANGELOG雛形追加）
+pnpm bump 1.5.0
 ```
 
 ## リリース

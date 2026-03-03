@@ -219,6 +219,44 @@ pub fn open_terminal(terminal: String, cwd: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn open_in_explorer(path: String) -> Result<(), String> {
+    let p = std::path::Path::new(&path);
+    if !p.exists() {
+        return Err(format!("Path does not exist: {}", path));
+    }
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        use std::process::Command;
+        const DETACHED_PROCESS: u32 = 0x00000008;
+
+        if p.is_dir() {
+            // フォルダ: そのフォルダを開く
+            Command::new("explorer.exe")
+                .arg(&path)
+                .creation_flags(DETACHED_PROCESS)
+                .spawn()
+                .map(|_| ())
+                .map_err(|e| format!("Failed to open explorer: {}", e))
+        } else {
+            // ファイル: 親フォルダを開いてファイルを選択状態にする
+            Command::new("explorer.exe")
+                .args(["/select,", &path])
+                .creation_flags(DETACHED_PROCESS)
+                .spawn()
+                .map(|_| ())
+                .map_err(|e| format!("Failed to open explorer: {}", e))
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        Err("Open in Explorer is only supported on Windows".to_string())
+    }
+}
+
+#[tauri::command]
 pub fn open_recycle_bin() -> Result<(), String> {
     #[cfg(windows)]
     {
