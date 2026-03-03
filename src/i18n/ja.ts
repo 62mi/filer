@@ -486,6 +486,25 @@ export const ja = {
     saved: "画像を保存しました",
   },
 
+  // ── ワークスペース ──
+  workspace: {
+    title: "ワークスペース",
+    save: "ワークスペースを保存",
+    load: "ワークスペースを読み込み",
+    delete: "削除",
+    noWorkspaces: "保存されたワークスペースがありません",
+    namePrompt: "ワークスペース名を入力",
+    namePlaceholder: "例: 作業用",
+    tabs: "タブ",
+    updatedAt: "更新日時",
+    confirmDelete: "ワークスペースを削除しますか？",
+    saved: "ワークスペースを保存しました",
+    loaded: "ワークスペースを読み込みました",
+    deleted: "ワークスペースを削除しました",
+    saveCommand: "ワークスペースを保存",
+    loadCommand: "ワークスペースを読み込み",
+  },
+
   // ── フォーマット ──
   format: {
     bytes: "バイト",

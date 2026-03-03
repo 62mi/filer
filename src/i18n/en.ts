@@ -463,6 +463,24 @@ export const en: Translations = {
     saved: "Image saved",
   },
 
+  workspace: {
+    title: "Workspaces",
+    save: "Save Workspace",
+    load: "Load Workspace",
+    delete: "Delete",
+    noWorkspaces: "No saved workspaces",
+    namePrompt: "Enter workspace name",
+    namePlaceholder: "e.g. Work",
+    tabs: "tabs",
+    updatedAt: "Updated",
+    confirmDelete: "Delete this workspace?",
+    saved: "Workspace saved",
+    loaded: "Workspace loaded",
+    deleted: "Workspace deleted",
+    saveCommand: "Save Workspace",
+    loadCommand: "Load Workspace",
+  },
+
   format: {
     bytes: "bytes",
   },

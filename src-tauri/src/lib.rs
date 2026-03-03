@@ -14,6 +14,7 @@ use commands::media::*;
 use commands::system::*;
 use db::history::*;
 use db::rules::*;
+use db::workspace::*;
 use db::Database;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -271,6 +272,12 @@ pub fn run() {
             get_google_docs_thumbnails,
             check_google_drive_status,
             save_temp_drag_icon,
+            save_workspace,
+            load_workspace,
+            list_workspaces,
+            delete_workspace,
+            save_session,
+            load_session,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {

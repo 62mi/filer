@@ -22,6 +22,7 @@ import { useExplorerStore } from "./stores/panelStore";
 import { useRuleSuggestionStore } from "./stores/ruleSuggestionStore";
 import { useThemeStore } from "./stores/themeStore";
 import { toast, useToastStore } from "./stores/toastStore";
+import { debouncedSaveSession, useWorkspaceStore } from "./stores/workspaceStore";
 
 function App() {
   const [sidebarWidth, setSidebarWidth] = useState(220);
@@ -37,6 +38,27 @@ function App() {
   // 起動時にテーマ初期化
   useEffect(() => {
     useThemeStore.getState().init();
+  }, []);
+
+  // 起動時にセッション復元
+  useEffect(() => {
+    useWorkspaceStore.getState().restoreSession();
+  }, []);
+
+  // タブ変更時にセッション自動保存（debounce）
+  useEffect(() => {
+    let prevTabPaths = "";
+    const unsub = useExplorerStore.subscribe((state) => {
+      // タブのパス一覧とアクティブタブのみ監視
+      const key = state.tabs.map((t) => t.path).join("|") + ":" + state.activeTabId;
+      if (key !== prevTabPaths) {
+        prevTabPaths = key;
+        if (useWorkspaceStore.getState().sessionRestored) {
+          debouncedSaveSession();
+        }
+      }
+    });
+    return unsub;
   }, []);
 
   // ネイティブドロップハンドラ（外部ファイルドロップ一元管理）
