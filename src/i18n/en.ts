@@ -437,6 +437,13 @@ export const en: Translations = {
 
   navigationBar: {
     terminalFailed: "Failed to open terminal",
+    searchByName: "Search by file name",
+    searchByContent: "Search by file content",
+    contentSearching: "Searching contents...",
+    contentSearchResults: "content matches",
+    contentSearchNoResults: "No files with matching content found",
+    contentSearchFailed: "Content search failed",
+    lineNumber: "Line",
   },
 
   sidebar: {

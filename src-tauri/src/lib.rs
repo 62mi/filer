@@ -279,6 +279,7 @@ pub fn run() {
             delete_workspace,
             save_session,
             load_session,
+            search_file_contents,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {

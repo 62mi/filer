@@ -458,6 +458,13 @@ export const ja = {
   // ── ナビゲーションバー ──
   navigationBar: {
     terminalFailed: "ターミナルの起動に失敗しました",
+    searchByName: "ファイル名で検索",
+    searchByContent: "ファイル内容で検索",
+    contentSearching: "内容を検索中...",
+    contentSearchResults: "件の内容一致",
+    contentSearchNoResults: "内容が一致するファイルが見つかりませんでした",
+    contentSearchFailed: "内容検索に失敗しました",
+    lineNumber: "行",
   },
 
   // ── サイドバー ──
