@@ -1,3 +1,4 @@
+pub mod custom_action;
 pub mod dir_size_cache;
 pub mod history;
 pub mod rules;
@@ -104,6 +105,16 @@ impl Database {
                 conditions   TEXT NOT NULL,
                 search_paths TEXT NOT NULL,
                 created_at   TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS custom_actions (
+                id          TEXT PRIMARY KEY,
+                name        TEXT NOT NULL,
+                command     TEXT NOT NULL,
+                icon        TEXT,
+                show_for    TEXT NOT NULL DEFAULT 'both',
+                extensions  TEXT NOT NULL DEFAULT '',
+                sort_order  INTEGER NOT NULL DEFAULT 0
             );",
         )
         .map_err(|e| format!("Failed to init tables: {}", e))?;

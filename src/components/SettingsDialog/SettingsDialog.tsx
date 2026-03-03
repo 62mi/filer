@@ -9,6 +9,8 @@ import {
   FolderOpen,
   Key,
   Monitor,
+  Pencil,
+  Plus,
   RefreshCw,
   RotateCcw,
   Trash2,
@@ -17,6 +19,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type Language, useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
+import { type CustomAction, useCustomActionStore } from "../../stores/customActionStore";
 import { type PathStyle, useSettingsStore } from "../../stores/settingsStore";
 import { COLOR_THEMES, useThemeStore } from "../../stores/themeStore";
 import { resetFfmpegCache } from "../../stores/thumbnailStore";
@@ -45,8 +48,7 @@ interface SettingField {
   unit?: string;
 }
 
-type TabMode = "general" | "simple" | "advanced" | "ai" | "workspace" | "about";
-
+type TabMode = "general" | "simple" | "advanced" | "ai" | "workspace" | "customAction" | "about";
 
 export function SettingsDialog() {
   const t = useTranslation();
@@ -210,6 +212,17 @@ export function SettingsDialog() {
           <button
             className={cn(
               "px-3 py-2 text-xs transition-colors border-b-2",
+              tab === "customAction"
+                ? "text-[var(--accent)] border-[var(--accent)]"
+                : "text-[#888] border-transparent hover:text-[#555]",
+            )}
+            onClick={() => setTab("customAction")}
+          >
+            {t.customAction.title}
+          </button>
+          <button
+            className={cn(
+              "px-3 py-2 text-xs transition-colors border-b-2",
               tab === "about"
                 ? "text-[var(--accent)] border-[var(--accent)]"
                 : "text-[#888] border-transparent hover:text-[#555]",
@@ -330,6 +343,7 @@ export function SettingsDialog() {
           )}
           {tab === "workspace" && <WorkspaceTab />}
           {tab === "ai" && <AiSettingsTab />}
+          {tab === "customAction" && <CustomActionTab />}
           {tab === "about" && (
             <div className="space-y-4">
               <div>
@@ -380,7 +394,7 @@ export function SettingsDialog() {
 
         {/* Footer */}
         <div className="flex justify-end px-4 py-3 border-t border-[#e5e5e5] gap-2">
-          {tab !== "about" && tab !== "ai" && tab !== "workspace" && (
+          {tab !== "about" && tab !== "ai" && tab !== "workspace" && tab !== "customAction" && (
             <button
               className="flex items-center gap-1 px-3 py-1.5 text-xs rounded border border-[#d0d0d0] text-[#666] hover:bg-[#f0f0f0] transition-colors"
               onClick={() => {
@@ -1022,6 +1036,217 @@ function WorkspaceTab() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function CustomActionTab() {
+  const t = useTranslation();
+  const actions = useCustomActionStore((s) => s.actions);
+  const loaded = useCustomActionStore((s) => s.loaded);
+  const loadActions = useCustomActionStore((s) => s.loadActions);
+  const saveAction = useCustomActionStore((s) => s.saveAction);
+  const deleteAction = useCustomActionStore((s) => s.deleteAction);
+
+  const [editing, setEditing] = useState<CustomAction | null>(null);
+  const [isNew, setIsNew] = useState(false);
+
+  useEffect(() => {
+    if (!loaded) loadActions();
+  }, [loaded, loadActions]);
+
+  const handleAdd = () => {
+    setEditing({
+      id: "",
+      name: "",
+      command: "",
+      icon: undefined,
+      showFor: "both",
+      extensions: "",
+      sortOrder: 0,
+    });
+    setIsNew(true);
+  };
+
+  const handleEdit = (action: CustomAction) => {
+    setEditing({ ...action });
+    setIsNew(false);
+  };
+
+  const handleSave = async () => {
+    if (!editing || !editing.name.trim() || !editing.command.trim()) return;
+    await saveAction({
+      id: isNew ? undefined : editing.id,
+      name: editing.name,
+      command: editing.command,
+      icon: editing.icon || undefined,
+      showFor: editing.showFor,
+      extensions: editing.extensions,
+    });
+    setEditing(null);
+    setIsNew(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteAction(id);
+  };
+
+  if (editing) {
+    return (
+      <div className="space-y-3">
+        <div className="text-xs font-medium text-[#333]">
+          {isNew ? t.customAction.addAction : t.customAction.editAction}
+        </div>
+
+        {/* アクション名 */}
+        <div>
+          <label className="text-[10px] text-[#999] uppercase tracking-wider">
+            {t.customAction.name}
+          </label>
+          <input
+            type="text"
+            value={editing.name}
+            onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+            className="w-full mt-1 px-3 py-1.5 text-xs border border-[#d0d0d0] rounded focus:outline-none focus:border-[var(--accent)]"
+          />
+        </div>
+
+        {/* コマンド */}
+        <div>
+          <label className="text-[10px] text-[#999] uppercase tracking-wider">
+            {t.customAction.command}
+          </label>
+          <input
+            type="text"
+            value={editing.command}
+            onChange={(e) => setEditing({ ...editing, command: e.target.value })}
+            placeholder={t.customAction.commandPlaceholder}
+            className="w-full mt-1 px-3 py-1.5 text-xs border border-[#d0d0d0] rounded focus:outline-none focus:border-[var(--accent)]"
+          />
+          <p className="text-[10px] text-[#bbb] mt-0.5">{t.customAction.commandHelp}</p>
+        </div>
+
+        {/* アイコン */}
+        <div>
+          <label className="text-[10px] text-[#999] uppercase tracking-wider">
+            {t.customAction.icon}
+          </label>
+          <input
+            type="text"
+            value={editing.icon ?? ""}
+            onChange={(e) => setEditing({ ...editing, icon: e.target.value || undefined })}
+            placeholder={t.customAction.iconPlaceholder}
+            className="w-full mt-1 px-3 py-1.5 text-xs border border-[#d0d0d0] rounded focus:outline-none focus:border-[var(--accent)]"
+          />
+        </div>
+
+        {/* 表示対象 */}
+        <div>
+          <label className="text-[10px] text-[#999] uppercase tracking-wider">
+            {t.customAction.showFor}
+          </label>
+          <select
+            value={editing.showFor}
+            onChange={(e) =>
+              setEditing({
+                ...editing,
+                showFor: e.target.value as "file" | "directory" | "both",
+              })
+            }
+            className="w-full mt-1 h-8 px-2 text-xs border border-[#d0d0d0] rounded outline-none focus:border-[var(--accent)] bg-white"
+          >
+            <option value="both">{t.customAction.showForBoth}</option>
+            <option value="file">{t.customAction.showForFile}</option>
+            <option value="directory">{t.customAction.showForDirectory}</option>
+          </select>
+        </div>
+
+        {/* 対象拡張子 */}
+        <div>
+          <label className="text-[10px] text-[#999] uppercase tracking-wider">
+            {t.customAction.extensions}
+          </label>
+          <input
+            type="text"
+            value={editing.extensions}
+            onChange={(e) => setEditing({ ...editing, extensions: e.target.value })}
+            placeholder={t.customAction.extensionsPlaceholder}
+            className="w-full mt-1 px-3 py-1.5 text-xs border border-[#d0d0d0] rounded focus:outline-none focus:border-[var(--accent)]"
+          />
+        </div>
+
+        {/* ボタン */}
+        <div className="flex justify-end gap-2 pt-2">
+          <button
+            className="px-3 py-1.5 text-xs rounded border border-[#d0d0d0] text-[#666] hover:bg-[#f0f0f0] transition-colors"
+            onClick={() => {
+              setEditing(null);
+              setIsNew(false);
+            }}
+          >
+            {t.common.cancel}
+          </button>
+          <button
+            className="px-4 py-1.5 text-xs rounded bg-[var(--accent)] text-white hover:opacity-90 transition-colors disabled:opacity-50"
+            onClick={handleSave}
+            disabled={!editing.name.trim() || !editing.command.trim()}
+          >
+            {t.common.save}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-[10px] text-[#999]">{t.customAction.description}</p>
+      </div>
+
+      {/* アクション一覧 */}
+      {actions.length === 0 ? (
+        <div className="text-xs text-[#999] text-center py-6">{t.customAction.noActions}</div>
+      ) : (
+        <div className="space-y-1.5">
+          {actions.map((action) => (
+            <div
+              key={action.id}
+              className="flex items-center justify-between px-3 py-2 bg-[#fafafa] rounded-lg group"
+            >
+              <div className="min-w-0">
+                <div className="text-xs font-medium text-[#333] truncate">{action.name}</div>
+                <div className="text-[10px] text-[#999] truncate">{action.command}</div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  className="p-1 rounded hover:bg-[#e8e8e8] text-[#999] transition-colors"
+                  onClick={() => handleEdit(action)}
+                  title={t.common.edit}
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+                <button
+                  className="p-1 rounded hover:bg-red-50 text-[#999] hover:text-red-500 transition-colors"
+                  onClick={() => handleDelete(action.id)}
+                  title={t.common.delete}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 追加ボタン */}
+      <button
+        className="flex items-center gap-1.5 w-full px-3 py-2 text-xs rounded border border-dashed border-[#d0d0d0] text-[#666] hover:bg-[#f5f5f5] hover:border-[var(--accent)] transition-colors"
+        onClick={handleAdd}
+      >
+        <Plus className="w-3 h-3" />
+        {t.customAction.addAction}
+      </button>
     </div>
   );
 }
