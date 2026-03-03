@@ -246,6 +246,7 @@ pub fn run() {
             get_file_icons,
             get_file_icons_large,
             get_thumbnails,
+            generate_folder_thumbnail,
             write_clipboard_file,
             clipboard_write_files,
             clipboard_read_files,
