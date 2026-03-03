@@ -31,6 +31,8 @@ interface GridViewProps {
   onFileMouseDown: (e: React.MouseEvent, index: number) => void;
   onClearSelection: () => void;
   onStartRename: (index: number) => void;
+  onFolderHover?: (path: string, rect: DOMRect) => void;
+  onFolderLeave?: () => void;
 }
 
 export function GridView({
@@ -51,6 +53,8 @@ export function GridView({
   onFileMouseDown,
   onClearSelection,
   onStartRename,
+  onFolderHover,
+  onFolderLeave,
 }: GridViewProps) {
   const fetchLargeIcons = useIconStore((s) => s.fetchLargeIcons);
   const gridIconSize = useSettingsStore((s) => s.gridIconSize);
@@ -168,6 +172,8 @@ export function GridView({
           onClearSelection={onClearSelection}
           selectedCount={selectedIndices.size}
           onStartRename={onStartRename}
+          onFolderHover={onFolderHover}
+          onFolderLeave={onFolderLeave}
         />
       ))}
     </div>
