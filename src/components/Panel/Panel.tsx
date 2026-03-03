@@ -3,6 +3,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { resolveResource } from "@tauri-apps/api/path";
 import { Loader } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRubberBand } from "../../hooks/useRubberBand";
 import {
   clearHighlight,
   findDropZone,
@@ -73,6 +74,7 @@ export function Panel() {
   const pasteFromStack = useExplorerStore((s) => s.pasteFromStack);
 
   const listRef = useRef<HTMLDivElement>(null);
+  const { rect: rubberBandRect, handleMouseDown: handleRubberBandMouseDown, justFinished: rubberBandJustFinishedRef } = useRubberBand(listRef);
   const prevPathRef = useRef(tab.path);
   const prevLoadingRef = useRef(tab.loading);
   const suggestionTimerRef = useRef<number | null>(null);
@@ -957,7 +959,10 @@ export function Panel() {
         className="flex-1 overflow-y-auto overflow-x-auto"
         data-drop-zone="panel-bg"
         data-panel-path={tab.path}
+        onMouseDown={handleRubberBandMouseDown}
         onClick={(e) => {
+          // ラバーバンド操作後のclickは選択解除しない
+          if (rubberBandJustFinishedRef.current) return;
           // ファイル行以外（空白エリア・グリッドgap等）をクリックしたら選択・カーソル解除
           if (!(e.target as HTMLElement).closest?.("[data-file-path]")) {
             clearSelection();
@@ -1068,6 +1073,22 @@ export function Panel() {
 
       {/* 移動先サジェストポップアップ */}
       <DragSuggestion onSelectDestination={handleSuggestionSelect} />
+
+      {/* ラバーバンド選択矩形 */}
+      {rubberBandRect && rubberBandRect.width > 0 && rubberBandRect.height > 0 && (
+        <div
+          className="fixed pointer-events-none z-[100]"
+          style={{
+            left: rubberBandRect.left,
+            top: rubberBandRect.top,
+            width: rubberBandRect.width,
+            height: rubberBandRect.height,
+            backgroundColor: "rgba(var(--accent-rgb), 0.12)",
+            border: "1px solid rgba(var(--accent-rgb), 0.5)",
+            borderRadius: 2,
+          }}
+        />
+      )}
 
       {/* カスタムドラッグゴースト（Explorer風） */}
       {dragGhostPaths &&

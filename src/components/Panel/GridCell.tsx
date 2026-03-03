@@ -185,6 +185,7 @@ export const GridCell = memo(function GridCell({
       data-mid-click-path={entry.is_dir ? entry.path : undefined}
       data-drop-zone="file-row"
       data-file-path={entry.path}
+      data-file-index={index}
       data-is-dir={entry.is_dir ? "true" : "false"}
       style={{ width: cellWidth, height: cellHeight }}
       onMouseDown={(e) => {
