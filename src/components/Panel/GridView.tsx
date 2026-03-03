@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useIconStore } from "../../stores/iconStore";
 import { getGridCellWidth, useSettingsStore } from "../../stores/settingsStore";
 import {
+  extractFolderPaths,
   extractGoogleDocsPaths,
   extractImagePaths,
   extractPdfPaths,
@@ -61,11 +62,13 @@ export function GridView({
   const prefetchPdfInBackground = useThumbnailStore((s) => s.prefetchPdfInBackground);
   const prefetchPsdInBackground = useThumbnailStore((s) => s.prefetchPsdInBackground);
   const prefetchGoogleDocsInBackground = useThumbnailStore((s) => s.prefetchGoogleDocsInBackground);
+  const prefetchFoldersInBackground = useThumbnailStore((s) => s.prefetchFoldersInBackground);
   const cancelPrefetch = useThumbnailStore((s) => s.cancelPrefetch);
   const cancelVideoPrefetch = useThumbnailStore((s) => s.cancelVideoPrefetch);
   const cancelPdfPrefetch = useThumbnailStore((s) => s.cancelPdfPrefetch);
   const cancelPsdPrefetch = useThumbnailStore((s) => s.cancelPsdPrefetch);
   const cancelGoogleDocsPrefetch = useThumbnailStore((s) => s.cancelGoogleDocsPrefetch);
+  const cancelFolderPrefetch = useThumbnailStore((s) => s.cancelFolderPrefetch);
   const THUMB_SIZE = 128;
 
   // Fetch large icons (lightweight, ext-based cache)
@@ -85,6 +88,7 @@ export function GridView({
   const pdfPaths = useMemo(() => extractPdfPaths(entries), [entries]);
   const psdPaths = useMemo(() => extractPsdPaths(entries), [entries]);
   const googleDocsPaths = useMemo(() => extractGoogleDocsPaths(entries), [entries]);
+  const folderPaths = useMemo(() => extractFolderPaths(entries), [entries]);
 
   useEffect(() => {
     if (imagePaths.length === 0) return;
@@ -119,6 +123,13 @@ export function GridView({
     prefetchGoogleDocsInBackground(googleDocsPaths, THUMB_SIZE);
     return () => cancelGoogleDocsPrefetch();
   }, [googleDocsPaths, prefetchGoogleDocsInBackground, cancelGoogleDocsPrefetch]);
+
+  // Background prefetch folder thumbnails (folder内の画像を探索)
+  useEffect(() => {
+    if (folderPaths.length === 0) return;
+    prefetchFoldersInBackground(folderPaths, THUMB_SIZE);
+    return () => cancelFolderPrefetch();
+  }, [folderPaths, prefetchFoldersInBackground, cancelFolderPrefetch]);
 
   const handleSelectRange = useCallback(
     (toIndex: number) => onSelectRange(cursorIndex, toIndex),

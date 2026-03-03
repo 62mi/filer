@@ -154,6 +154,70 @@ pub async fn get_thumbnails(
     Ok(result)
 }
 
+/// 対応する画像拡張子
+const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "bmp"];
+
+/// フォルダ内を浅く走査して最初の画像ファイルのサムネイルを返す
+#[tauri::command]
+pub async fn generate_folder_thumbnail(
+    path: String,
+    size: u32,
+    thumbnail_cache: State<'_, ThumbnailCache>,
+) -> Result<String, String> {
+    // キャッシュ確認
+    {
+        let cache = thumbnail_cache
+            .cache
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some(cached) = cache.get(&(path.clone(), size)) {
+            return Ok(cached.clone());
+        }
+    }
+
+    let folder_path = path.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        find_and_generate_folder_thumbnail(&folder_path, size)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    match result {
+        Ok(data_url) => {
+            // キャッシュに保存
+            let mut cache = thumbnail_cache
+                .cache
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            cache.insert((path, size), data_url.clone());
+            Ok(data_url)
+        }
+        Err(_) => Ok(String::new()),
+    }
+}
+
+/// フォルダ内の最初の画像ファイルを探してサムネイル生成
+fn find_and_generate_folder_thumbnail(folder_path: &str, size: u32) -> Result<String, String> {
+    let dir = std::fs::read_dir(folder_path).map_err(|e| e.to_string())?;
+
+    for entry in dir.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            let ext_lower = ext.to_lowercase();
+            if IMAGE_EXTENSIONS.contains(&ext_lower.as_str()) {
+                if let Some(path_str) = path.to_str() {
+                    return generate_thumbnail(path_str, size);
+                }
+            }
+        }
+    }
+
+    Err("No image found in folder".into())
+}
+
 fn generate_thumbnail(path: &str, size: u32) -> Result<String, String> {
     let img = image::open(path).map_err(|e| e.to_string())?;
     let thumb = img.thumbnail(size, size);
