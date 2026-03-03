@@ -1,7 +1,7 @@
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { resolveResource } from "@tauri-apps/api/path";
-import { Loader } from "lucide-react";
+import { ArrowUp, Loader } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRubberBand } from "../../hooks/useRubberBand";
 import {
@@ -24,7 +24,7 @@ import { useSuggestionStore } from "../../stores/suggestionStore";
 import { useThumbnailStore } from "../../stores/thumbnailStore";
 import { toast } from "../../stores/toastStore";
 import { useUndoStore } from "../../stores/undoStore";
-import type { FileEntry } from "../../types";
+import type { FileEntry, SortKey } from "../../types";
 import { generateDragIcon } from "../../utils/dragIcon";
 import { getFileType } from "../../utils/fileType";
 import { formatDate, formatFileSize } from "../../utils/format";
@@ -35,6 +35,7 @@ import { DragSuggestion } from "../DragSuggestion/DragSuggestion";
 import { PropertiesDialog } from "../PropertiesDialog";
 import { QuickLook } from "../QuickLook";
 import { PatternSuggestionBanner, RuleSuggestionBanner } from "../RuleSuggestion";
+import { cn } from "../../utils/cn";
 import { ColumnHeader } from "./ColumnHeader";
 import { FileRow } from "./FileRow";
 import { FolderPeek } from "./FolderPeek";
@@ -1053,6 +1054,33 @@ export function Panel() {
             onSort={setSort}
             onAutoFit={handleAutoFit}
           />
+        )}
+        {/* Grid sort bar (icons mode only) */}
+        {viewMode === "icons" && (
+          <div className="flex items-center h-7 px-3 border-b border-[#e5e5e5] bg-[#fafafa] text-xs shrink-0 gap-0.5">
+            {(["name", "modified", "extension", "size"] as SortKey[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => setSort(key)}
+                className={cn(
+                  "flex items-center px-2 py-0.5 rounded transition-colors",
+                  tab.sortKey === key
+                    ? "text-[var(--accent)] font-medium"
+                    : "text-[#999] hover:text-[#666] hover:bg-[#eee]",
+                )}
+              >
+                {t.columnHeader[key === "extension" ? "type" : key]}
+                {tab.sortKey === key && (
+                  <ArrowUp
+                    className={cn(
+                      "w-3 h-3 ml-0.5 transition-transform duration-200",
+                      tab.sortOrder === "desc" && "rotate-180",
+                    )}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
         )}
         {(tab.loading || tab.searching || tab.contentSearching) && (
           <div className="flex items-center justify-center h-full text-[#999] gap-2">

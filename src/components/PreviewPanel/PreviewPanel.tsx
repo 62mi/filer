@@ -289,7 +289,14 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
             <Music className="w-10 h-10 text-[#bbb]" />
             <div className="text-xs font-medium text-[#1a1a1a] text-center break-all">{e.name}</div>
             {preview.mediaUrl && (
-              <audio src={preview.mediaUrl} controls className="w-full">
+              <audio
+                src={preview.mediaUrl}
+                controls
+                autoPlay
+                tabIndex={-1}
+                onFocus={(e) => e.currentTarget.blur()}
+                className="w-full"
+              >
                 <track kind="captions" />
               </audio>
             )}

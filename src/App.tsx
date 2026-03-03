@@ -213,7 +213,7 @@ function App() {
       <TabBar />
 
       {/* Navigation bar */}
-      <NavigationBar />
+      <NavigationBar previewOpen={previewOpen} onTogglePreview={() => setPreviewOpen(!previewOpen)} />
 
       {/* Bookmark bar */}
       <BookmarkBar />
@@ -260,7 +260,7 @@ function App() {
       </div>
 
       {/* Status bar */}
-      <StatusBar onTogglePreview={() => setPreviewOpen(!previewOpen)} previewOpen={previewOpen} />
+      <StatusBar />
 
       {/* Rule Manager Dialog */}
       <RuleManager />

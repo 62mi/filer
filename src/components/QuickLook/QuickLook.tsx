@@ -318,7 +318,14 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
             <Music className="w-16 h-16 text-[#bbb]" />
             <div className="text-base font-medium text-[#1a1a1a]">{entry.name}</div>
             {preview.mediaUrl && (
-              <audio src={preview.mediaUrl} controls className="w-full">
+              <audio
+                src={preview.mediaUrl}
+                controls
+                autoPlay
+                tabIndex={-1}
+                onFocus={(e) => e.currentTarget.blur()}
+                className="w-full"
+              >
                 <track kind="captions" />
               </audio>
             )}

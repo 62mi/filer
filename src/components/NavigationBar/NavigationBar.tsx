@@ -6,6 +6,8 @@ import {
   Eye,
   EyeOff,
   FileText,
+  PanelRightClose,
+  PanelRightOpen,
   RotateCw,
   Search,
   Star,
@@ -20,6 +22,11 @@ import { useSettingsStore } from "../../stores/settingsStore";
 import { toast } from "../../stores/toastStore";
 import { cn } from "../../utils/cn";
 import { formatPath } from "../../utils/format";
+
+interface NavigationBarProps {
+  previewOpen: boolean;
+  onTogglePreview: () => void;
+}
 
 const TERMINAL_COMMANDS = new Set(["cmd", "powershell", "pwsh", "wt"]);
 
@@ -49,7 +56,7 @@ function NavButton({
   );
 }
 
-export function NavigationBar() {
+export function NavigationBar({ previewOpen, onTogglePreview }: NavigationBarProps) {
   const t = useTranslation();
   const tab = useExplorerStore((s) => s.tabs.find((t) => t.id === s.activeTabId) || s.tabs[0]);
   const showHidden = useExplorerStore((s) => s.showHidden);
@@ -251,6 +258,15 @@ export function NavigationBar() {
       {/* Hidden files toggle */}
       <NavButton onClick={toggleHidden} title="Toggle hidden files (Ctrl+H)">
         {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4 text-[#999]" />}
+      </NavButton>
+
+      {/* Preview panel toggle */}
+      <NavButton onClick={onTogglePreview} title={t.statusBar.togglePreview}>
+        {previewOpen ? (
+          <PanelRightClose className="w-4 h-4" />
+        ) : (
+          <PanelRightOpen className="w-4 h-4 text-[#999]" />
+        )}
       </NavButton>
 
       {/* Search bar */}

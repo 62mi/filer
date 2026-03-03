@@ -1,4 +1,4 @@
-import { BarChart3, PanelRightClose, PanelRightOpen, Sparkles } from "lucide-react";
+import { BarChart3, Sparkles } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
@@ -9,12 +9,7 @@ import { useSettingsStore } from "../../stores/settingsStore";
 import { formatFileSize } from "../../utils/format";
 import { CopyQueueMiniIndicator } from "../CopyQueue";
 
-interface StatusBarProps {
-  onTogglePreview: () => void;
-  previewOpen: boolean;
-}
-
-export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
+export function StatusBar() {
   const t = useTranslation();
   const tab = useExplorerStore((s) => s.tabs.find((tt) => tt.id === s.activeTabId) || s.tabs[0]);
   const statusBarHeight = useSettingsStore((s) => s.statusBarHeight);
@@ -133,18 +128,6 @@ export function StatusBar({ onTogglePreview, previewOpen }: StatusBarProps) {
           )}
         </button>
       )}
-
-      <button
-        className="p-0.5 mr-2 rounded hover:bg-[var(--chrome-hover)] text-[var(--chrome-text-dim)] transition-colors"
-        onClick={onTogglePreview}
-        title={t.statusBar.togglePreview}
-      >
-        {previewOpen ? (
-          <PanelRightClose className="w-3.5 h-3.5" />
-        ) : (
-          <PanelRightOpen className="w-3.5 h-3.5" />
-        )}
-      </button>
 
       <span className="text-[var(--chrome-text-dim)] truncate max-w-md">{tab.path}</span>
     </div>
