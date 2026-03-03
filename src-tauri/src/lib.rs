@@ -12,6 +12,7 @@ use commands::fs::*;
 use commands::icons::*;
 use commands::media::*;
 use commands::system::*;
+use db::custom_action::*;
 use db::history::*;
 use db::rules::*;
 use db::Database;
@@ -271,6 +272,10 @@ pub fn run() {
             get_google_docs_thumbnails,
             check_google_drive_status,
             save_temp_drag_icon,
+            list_custom_actions,
+            save_custom_action,
+            delete_custom_action,
+            execute_custom_action,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {

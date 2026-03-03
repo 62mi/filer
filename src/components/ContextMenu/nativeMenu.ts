@@ -2,9 +2,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { Menu, MenuItem, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
 import { getTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
+import { useCustomActionStore } from "../../stores/customActionStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useRuleStore } from "../../stores/ruleStore";
 import { useRuleWizardStore } from "../../stores/ruleWizardStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { useTemplateStore } from "../../stores/templateStore";
 import { toast } from "../../stores/toastStore";
 import { useUndoStore } from "../../stores/undoStore";
@@ -185,6 +187,41 @@ async function buildFileMenu(
       action: () => useExplorerStore.getState().startRename(targetIndex),
     }),
   );
+
+  // ── カスタムアクション ──
+  const customActionStore = useCustomActionStore.getState();
+  if (!customActionStore.loaded) {
+    await customActionStore.loadActions();
+  }
+  const matchingActions = customActionStore.getActionsForEntry(entry.is_dir, entry.extension);
+  if (matchingActions.length > 0) {
+    items.push(await PredefinedMenuItem.new({ item: "Separator" }));
+    const actionSubItems: MenuItem[] = [];
+    for (const action of matchingActions) {
+      actionSubItems.push(
+        await MenuItem.new({
+          text: action.name,
+          action: () => {
+            useCustomActionStore.getState().executeAction(action.id, entry.path);
+          },
+        }),
+      );
+    }
+    actionSubItems.push(
+      await MenuItem.new({
+        text: t.contextMenu.manageCustomActions,
+        action: () => {
+          useSettingsStore.getState().openSettings("general");
+        },
+      }),
+    );
+    items.push(
+      await Submenu.new({
+        text: t.contextMenu.customActions,
+        items: actionSubItems,
+      }),
+    );
+  }
 
   items.push(await PredefinedMenuItem.new({ item: "Separator" }));
 
@@ -418,6 +455,41 @@ async function buildBackgroundMenu(
       },
     }),
   );
+
+  // ── カスタムアクション（背景メニュー） ──
+  const bgCustomActionStore = useCustomActionStore.getState();
+  if (!bgCustomActionStore.loaded) {
+    await bgCustomActionStore.loadActions();
+  }
+  const bgMatchingActions = bgCustomActionStore.getActionsForEntry(true, "");
+  if (bgMatchingActions.length > 0) {
+    items.push(await PredefinedMenuItem.new({ item: "Separator" }));
+    const bgActionSubItems: MenuItem[] = [];
+    for (const action of bgMatchingActions) {
+      bgActionSubItems.push(
+        await MenuItem.new({
+          text: action.name,
+          action: () => {
+            useCustomActionStore.getState().executeAction(action.id, tab.path);
+          },
+        }),
+      );
+    }
+    bgActionSubItems.push(
+      await MenuItem.new({
+        text: t.contextMenu.manageCustomActions,
+        action: () => {
+          useSettingsStore.getState().openSettings("general");
+        },
+      }),
+    );
+    items.push(
+      await Submenu.new({
+        text: t.contextMenu.customActions,
+        items: bgActionSubItems,
+      }),
+    );
+  }
 
   items.push(await PredefinedMenuItem.new({ item: "Separator" }));
 
