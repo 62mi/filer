@@ -28,6 +28,7 @@ import { getFileType } from "../../utils/fileType";
 import { formatDate, formatFileSize } from "../../utils/format";
 import { AiOrganizer } from "../AiOrganizer";
 import { showNativeContextMenu } from "../ContextMenu";
+import { ContentSearchResults } from "./ContentSearchResults";
 import { DragSuggestion } from "../DragSuggestion/DragSuggestion";
 import { PropertiesDialog } from "../PropertiesDialog";
 import { QuickLook } from "../QuickLook";
@@ -975,10 +976,10 @@ export function Panel() {
             onAutoFit={handleAutoFit}
           />
         )}
-        {(tab.loading || tab.searching) && (
+        {(tab.loading || tab.searching || tab.contentSearching) && (
           <div className="flex items-center justify-center h-full text-[#999] gap-2">
             <Loader className="w-4 h-4 animate-spin" />
-            {tab.searching ? t.panel.searching : t.panel.loading}
+            {tab.contentSearching ? t.navigationBar.contentSearching : tab.searching ? t.panel.searching : t.panel.loading}
           </div>
         )}
         {tab.error && (
@@ -986,14 +987,26 @@ export function Panel() {
             {tab.error}
           </div>
         )}
-        {!tab.loading && !tab.searching && !tab.error && displayEntries.length === 0 && (
+        {/* 内容検索結果表示 */}
+        {!tab.loading && !tab.contentSearching && !tab.error && tab.contentSearchResults !== null && (
+          tab.contentSearchResults.length > 0 ? (
+            <ContentSearchResults results={tab.contentSearchResults} query={tab.searchQuery} />
+          ) : (
+            <div className="flex items-center justify-center h-full text-[#999] animate-fade-in">
+              {t.navigationBar.contentSearchNoResults}
+            </div>
+          )
+        )}
+        {!tab.loading && !tab.searching && !tab.contentSearching && !tab.error && tab.contentSearchResults === null && displayEntries.length === 0 && (
           <div className="flex items-center justify-center h-full text-[#999] animate-fade-in">
             {tab.searchResults !== null ? t.panel.noResults : t.panel.emptyFolder}
           </div>
         )}
         {!tab.loading &&
           !tab.searching &&
+          !tab.contentSearching &&
           !tab.error &&
+          tab.contentSearchResults === null &&
           (viewMode === "details" ? (
             displayEntries.map((entry, index) => (
               <FileRow

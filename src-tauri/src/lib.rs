@@ -271,6 +271,7 @@ pub fn run() {
             get_google_docs_thumbnails,
             check_google_drive_status,
             save_temp_drag_icon,
+            search_file_contents,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
