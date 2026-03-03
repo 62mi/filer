@@ -2,13 +2,14 @@ import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { resolveResource } from "@tauri-apps/api/path";
 import { Loader } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   clearHighlight,
   findDropZone,
   handleNativeDrop,
   setHighlight,
 } from "../../hooks/useNativeDrop";
+import { useSortAnimation } from "../../hooks/useSortAnimation";
 import { getTranslation, useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
@@ -55,7 +56,7 @@ export function Panel() {
   const selectRange = useExplorerStore((s) => s.selectRange);
   const selectAll = useExplorerStore((s) => s.selectAll);
   const clearSelection = useExplorerStore((s) => s.clearSelection);
-  const setSort = useExplorerStore((s) => s.setSort);
+  const setSortRaw = useExplorerStore((s) => s.setSort);
   const toggleHidden = useExplorerStore((s) => s.toggleHidden);
   const startRename = useExplorerStore((s) => s.startRename);
   const commitRename = useExplorerStore((s) => s.commitRename);
@@ -76,6 +77,28 @@ export function Panel() {
   const prevPathRef = useRef(tab.path);
   const prevLoadingRef = useRef(tab.loading);
   const suggestionTimerRef = useRef<number | null>(null);
+
+  // ソート切替FLIPアニメーション
+  const { capturePositions, animateFlip } = useSortAnimation();
+  const sortAnimPendingRef = useRef(false);
+
+  /** ソート変更: 位置キャプチャ→ソート実行→アニメーション予約 */
+  const setSort = useCallback(
+    (key: import("../../types").SortKey) => {
+      capturePositions(listRef.current);
+      setSortRaw(key);
+      sortAnimPendingRef.current = true;
+    },
+    [capturePositions, setSortRaw],
+  );
+
+  // ソート後にDOMが更新されたらFLIPアニメーションを再生
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tab.entriesはソート変更のトリガーとして必要
+  useLayoutEffect(() => {
+    if (!sortAnimPendingRef.current) return;
+    sortAnimPendingRef.current = false;
+    animateFlip(listRef.current);
+  }, [tab.entries, animateFlip]);
 
   const aiDialogOpen = useAiStore((s) => s.dialogOpen);
   const aiDialogTabId = useAiStore((s) => s.dialogTabId);
