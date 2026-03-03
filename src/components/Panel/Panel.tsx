@@ -34,6 +34,7 @@ import { QuickLook } from "../QuickLook";
 import { PatternSuggestionBanner, RuleSuggestionBanner } from "../RuleSuggestion";
 import { ColumnHeader } from "./ColumnHeader";
 import { FileRow } from "./FileRow";
+import { FolderPeek } from "./FolderPeek";
 import { GridView } from "./GridView";
 import { Toolbar } from "./Toolbar";
 
@@ -76,6 +77,11 @@ export function Panel() {
   const prevPathRef = useRef(tab.path);
   const prevLoadingRef = useRef(tab.loading);
   const suggestionTimerRef = useRef<number | null>(null);
+
+  // フォルダチラ見せ (FolderPeek) 状態
+  const [folderPeekPath, setFolderPeekPath] = useState<string | null>(null);
+  const [folderPeekRect, setFolderPeekRect] = useState<DOMRect | null>(null);
+  const folderPeekTimerRef = useRef<number | null>(null);
 
   const aiDialogOpen = useAiStore((s) => s.dialogOpen);
   const aiDialogTabId = useAiStore((s) => s.dialogTabId);
@@ -306,6 +312,37 @@ export function Panel() {
     },
     [onProperties],
   );
+
+  // フォルダホバー: debounce付きでFolderPeekポップアップを表示
+  const handleFolderHover = useCallback(
+    (path: string, rect: DOMRect) => {
+      // ドラッグ中は表示しない
+      if (document.body.classList.contains("file-dragging")) return;
+      // 既に同じフォルダが表示中ならスキップ
+      if (folderPeekPath === path) return;
+      // タイマーリセット
+      if (folderPeekTimerRef.current) {
+        clearTimeout(folderPeekTimerRef.current);
+      }
+      folderPeekTimerRef.current = window.setTimeout(() => {
+        folderPeekTimerRef.current = null;
+        // ドラッグ中でないことを再確認
+        if (document.body.classList.contains("file-dragging")) return;
+        setFolderPeekPath(path);
+        setFolderPeekRect(rect);
+      }, 500);
+    },
+    [folderPeekPath],
+  );
+
+  const handleFolderLeave = useCallback(() => {
+    if (folderPeekTimerRef.current) {
+      clearTimeout(folderPeekTimerRef.current);
+      folderPeekTimerRef.current = null;
+    }
+    setFolderPeekPath(null);
+    setFolderPeekRect(null);
+  }, []);
 
   // ハイブリッドドラッグ: カスタム内部ドラッグ + ウィンドウ外でネイティブOS D&D
   const dragStartRef = useRef<{ x: number; y: number; index: number } | null>(null);
@@ -1018,6 +1055,8 @@ export function Panel() {
                 selectedCount={tab.selectedIndices.size}
                 onStartRename={startRename}
                 maxFileSize={maxFileSize}
+                onFolderHover={handleFolderHover}
+                onFolderLeave={handleFolderLeave}
               />
             ))
           ) : (
@@ -1039,6 +1078,8 @@ export function Panel() {
               onFileMouseDown={handleFileMouseDown}
               onClearSelection={clearSelection}
               onStartRename={startRename}
+              onFolderHover={handleFolderHover}
+              onFolderLeave={handleFolderLeave}
             />
           ))}
       </div>
@@ -1065,6 +1106,13 @@ export function Panel() {
           }}
         />
       )}
+
+      {/* フォルダ中身チラ見せポップアップ */}
+      <FolderPeek
+        folderPath={folderPeekPath}
+        anchorRect={folderPeekRect}
+        onClose={handleFolderLeave}
+      />
 
       {/* 移動先サジェストポップアップ */}
       <DragSuggestion onSelectDestination={handleSuggestionSelect} />

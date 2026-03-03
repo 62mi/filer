@@ -29,6 +29,8 @@ export interface GridCellProps {
   onClearSelection: () => void;
   selectedCount: number;
   onStartRename: (index: number) => void;
+  onFolderHover?: (path: string, rect: DOMRect) => void;
+  onFolderLeave?: () => void;
 }
 
 export const GridCell = memo(function GridCell({
@@ -51,6 +53,8 @@ export const GridCell = memo(function GridCell({
   onClearSelection,
   selectedCount,
   onStartRename,
+  onFolderHover,
+  onFolderLeave,
 }: GridCellProps) {
   const [renameValue, setRenameValue] = useState(entry.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -238,6 +242,17 @@ export const GridCell = memo(function GridCell({
           slowClickTimerRef.current = null;
         }
         onContextMenu(e, index);
+      }}
+      onMouseEnter={(e) => {
+        if (entry.is_dir && onFolderHover) {
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          onFolderHover(entry.path, rect);
+        }
+      }}
+      onMouseLeave={() => {
+        if (entry.is_dir && onFolderLeave) {
+          onFolderLeave();
+        }
       }}
     >
       {/* Selection checkmark */}
