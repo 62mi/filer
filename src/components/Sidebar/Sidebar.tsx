@@ -13,6 +13,9 @@ import {
   Layers,
   Monitor,
   Music,
+  Pencil,
+  Plus,
+  Search,
   Trash2,
   Video,
   X,
@@ -27,6 +30,7 @@ import {
 import { useTranslation } from "../../i18n";
 import { useIconStore } from "../../stores/iconStore";
 import { useExplorerStore } from "../../stores/panelStore";
+import { useSmartFolderStore } from "../../stores/smartFolderStore";
 import type { DriveInfo } from "../../types";
 import { cn } from "../../utils/cn";
 import { clampMenuPosition } from "../../utils/menuPosition";
@@ -56,12 +60,24 @@ export function Sidebar() {
   const removeFromStack = useExplorerStore((s) => s.removeFromStack);
   const clearStack = useExplorerStore((s) => s.clearStack);
   const fetchIcons = useIconStore((s) => s.fetchIcons);
+  const smartFolders = useSmartFolderStore((s) => s.smartFolders);
+  const loadSmartFolders = useSmartFolderStore((s) => s.load);
+  const openEditor = useSmartFolderStore((s) => s.openEditor);
+  const removeSmartFolder = useSmartFolderStore((s) => s.remove);
 
   const [drives, setDrives] = useState<DriveInfo[]>([]);
   const [homeDir, setHomeDir] = useState("");
   const [quickAccessOpen, setQuickAccessOpen] = useState(true);
   const [pcOpen, setPcOpen] = useState(true);
+  const [smartFolderOpen, setSmartFolderOpen] = useState(true);
   const [stackOpen, setStackOpen] = useState(true);
+  const [sfContextMenu, setSfContextMenu] = useState<{
+    x: number;
+    y: number;
+    folderId: number;
+  } | null>(null);
+  const sfContextMenuRef = useRef<HTMLDivElement>(null);
+  const [sfMenuPos, setSfMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [stackSelected, setStackSelected] = useState<Set<string>>(new Set());
   const [stackLastClicked, setStackLastClicked] = useState<string | null>(null);
   const [stackContextMenu, setStackContextMenu] = useState<{
@@ -114,7 +130,32 @@ export function Sidebar() {
   useEffect(() => {
     invoke<DriveInfo[]>("get_drives").then(setDrives);
     invoke<string>("get_home_dir").then(setHomeDir);
-  }, []);
+    loadSmartFolders();
+  }, [loadSmartFolders]);
+
+  // スマートフォルダコンテキストメニュー閉じる
+  useEffect(() => {
+    if (!sfContextMenu) return;
+    const handleClick = () => setSfContextMenu(null);
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSfContextMenu(null);
+    };
+    window.addEventListener("mousedown", handleClick);
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      window.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [sfContextMenu]);
+
+  // スマートフォルダコンテキストメニューをビューポート内にクランプ
+  useEffect(() => {
+    if (!sfContextMenu || !sfContextMenuRef.current) return;
+    const rect = sfContextMenuRef.current.getBoundingClientRect();
+    const clamped = clampMenuPosition(sfContextMenu.x, sfContextMenu.y, rect.width, rect.height);
+    setSfMenuPos(clamped);
+    return () => setSfMenuPos(null);
+  }, [sfContextMenu]);
 
   // サイドバー用のアイコンを取得
   useEffect(() => {
@@ -297,6 +338,60 @@ export function Sidebar() {
             <span className="truncate">{drive.display_name}</span>
           </button>
         ))}
+
+      {/* スマートフォルダ */}
+      <button
+        className="flex items-center gap-1 px-2 py-1 mt-2 hover:bg-[var(--chrome-hover)] text-left w-full font-semibold transition-colors duration-100"
+        onClick={() => setSmartFolderOpen(!smartFolderOpen)}
+      >
+        <ChevronRight
+          className={cn(
+            "w-3 h-3 transition-transform duration-200",
+            smartFolderOpen && "rotate-90",
+          )}
+        />
+        <Search className="w-3.5 h-3.5 mr-0.5" />
+        {t.sidebar.smartFolders}
+        <span
+          className="ml-auto p-0.5 rounded hover:bg-[var(--chrome-active)] transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            openEditor();
+          }}
+          title={t.smartFolder.create}
+        >
+          <Plus className="w-3 h-3" />
+        </span>
+      </button>
+      {smartFolderOpen && (
+        <div>
+          {smartFolders.length === 0 ? (
+            <div className="flex items-center justify-center py-2 text-[11px] text-[var(--chrome-text-dim)] italic">
+              {t.smartFolder.empty}
+            </div>
+          ) : (
+            smartFolders.map((sf) => (
+              <button
+                key={sf.id}
+                className={cn(
+                  "flex items-center gap-2 pl-6 pr-2 py-[3px] hover:bg-[var(--chrome-hover)] text-left w-full min-w-0 transition-colors duration-100",
+                  currentPath === `smart-folder:${sf.id}` && "bg-[var(--chrome-active)]",
+                )}
+                onClick={() => loadDirectory(`smart-folder:${sf.id}`)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSfContextMenu({ x: e.clientX, y: e.clientY, folderId: sf.id });
+                }}
+                title={sf.name}
+              >
+                <Search className="w-4 h-4 text-[var(--accent)] shrink-0" />
+                <span className="truncate">{sf.name}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Stack */}
       <button
@@ -496,6 +591,43 @@ export function Sidebar() {
           <span className="text-[12px]">{t.sidebar.trash}</span>
         </button>
       </div>
+
+      {/* Smart folder context menu */}
+      {sfContextMenu && (
+        <div
+          ref={sfContextMenuRef}
+          className="fixed z-50 min-w-40 bg-white border border-[#e0e0e0] rounded-lg shadow-lg py-1 animate-fade-scale-in origin-top-left"
+          style={{
+            left: sfMenuPos ? sfMenuPos.x : sfContextMenu.x,
+            top: sfMenuPos ? sfMenuPos.y : sfContextMenu.y,
+            visibility: sfMenuPos ? "visible" : "hidden",
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[var(--chrome-hover)] transition-colors"
+            onClick={() => {
+              const folder = smartFolders.find((sf) => sf.id === sfContextMenu.folderId);
+              if (folder) openEditor(folder);
+              setSfContextMenu(null);
+            }}
+          >
+            <Pencil className="w-4 h-4 text-[var(--chrome-text-dim)]" />
+            {t.common.edit}
+          </button>
+          <div className="h-px bg-[var(--chrome-border)] my-1" />
+          <button
+            className="flex items-center gap-3 w-full px-3 py-1.5 text-sm text-left hover:bg-[var(--chrome-hover)] text-red-500 transition-colors"
+            onClick={() => {
+              removeSmartFolder(sfContextMenu.folderId);
+              setSfContextMenu(null);
+            }}
+          >
+            <Trash2 className="w-4 h-4" />
+            {t.common.delete}
+          </button>
+        </div>
+      )}
 
       {/* Stack context menu */}
       {stackContextMenu && (

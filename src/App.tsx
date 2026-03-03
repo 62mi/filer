@@ -13,6 +13,7 @@ import { SettingsDialog } from "./components/SettingsDialog/SettingsDialog";
 import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { TabBar } from "./components/TabBar";
+import { SmartFolderEditor } from "./components/SmartFolderEditor/SmartFolderEditor";
 import { TemplateManager } from "./components/TemplateManager";
 import { useNativeDrop } from "./hooks/useNativeDrop";
 import { getTranslation } from "./i18n";
@@ -274,6 +275,9 @@ function App() {
 
       {/* Template Manager Dialog */}
       <TemplateManager />
+
+      {/* Smart Folder Editor */}
+      <SmartFolderEditor />
 
       {/* Copy Queue Panel */}
       <CopyQueuePanel />

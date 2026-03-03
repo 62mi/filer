@@ -1,6 +1,7 @@
 pub mod dir_size_cache;
 pub mod history;
 pub mod rules;
+pub mod smart_folder;
 pub mod usage;
 pub mod workspace;
 
@@ -95,6 +96,14 @@ impl Database {
                 name       TEXT NOT NULL UNIQUE,
                 data       TEXT NOT NULL,
                 updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS smart_folders (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                name         TEXT NOT NULL,
+                conditions   TEXT NOT NULL,
+                search_paths TEXT NOT NULL,
+                created_at   TEXT NOT NULL
             );",
         )
         .map_err(|e| format!("Failed to init tables: {}", e))?;

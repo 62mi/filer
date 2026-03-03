@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "../../i18n";
 import { useBookmarkStore } from "../../stores/bookmarkStore";
 import { useExplorerStore } from "../../stores/panelStore";
+import { useSmartFolderStore } from "../../stores/smartFolderStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { toast } from "../../stores/toastStore";
 import { cn } from "../../utils/cn";
@@ -114,6 +115,12 @@ export function NavigationBar() {
   };
 
   const isHome = tab.path === "home:";
+  const isSmartFolder = tab.path.startsWith("smart-folder:");
+  const smartFolderName = useSmartFolderStore((s) => {
+    if (!isSmartFolder) return "";
+    const id = Number(tab.path.replace("smart-folder:", ""));
+    return s.smartFolders.find((sf) => sf.id === id)?.name ?? t.sidebar.smartFolders;
+  });
   const segments = tab.path.split(/[\\/]/).filter(Boolean);
 
   return (
@@ -129,7 +136,7 @@ export function NavigationBar() {
       >
         <ArrowRight className="w-4 h-4" />
       </NavButton>
-      <NavButton onClick={navigateUp} title="Up (Alt+Up)" disabled={isHome}>
+      <NavButton onClick={navigateUp} title="Up (Alt+Up)" disabled={isHome || isSmartFolder}>
         <ArrowUp className="w-4 h-4" />
       </NavButton>
       <NavButton
@@ -187,6 +194,11 @@ export function NavigationBar() {
             <div className="flex items-center flex-1 min-w-0 overflow-hidden">
               {isHome ? (
                 <span className="text-[#666]">{t.sidebar.home}</span>
+              ) : isSmartFolder ? (
+                <span className="flex items-center gap-1.5 text-[#666]">
+                  <Search className="w-3.5 h-3.5 text-[var(--accent)]" />
+                  {smartFolderName}
+                </span>
               ) : (
                 segments.map((segment, i) => {
                   const segmentPath = segments.slice(0, i + 1).join("\\");

@@ -468,6 +468,57 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       return;
     }
 
+    // スマートフォルダ: execute_smart_folder で検索結果を表示
+    const smartMatch = path.match(/^smart-folder:(\d+)$/);
+    if (smartMatch) {
+      const smartId = Number(smartMatch[1]);
+      const tab = get().getActiveTab();
+      set((s) => ({
+        tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+          loading: true,
+          error: null,
+          searchResults: null,
+          searchQuery: "",
+          searching: false,
+        })),
+      }));
+      try {
+        const entries: FileEntry[] = await invoke("execute_smart_folder", { id: smartId });
+        const { showHidden } = get();
+        const filtered = showHidden ? entries : entries.filter((e) => !e.is_hidden);
+        let history = tab.history;
+        let historyIndex = tab.historyIndex;
+        if (addToHistory) {
+          history = [...tab.history.slice(0, tab.historyIndex + 1), path];
+          historyIndex = history.length - 1;
+        }
+        set((s) => ({
+          tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+            path,
+            entries: filtered,
+            selectedIndices: new Set<number>(),
+            cursorIndex: 0,
+            loading: false,
+            error: null,
+            history,
+            historyIndex,
+            renamingIndex: null,
+            searchResults: null,
+            searchQuery: "",
+            searching: false,
+          })),
+        }));
+      } catch (e: unknown) {
+        set((s) => ({
+          tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+            loading: false,
+            error: e instanceof Error ? e.message : String(e),
+          })),
+        }));
+      }
+      return;
+    }
+
     const { showHidden } = get();
 
     // 遷移前に現在の表示状態をキャッシュに保存（パスが変わる場合のみ）

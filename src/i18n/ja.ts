@@ -472,12 +472,38 @@ export const ja = {
     home: "ホーム",
     quickAccess: "クイック アクセス",
     thisPC: "PC",
+    smartFolders: "スマートフォルダ",
     stack: "スタック",
     clearStack: "スタッククリア",
     dragFilesHere: "ここにファイルをドラッグ",
     remove: "削除",
     clearAll: "すべてクリア",
     trash: "ゴミ箱",
+  },
+
+  // ── スマートフォルダ ──
+  smartFolder: {
+    create: "スマートフォルダを作成",
+    edit: "スマートフォルダを編集",
+    empty: "スマートフォルダなし",
+    namePlaceholder: "例: 大きな画像ファイル",
+    searchPaths: "検索対象フォルダ",
+    selectSearchPath: "検索対象フォルダを選択",
+    noSearchPaths: "検索対象フォルダを追加してください",
+    conditions: "検索条件",
+    noConditions: "条件なし（すべてのファイルが対象）",
+    conditionsHint: "すべての条件に合致するファイルが表示されます（AND条件）",
+    conditionTypes: {
+      extension: "拡張子",
+      name_contains: "名前に含む",
+      name_glob: "名前パターン",
+      size_min: "最小サイズ (bytes)",
+      size_max: "最大サイズ (bytes)",
+      modified_after: "更新日（以降）",
+      modified_before: "更新日（以前）",
+    } as Record<string, string>,
+    placeholderNameContains: "検索キーワード",
+    placeholderSize: "バイト数",
   },
 
   // ── 画像操作 ──

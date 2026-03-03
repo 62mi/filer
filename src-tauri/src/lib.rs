@@ -14,6 +14,7 @@ use commands::media::*;
 use commands::system::*;
 use db::history::*;
 use db::rules::*;
+use db::smart_folder::*;
 use db::workspace::*;
 use db::Database;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -280,6 +281,10 @@ pub fn run() {
             save_session,
             load_session,
             search_file_contents,
+            save_smart_folder,
+            list_smart_folders,
+            delete_smart_folder,
+            execute_smart_folder,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
