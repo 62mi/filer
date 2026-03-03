@@ -1,5 +1,6 @@
 use crate::db::Database;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -948,5 +949,364 @@ pub fn save_temp_drag_icon(data: Vec<u8>) -> Result<String, String> {
     let path = std::env::temp_dir().join("filer_drag_icon.png");
     fs::write(&path, &data).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().into_owned())
+}
+
+// ───────────────────────────────────────────────────────
+//  整理スコア (Organization Score)
+// ───────────────────────────────────────────────────────
+
+/// 整理スコア計算結果
+#[derive(Debug, Serialize)]
+pub struct OrganizationScore {
+    pub score: u32,
+    pub naming_score: u32,
+    pub folder_ratio_score: u32,
+    pub diversity_score: u32,
+    pub duplicate_score: u32,
+}
+
+/// 重複疑いパターン: (1), (2), Copy, コピー 等
+fn is_suspected_duplicate(name: &str) -> bool {
+    // " (数字)" パターン
+    if let Some(paren_pos) = name.rfind(" (") {
+        if let Some(close_pos) = name[paren_pos..].find(')') {
+            let inner = &name[paren_pos + 2..paren_pos + close_pos];
+            if inner.chars().all(|c| c.is_ascii_digit()) && !inner.is_empty() {
+                return true;
+            }
+        }
+    }
+    let lower = name.to_lowercase();
+    lower.contains(" - copy")
+        || lower.contains(" copy")
+        || lower.contains("コピー")
+        || lower.contains(" - コピー")
+}
+
+/// フォルダの整理スコアを計算する（0-100、100が最も整理されている）
+#[tauri::command]
+pub async fn calculate_organization_score(path: String) -> Result<OrganizationScore, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir_path = Path::new(&path);
+        if !dir_path.is_dir() {
+            return Err(format!("Not a directory: {}", path));
+        }
+
+        let entries = fs::read_dir(dir_path)
+            .map_err(|e| format!("Failed to read directory: {}", e))?;
+
+        let mut file_count = 0u32;
+        let mut dir_count = 0u32;
+        let mut no_ext_count = 0u32;
+        let mut duplicate_count = 0u32;
+        let mut extensions: HashMap<String, u32> = HashMap::new();
+        let mut naming_styles: [u32; 4] = [0; 4]; // 0=all_lower, 1=all_upper, 2=camel, 3=mixed
+
+        for entry in entries {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            let metadata = match entry.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            let name = entry.file_name().to_string_lossy().to_string();
+
+            if metadata.is_dir() {
+                dir_count += 1;
+                continue;
+            }
+            file_count += 1;
+
+            // 拡張子チェック
+            let ext = Path::new(&name)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            if ext.is_empty() {
+                no_ext_count += 1;
+            } else {
+                *extensions.entry(ext).or_insert(0) += 1;
+            }
+
+            // 命名スタイル判定（拡張子を除いたステム部分）
+            let stem = Path::new(&name)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or(&name);
+            let alpha_chars: String = stem.chars().filter(|c| c.is_alphabetic()).collect();
+            if !alpha_chars.is_empty() {
+                if alpha_chars == alpha_chars.to_lowercase() {
+                    naming_styles[0] += 1;
+                } else if alpha_chars == alpha_chars.to_uppercase() {
+                    naming_styles[1] += 1;
+                } else if alpha_chars.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
+                    naming_styles[2] += 1; // CamelCase / Title
+                } else {
+                    naming_styles[3] += 1;
+                }
+            }
+
+            // 重複疑い
+            if is_suspected_duplicate(&name) {
+                duplicate_count += 1;
+            }
+        }
+
+        let total = file_count + dir_count;
+        if total == 0 {
+            // 空フォルダは満点
+            return Ok(OrganizationScore {
+                score: 100,
+                naming_score: 100,
+                folder_ratio_score: 100,
+                diversity_score: 100,
+                duplicate_score: 100,
+            });
+        }
+
+        // 1. 命名規則の統一度 (25pt)
+        //    拡張子なしファイルのペナルティ + 命名スタイル一貫性
+        let naming_score = if file_count == 0 {
+            100
+        } else {
+            let no_ext_ratio = no_ext_count as f64 / file_count as f64;
+            let no_ext_penalty = (no_ext_ratio * 40.0) as u32; // 最大40pt減点
+
+            // 最も多い命名スタイルの割合
+            let max_style = *naming_styles.iter().max().unwrap_or(&0);
+            let style_total: u32 = naming_styles.iter().sum();
+            let consistency = if style_total > 0 {
+                max_style as f64 / style_total as f64
+            } else {
+                1.0
+            };
+            let style_score = (consistency * 100.0) as u32;
+            style_score.saturating_sub(no_ext_penalty).min(100)
+        };
+
+        // 2. フォルダ分類率 (25pt)
+        //    ファイル数 / (フォルダ数 + 1) — 低いほど良い（ファイルがフォルダに分類されている）
+        let folder_ratio_score = {
+            let ratio = file_count as f64 / (dir_count as f64 + 1.0);
+            if ratio <= 5.0 {
+                100 // 5ファイル以下/フォルダなら十分整理されている
+            } else if ratio <= 10.0 {
+                80
+            } else if ratio <= 20.0 {
+                60
+            } else if ratio <= 50.0 {
+                40
+            } else {
+                20
+            }
+        };
+
+        // 3. ファイル種類の多様性 (25pt)
+        //    拡張子の種類が少ないほど良い（同質なフォルダ）
+        let diversity_score = {
+            let ext_count = extensions.len() as u32;
+            if ext_count <= 2 {
+                100
+            } else if ext_count <= 4 {
+                80
+            } else if ext_count <= 8 {
+                60
+            } else if ext_count <= 15 {
+                40
+            } else {
+                20
+            }
+        };
+
+        // 4. 重複疑い (25pt)
+        let duplicate_score = if file_count == 0 {
+            100
+        } else {
+            let dup_ratio = duplicate_count as f64 / file_count as f64;
+            if dup_ratio == 0.0 {
+                100
+            } else if dup_ratio < 0.05 {
+                80
+            } else if dup_ratio < 0.1 {
+                60
+            } else if dup_ratio < 0.2 {
+                40
+            } else {
+                20
+            }
+        };
+
+        // 総合スコア（4項目の加重平均）
+        let score = (naming_score + folder_ratio_score + diversity_score + duplicate_score) / 4;
+
+        Ok(OrganizationScore {
+            score,
+            naming_score,
+            folder_ratio_score,
+            diversity_score,
+            duplicate_score,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+// ───────────────────────────────────────────────────────
+//  重複ファイル検出 (Duplicate File Detection)
+// ───────────────────────────────────────────────────────
+
+/// 重複ファイルグループ内のファイル情報
+#[derive(Debug, Serialize, Clone)]
+pub struct DuplicateFileInfo {
+    pub path: String,
+    pub name: String,
+    pub size: u64,
+    pub modified: f64,
+}
+
+/// 重複ファイルのグループ
+#[derive(Debug, Serialize)]
+pub struct DuplicateGroup {
+    pub hash: String,
+    pub size: u64,
+    pub files: Vec<DuplicateFileInfo>,
+}
+
+/// 重複検出結果
+#[derive(Debug, Serialize)]
+pub struct DuplicateResult {
+    pub groups: Vec<DuplicateGroup>,
+    pub total_wasted_bytes: u64,
+    pub scanned_files: u32,
+}
+
+/// 100MB上限
+const DUPLICATE_MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
+/// 先頭チャンクサイズ（4KB）
+const HASH_CHUNK_SIZE: usize = 4096;
+
+/// ファイルの先頭4KBのblake3ハッシュを計算
+fn hash_file_head(path: &Path) -> Result<String, std::io::Error> {
+    let mut file = fs::File::open(path)?;
+    let mut buf = vec![0u8; HASH_CHUNK_SIZE];
+    let n = file.read(&mut buf)?;
+    buf.truncate(n);
+    Ok(blake3::hash(&buf).to_hex().to_string())
+}
+
+/// 重複ファイルを検出する
+/// 1. サイズでグルーピング
+/// 2. 同サイズファイルの先頭4KBをblake3でハッシュ比較
+#[tauri::command]
+pub async fn find_duplicate_files(path: String, recursive: Option<bool>) -> Result<DuplicateResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir_path = Path::new(&path);
+        if !dir_path.is_dir() {
+            return Err(format!("Not a directory: {}", path));
+        }
+
+        let is_recursive = recursive.unwrap_or(true);
+        let max_depth = if is_recursive { usize::MAX } else { 1 };
+
+        // Phase 1: サイズでグルーピング
+        let mut size_groups: HashMap<u64, Vec<PathBuf>> = HashMap::new();
+        let mut scanned_files = 0u32;
+
+        for entry in WalkDir::new(dir_path)
+            .max_depth(max_depth)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            let metadata = match entry.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if metadata.is_dir() || metadata.is_symlink() {
+                continue;
+            }
+            let size = metadata.len();
+            // 0バイトファイルとサイズ上限超過はスキップ
+            if size == 0 || size > DUPLICATE_MAX_FILE_SIZE {
+                continue;
+            }
+            scanned_files += 1;
+            size_groups
+                .entry(size)
+                .or_default()
+                .push(entry.into_path());
+        }
+
+        // Phase 2: 同サイズファイルのハッシュ比較
+        let mut groups = Vec::new();
+        let mut total_wasted_bytes = 0u64;
+
+        for (size, paths) in &size_groups {
+            if paths.len() < 2 {
+                continue;
+            }
+
+            // ハッシュでグルーピング
+            let mut hash_groups: HashMap<String, Vec<&PathBuf>> = HashMap::new();
+            for p in paths {
+                match hash_file_head(p) {
+                    Ok(hash) => {
+                        hash_groups.entry(hash).or_default().push(p);
+                    }
+                    Err(e) => {
+                        eprintln!("[fs] Failed to hash {}: {}", p.display(), e);
+                    }
+                }
+            }
+
+            for (hash, matched_paths) in hash_groups {
+                if matched_paths.len() < 2 {
+                    continue;
+                }
+
+                let files: Vec<DuplicateFileInfo> = matched_paths
+                    .iter()
+                    .map(|p| {
+                        let modified = fs::metadata(p)
+                            .ok()
+                            .and_then(|m| m.modified().ok())
+                            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                            .map(|d| d.as_secs_f64())
+                            .unwrap_or(0.0);
+                        DuplicateFileInfo {
+                            path: p.to_string_lossy().to_string(),
+                            name: p.file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_default(),
+                            size: *size,
+                            modified,
+                        }
+                    })
+                    .collect();
+
+                // 重複分のバイト数（ファイル数 - 1）× サイズ
+                total_wasted_bytes += (files.len() as u64 - 1) * size;
+
+                groups.push(DuplicateGroup {
+                    hash,
+                    size: *size,
+                    files,
+                });
+            }
+        }
+
+        // サイズ降順でソート
+        groups.sort_by(|a, b| b.size.cmp(&a.size));
+
+        Ok(DuplicateResult {
+            groups,
+            total_wasted_bytes,
+            scanned_files,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 

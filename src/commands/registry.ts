@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useAiStore } from "../stores/aiStore";
+import { useDuplicateDetectorStore } from "../stores/duplicateDetectorStore";
 import { useExplorerStore } from "../stores/panelStore";
 import { useRuleStore } from "../stores/ruleStore";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -112,6 +113,16 @@ export function getCommands(): Command[] {
         invoke("create_new_window").catch(() => {
           toast.error("新しいウィンドウの作成に失敗しました");
         });
+      },
+    },
+    {
+      id: "duplicate-detector",
+      label: "重複ファイル検出",
+      action: () => {
+        const tab = useExplorerStore.getState().getActiveTab();
+        if (tab.path && tab.path !== "home:") {
+          useDuplicateDetectorStore.getState().open(tab.path);
+        }
       },
     },
   ];

@@ -45,7 +45,6 @@ interface SettingField {
 
 type TabMode = "general" | "simple" | "advanced" | "ai" | "about";
 
-
 export function SettingsDialog() {
   const t = useTranslation();
   const isOpen = useSettingsStore((s) => s.isOpen);

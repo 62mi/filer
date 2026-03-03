@@ -260,6 +260,9 @@ interface ExplorerStore {
   clipboard: ClipboardData | null;
   cursorVisible: boolean;
 
+  // Organization score
+  organizationScore: number | null;
+
   // Tab actions
   addTab: (path?: string, background?: boolean) => void;
   closeTab: (id: string) => void;
@@ -347,6 +350,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   showHidden: false,
   clipboard: null,
   cursorVisible: true,
+  organizationScore: null,
   stackItems: [],
 
   getActiveTab: () => {
@@ -429,6 +433,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         historyIndex = history.length - 1;
       }
       set((s) => ({
+        organizationScore: null,
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({
           path,
           entries: [],
@@ -521,7 +526,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           tabs: updateActiveTab(s.tabs, activeTabId, () => ({
             pendingRenamePath: null,
             ...(renameIdx >= 0
-              ? { renamingIndex: renameIdx, cursorIndex: renameIdx, selectedIndices: new Set([renameIdx]) }
+              ? {
+                  renamingIndex: renameIdx,
+                  cursorIndex: renameIdx,
+                  selectedIndices: new Set([renameIdx]),
+                }
               : {}),
           })),
         }));
@@ -530,6 +539,19 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       // フォルダサイズ計算: ディレクトリのパスを抽出してリクエスト
       const dirPaths = sorted.filter((e) => e.is_dir).map((e) => e.path);
       useDirSizeStore.getState().requestSizes(dirPaths);
+
+      // 整理スコア計算（非同期・UIブロックなし）
+      set({ organizationScore: null });
+      invoke<{ score: number }>("calculate_organization_score", { path })
+        .then((result) => {
+          // パスが変わっていなければスコアを反映
+          if (get().getActiveTab().path === path) {
+            set({ organizationScore: result.score });
+          }
+        })
+        .catch(() => {
+          // スコア計算失敗は無視
+        });
     } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({

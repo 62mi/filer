@@ -463,6 +463,30 @@ export const en: Translations = {
     saved: "Image saved",
   },
 
+  organizationScore: {
+    title: "Organization Score",
+  },
+
+  duplicateDetector: {
+    title: "Duplicate File Detector",
+    scanning: "Scanning...",
+    noDuplicates: "No duplicate files found",
+    filesScanned: "files scanned",
+    groupsFound: "duplicate group(s)",
+    reclaimable: "reclaimable",
+    selectAllDuplicates: "Select all duplicates",
+    deselectAll: "Deselect all",
+    rescan: "Re-scan",
+    filesInGroup: "identical files",
+    each: "each",
+    original: "Original",
+    filesSelected: "file(s) selected",
+    selectFilesToDelete: "Select files to delete",
+    deleteSelected: "Delete selected",
+    deleting: "Deleting...",
+    commandLabel: "Find Duplicate Files",
+  },
+
   format: {
     bytes: "bytes",
   },

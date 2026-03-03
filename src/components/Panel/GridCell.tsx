@@ -277,7 +277,10 @@ export const GridCell = memo(function GridCell({
             )}
           </>
         ) : hasThumbnailMedia && isPending ? (
-          <Loader className="text-[#aaa] animate-spin" style={{ width: iconDisplaySize * 0.35, height: iconDisplaySize * 0.35 }} />
+          <Loader
+            className="text-[#aaa] animate-spin"
+            style={{ width: iconDisplaySize * 0.35, height: iconDisplaySize * 0.35 }}
+          />
         ) : largeIcon ? (
           <img
             src={largeIcon}

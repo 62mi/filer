@@ -271,6 +271,8 @@ pub fn run() {
             get_google_docs_thumbnails,
             check_google_drive_status,
             save_temp_drag_icon,
+            calculate_organization_score,
+            find_duplicate_files,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
