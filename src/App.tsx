@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { BookmarkBar } from "./components/BookmarkBar";
 import { CommandPalette } from "./components/CommandPalette";
 import { CopyQueuePanel } from "./components/CopyQueue";
+import { DuplicateDetector } from "./components/DuplicateDetector";
 import { HomeView } from "./components/HomeView";
 import { NavigationBar } from "./components/NavigationBar";
 import { Panel } from "./components/Panel";
@@ -281,6 +282,9 @@ function App() {
 
       {/* Copy Queue Panel */}
       <CopyQueuePanel />
+
+      {/* Duplicate Detector Dialog */}
+      <DuplicateDetector />
 
       {/* Toast notifications */}
       {toasts.length > 0 && (

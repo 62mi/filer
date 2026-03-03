@@ -509,12 +509,25 @@ export function Panel() {
       // 外部ドラッグ用アイコンをバックグラウンド生成
       externalDragIconRef.current = null;
       const firstEntry = dragEntries[0];
-      const PREVIEW_IMG_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"]);
+      const PREVIEW_IMG_EXTS = new Set([
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "webp",
+        "bmp",
+        "svg",
+        "avif",
+        "ico",
+      ]);
       const thumbStore = useThumbnailStore.getState();
       const iconStore = useIconStore.getState();
       const cachedThumb = thumbStore.getThumbnail(firstEntry.path, 128);
-      const previewSrc = cachedThumb || (!firstEntry.is_dir && PREVIEW_IMG_EXTS.has(firstEntry.extension)
-        ? convertFileSrc(firstEntry.path) : null);
+      const previewSrc =
+        cachedThumb ||
+        (!firstEntry.is_dir && PREVIEW_IMG_EXTS.has(firstEntry.extension)
+          ? convertFileSrc(firstEntry.path)
+          : null);
       const iconKey = firstEntry.is_dir ? "__directory__" : firstEntry.extension;
       const iconSrc = iconStore.largeIcons[iconKey] || iconStore.icons[iconKey] || null;
       generateDragIcon({
@@ -1255,9 +1268,7 @@ export function Panel() {
                         const store = useIconStore.getState();
                         const iconUrl = store.largeIcons[iconKey] || store.icons[iconKey];
                         if (iconUrl)
-                          return (
-                            <img src={iconUrl} alt="" className="w-8 h-8" draggable={false} />
-                          );
+                          return <img src={iconUrl} alt="" className="w-8 h-8" draggable={false} />;
                         return (
                           <span className="text-2xl leading-none">
                             {isDir ? "\uD83D\uDCC1" : "\uD83D\uDCC4"}

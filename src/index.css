@@ -25,7 +25,9 @@
   --folder-fill: #f2c55c;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
 }
 
@@ -429,7 +431,9 @@ body.file-dragging * {
 /* ドラッグゴースト: ウィンドウ端接近時の強調 */
 .drag-ghost-near-edge .drag-ghost-card {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 1px var(--accent), 0 2px 12px rgba(var(--accent-rgb), 0.35) !important;
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 2px 12px rgba(var(--accent-rgb), 0.35) !important;
 }
 
 /* === Markdown Preview === */

@@ -182,9 +182,7 @@ async function handleTrashDrop(paths: string[]) {
       });
     }
     if (result.failed.length > 0) {
-      toast.error(
-        `${result.failed.length}件の削除に失敗: ${result.failed[0][1]}`,
-      );
+      toast.error(`${result.failed.length}件の削除に失敗: ${result.failed[0][1]}`);
     }
     useExplorerStore.getState().refreshDirectory();
   } catch (err: unknown) {

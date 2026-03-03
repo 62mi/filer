@@ -15,6 +15,7 @@ function icon(name: string) {
 // プロジェクト内で使用されているアイコン一覧（アルファベット順）
 export const AlertTriangle = icon("AlertTriangle");
 export const ArrowLeft = icon("ArrowLeft");
+export const BarChart3 = icon("BarChart3");
 export const ArrowRight = icon("ArrowRight");
 export const ArrowUp = icon("ArrowUp");
 export const Bookmark = icon("Bookmark");

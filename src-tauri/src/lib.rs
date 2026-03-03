@@ -290,6 +290,8 @@ pub fn run() {
             save_custom_action,
             delete_custom_action,
             execute_custom_action,
+            calculate_organization_score,
+            find_duplicate_files,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
