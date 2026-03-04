@@ -6,6 +6,7 @@ import { useTranslation } from "../../i18n";
 import { useBookmarkStore } from "../../stores/bookmarkStore";
 import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
 import { useExplorerStore } from "../../stores/panelStore";
+import { toast } from "../../stores/toastStore";
 import type { FileEntry } from "../../types";
 
 interface ResultItem {
@@ -139,7 +140,11 @@ export function CommandPalette() {
           if (entry.is_dir) {
             useExplorerStore.getState().loadDirectory(entry.path);
           } else {
-            invoke("open_in_default_app", { path: entry.path }).catch(() => {});
+            invoke("open_in_default_app", { path: entry.path }).catch((err: unknown) => {
+              toast.error(
+                `ファイルを開けませんでした: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            });
           }
         },
       });

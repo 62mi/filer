@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { toast } from "./toastStore";
 
 export interface Bookmark {
   id: string;
@@ -318,7 +319,9 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
       set({ bookmarks, folders, loaded: true });
       if (needsSave) get().saveBookmarks();
     } catch (err) {
-      console.warn("ブックマークの読み込みに失敗しました:", err);
+      toast.error(
+        `ブックマークの読み込みに失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      );
       set({ loaded: true });
     }
   },
@@ -329,7 +332,9 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
       localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
       localStorage.setItem(FOLDER_STORAGE_KEY, JSON.stringify(folders));
     } catch (err) {
-      console.warn("ブックマークの保存に失敗しました:", err);
+      toast.error(
+        `ブックマークの保存に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   },
 }));

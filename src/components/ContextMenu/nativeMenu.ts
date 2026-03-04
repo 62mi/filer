@@ -48,7 +48,11 @@ async function buildFileMenu(
         if (entry.is_dir) {
           useExplorerStore.getState().loadDirectory(entry.path);
         } else {
-          invoke("open_in_default_app", { path: entry.path }).catch(() => {});
+          invoke("open_in_default_app", { path: entry.path }).catch((err: unknown) => {
+            toast.error(
+              `ファイルを開けませんでした: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          });
         }
       },
     }),
@@ -62,7 +66,11 @@ async function buildFileMenu(
       await MenuItem.new({
         text: t.contextMenu.openWith,
         action: () => {
-          invoke("open_with_dialog", { path: entry.path }).catch(() => {});
+          invoke("open_with_dialog", { path: entry.path }).catch((err: unknown) => {
+            toast.error(
+              `プログラムを開けませんでした: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          });
         },
       }),
     );
@@ -73,7 +81,11 @@ async function buildFileMenu(
     await MenuItem.new({
       text: t.contextMenu.openInExplorer,
       action: () => {
-        invoke("open_in_explorer", { path: entry.path }).catch(() => {});
+        invoke("open_in_explorer", { path: entry.path }).catch((err: unknown) => {
+          toast.error(
+            `エクスプローラーで開けませんでした: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
       },
     }),
   );
@@ -451,7 +463,11 @@ async function buildBackgroundMenu(
     await MenuItem.new({
       text: t.contextMenu.openInExplorer,
       action: () => {
-        invoke("open_in_explorer", { path: tab.path }).catch(() => {});
+        invoke("open_in_explorer", { path: tab.path }).catch((err: unknown) => {
+          toast.error(
+            `エクスプローラーで開けませんでした: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
       },
     }),
   );

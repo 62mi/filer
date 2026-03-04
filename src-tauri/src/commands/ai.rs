@@ -344,7 +344,7 @@ fn record_usage_to_db(db: &Database, usage: &ApiUsage, operation: &str) {
 #[serde(tag = "type")]
 enum ContentBlock {
     #[serde(rename = "text")]
-    Text { text: String },
+    Text { _text: String },
     #[serde(rename = "tool_use")]
     ToolUse {
         name: String,

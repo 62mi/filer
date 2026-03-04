@@ -1,10 +1,9 @@
 use crate::db::Database;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Instant, UNIX_EPOCH};
 use tauri::{Emitter, Manager};
 use walkdir::WalkDir;
 
