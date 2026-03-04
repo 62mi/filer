@@ -89,7 +89,9 @@ export const GridCell = memo(function GridCell({
   const hasThumbnail = useThumbnailStore((s) =>
     hasThumbnailTarget ? !!s.thumbnails[thumbKey] : false,
   );
-  const isPending = useThumbnailStore((s) => (hasThumbnailTarget ? s.pending.has(thumbKey) : false));
+  const isPending = useThumbnailStore((s) =>
+    hasThumbnailTarget ? s.pending.has(thumbKey) : false,
+  );
   const isFailed = useThumbnailStore((s) => (hasThumbnailTarget ? s.failed.has(thumbKey) : false));
 
   // IntersectionObserver: ビューポートに入ったらサムネイル取得
@@ -276,23 +278,56 @@ export const GridCell = memo(function GridCell({
       >
         {hasThumbnailTarget && thumbnail ? (
           <>
+            {/* フォルダ: 背面にずらしたカードで「複数ファイル感」を演出 */}
+            {isFolder && (
+              <>
+                <div
+                  className="absolute rounded-sm bg-[#e8e8e8] border border-[#d0d0d0]"
+                  style={{
+                    width: gridIconSize * 0.7,
+                    height: gridIconSize * 0.7,
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%) rotate(6deg) translate(4px, -2px)",
+                  }}
+                />
+                <div
+                  className="absolute rounded-sm bg-[#f0f0f0] border border-[#d8d8d8]"
+                  style={{
+                    width: gridIconSize * 0.7,
+                    height: gridIconSize * 0.7,
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%) rotate(-4deg) translate(-3px, -1px)",
+                  }}
+                />
+              </>
+            )}
             <img
               src={thumbnail}
               alt=""
-              className="rounded-sm animate-fade-in"
+              className="rounded-sm animate-fade-in relative"
               style={{
-                maxWidth: gridIconSize,
-                maxHeight: gridIconSize,
+                maxWidth: isFolder ? gridIconSize * 0.72 : gridIconSize,
+                maxHeight: isFolder ? gridIconSize * 0.72 : gridIconSize,
                 objectFit: "contain",
                 filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.2))",
               }}
               draggable={false}
               onError={isGoogleDocs ? () => markFailed(entry.path, THUMB_SIZE) : undefined}
             />
-            {isFolder ? (
+            {isFolder && largeIcon ? (
+              <img
+                src={largeIcon}
+                alt=""
+                className="absolute bottom-0 right-0"
+                style={{ width: 32, height: 32, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}
+                draggable={false}
+              />
+            ) : isFolder ? (
               <Folder
                 className="absolute bottom-0 right-0 text-amber-500"
-                style={{ width: 20, height: 20, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}
+                style={{ width: 32, height: 32, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}
               />
             ) : smallIcon && !isImage ? (
               <img
@@ -305,7 +340,10 @@ export const GridCell = memo(function GridCell({
             ) : null}
           </>
         ) : hasThumbnailTarget && isPending && !isFolder ? (
-          <Loader className="text-[#aaa] animate-spin" style={{ width: iconDisplaySize * 0.35, height: iconDisplaySize * 0.35 }} />
+          <Loader
+            className="text-[#aaa] animate-spin"
+            style={{ width: iconDisplaySize * 0.35, height: iconDisplaySize * 0.35 }}
+          />
         ) : largeIcon ? (
           <img
             src={largeIcon}

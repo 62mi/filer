@@ -1,6 +1,6 @@
 [package]
 name = "filer"
-version = "1.4.4"
+version = "1.5.0"
 description = "A dual-pane file manager for Windows"
 authors = ["Tomako"]
 license = "UNLICENSED"
@@ -32,7 +32,6 @@ glob = "0.3"
 uuid = { version = "1", features = ["v4"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
-blake3 = "1"
 keyring = { version = "3", features = ["windows-native"] }
 tauri-plugin-drag = "2"
 tauri-plugin-single-instance = "2"

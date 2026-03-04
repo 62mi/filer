@@ -2,15 +2,14 @@ import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { resolveResource } from "@tauri-apps/api/path";
 import { ArrowUp, Loader } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useRubberBand } from "../../hooks/useRubberBand";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   clearHighlight,
   findDropZone,
   handleNativeDrop,
   setHighlight,
 } from "../../hooks/useNativeDrop";
-import { useSortAnimation } from "../../hooks/useSortAnimation";
+import { useRubberBand } from "../../hooks/useRubberBand";
 import { getTranslation, useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
@@ -25,18 +24,18 @@ import { useThumbnailStore } from "../../stores/thumbnailStore";
 import { toast } from "../../stores/toastStore";
 import { useUndoStore } from "../../stores/undoStore";
 import type { FileEntry, SortKey } from "../../types";
+import { cn } from "../../utils/cn";
 import { generateDragIcon } from "../../utils/dragIcon";
 import { getFileType } from "../../utils/fileType";
 import { formatDate, formatFileSize } from "../../utils/format";
 import { AiOrganizer } from "../AiOrganizer";
 import { showNativeContextMenu } from "../ContextMenu";
-import { ContentSearchResults } from "./ContentSearchResults";
 import { DragSuggestion } from "../DragSuggestion/DragSuggestion";
 import { PropertiesDialog } from "../PropertiesDialog";
 import { QuickLook } from "../QuickLook";
 import { PatternSuggestionBanner, RuleSuggestionBanner } from "../RuleSuggestion";
-import { cn } from "../../utils/cn";
 import { ColumnHeader } from "./ColumnHeader";
+import { ContentSearchResults } from "./ContentSearchResults";
 import { FileRow } from "./FileRow";
 import { FolderPeek } from "./FolderPeek";
 import { GridView } from "./GridView";
@@ -60,7 +59,7 @@ export function Panel() {
   const selectRange = useExplorerStore((s) => s.selectRange);
   const selectAll = useExplorerStore((s) => s.selectAll);
   const clearSelection = useExplorerStore((s) => s.clearSelection);
-  const setSortRaw = useExplorerStore((s) => s.setSort);
+  const setSort = useExplorerStore((s) => s.setSort);
   const toggleHidden = useExplorerStore((s) => s.toggleHidden);
   const startRename = useExplorerStore((s) => s.startRename);
   const commitRename = useExplorerStore((s) => s.commitRename);
@@ -78,37 +77,30 @@ export function Panel() {
   const pasteFromStack = useExplorerStore((s) => s.pasteFromStack);
 
   const listRef = useRef<HTMLDivElement>(null);
-  const { rect: rubberBandRect, handleMouseDown: handleRubberBandMouseDown, justFinished: rubberBandJustFinishedRef } = useRubberBand(listRef);
+  const {
+    rect: rubberBandRect,
+    handleMouseDown: handleRubberBandMouseDown,
+    justFinished: rubberBandJustFinishedRef,
+  } = useRubberBand(listRef);
   const prevPathRef = useRef(tab.path);
   const prevLoadingRef = useRef(tab.loading);
   const suggestionTimerRef = useRef<number | null>(null);
-
-  // ソート切替FLIPアニメーション
-  const { capturePositions, animateFlip } = useSortAnimation();
-  const sortAnimPendingRef = useRef(false);
-
-  /** ソート変更: 位置キャプチャ→ソート実行→アニメーション予約 */
-  const setSort = useCallback(
-    (key: import("../../types").SortKey) => {
-      capturePositions(listRef.current);
-      setSortRaw(key);
-      sortAnimPendingRef.current = true;
-    },
-    [capturePositions, setSortRaw],
-  );
-
-  // ソート後にDOMが更新されたらFLIPアニメーションを再生
-  // biome-ignore lint/correctness/useExhaustiveDependencies: tab.entriesはソート変更のトリガーとして必要
-  useLayoutEffect(() => {
-    if (!sortAnimPendingRef.current) return;
-    sortAnimPendingRef.current = false;
-    animateFlip(listRef.current);
-  }, [tab.entries, animateFlip]);
 
   // フォルダチラ見せ (FolderPeek) 状態
   const [folderPeekPath, setFolderPeekPath] = useState<string | null>(null);
   const [folderPeekRect, setFolderPeekRect] = useState<DOMRect | null>(null);
   const folderPeekTimerRef = useRef<number | null>(null);
+
+  // パス変更時にフォルダピークを閉じる
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tab.pathの変更を検知して閉じる意図的な依存
+  useEffect(() => {
+    setFolderPeekPath(null);
+    setFolderPeekRect(null);
+    if (folderPeekTimerRef.current) {
+      clearTimeout(folderPeekTimerRef.current);
+      folderPeekTimerRef.current = null;
+    }
+  }, [tab.path]);
 
   const aiDialogOpen = useAiStore((s) => s.dialogOpen);
   const aiDialogTabId = useAiStore((s) => s.dialogTabId);
@@ -306,6 +298,14 @@ export function Panel() {
 
   const handleNavigate = useCallback(
     (entry: FileEntry) => {
+      // フォルダピークを即座に閉じる
+      if (folderPeekTimerRef.current) {
+        clearTimeout(folderPeekTimerRef.current);
+        folderPeekTimerRef.current = null;
+      }
+      setFolderPeekPath(null);
+      setFolderPeekRect(null);
+
       if (entry.is_dir) {
         loadDirectory(entry.path);
       } else {
@@ -1085,7 +1085,11 @@ export function Panel() {
         {(tab.loading || tab.searching || tab.contentSearching) && (
           <div className="flex items-center justify-center h-full text-[#999] gap-2">
             <Loader className="w-4 h-4 animate-spin" />
-            {tab.contentSearching ? t.navigationBar.contentSearching : tab.searching ? t.panel.searching : t.panel.loading}
+            {tab.contentSearching
+              ? t.navigationBar.contentSearching
+              : tab.searching
+                ? t.panel.searching
+                : t.panel.loading}
           </div>
         )}
         {tab.error && (
@@ -1094,20 +1098,27 @@ export function Panel() {
           </div>
         )}
         {/* 内容検索結果表示 */}
-        {!tab.loading && !tab.contentSearching && !tab.error && tab.contentSearchResults !== null && (
-          tab.contentSearchResults.length > 0 ? (
+        {!tab.loading &&
+          !tab.contentSearching &&
+          !tab.error &&
+          tab.contentSearchResults !== null &&
+          (tab.contentSearchResults.length > 0 ? (
             <ContentSearchResults results={tab.contentSearchResults} query={tab.searchQuery} />
           ) : (
             <div className="flex items-center justify-center h-full text-[#999] animate-fade-in">
               {t.navigationBar.contentSearchNoResults}
             </div>
-          )
-        )}
-        {!tab.loading && !tab.searching && !tab.contentSearching && !tab.error && tab.contentSearchResults === null && displayEntries.length === 0 && (
-          <div className="flex items-center justify-center h-full text-[#999] animate-fade-in">
-            {tab.searchResults !== null ? t.panel.noResults : t.panel.emptyFolder}
-          </div>
-        )}
+          ))}
+        {!tab.loading &&
+          !tab.searching &&
+          !tab.contentSearching &&
+          !tab.error &&
+          tab.contentSearchResults === null &&
+          displayEntries.length === 0 && (
+            <div className="flex items-center justify-center h-full text-[#999] animate-fade-in">
+              {tab.searchResults !== null ? t.panel.noResults : t.panel.emptyFolder}
+            </div>
+          )}
         {!tab.loading &&
           !tab.searching &&
           !tab.contentSearching &&

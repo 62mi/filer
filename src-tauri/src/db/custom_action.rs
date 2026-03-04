@@ -129,11 +129,14 @@ pub async fn execute_custom_action(command: String, path: String) -> Result<(), 
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_default();
 
+    // シェルメタ文字を含むパスによるインジェクション防止のためクォーティング
+    let quote = |s: &str| format!("\"{}\"", s.replace('"', "\\\""));
+
     let expanded = command
-        .replace("{path}", &path)
-        .replace("{dir}", &dir)
-        .replace("{name}", &name)
-        .replace("{ext}", &ext);
+        .replace("{path}", &quote(&path))
+        .replace("{dir}", &quote(&dir))
+        .replace("{name}", &quote(&name))
+        .replace("{ext}", &quote(&ext));
 
     tauri::async_runtime::spawn_blocking(move || {
         std::process::Command::new("cmd")

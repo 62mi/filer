@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Language } from "../i18n";
+import { toast } from "./toastStore";
 
 export type PathStyle = "windows" | "linux";
 
@@ -110,7 +111,9 @@ function loadSettings(): Partial<SettingsData> {
     const data = localStorage.getItem(STORAGE_KEY);
     return data ? JSON.parse(data) : {};
   } catch (err) {
-    console.warn("設定の読み込みに失敗しました:", err);
+    toast.error(
+      `設定の読み込みに失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+    );
     return {};
   }
 }
@@ -138,7 +141,7 @@ function saveSettings(state: SettingsState) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (err) {
-    console.warn("設定の保存に失敗しました:", err);
+    toast.error(`設定の保存に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 

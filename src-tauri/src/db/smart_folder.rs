@@ -2,7 +2,7 @@ use super::Database;
 use crate::commands::fs::FileEntry;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 
 const DEFAULT_SMART_FOLDER_MAX_DEPTH: usize = 5;
@@ -96,7 +96,7 @@ fn matches_conditions(
                     Ok(date) => {
                         let ts = date
                             .and_hms_opt(0, 0, 0)
-                            .unwrap()
+                            .expect("0:00:00 is always valid")
                             .and_utc()
                             .timestamp() as f64;
                         modified >= ts
@@ -109,7 +109,7 @@ fn matches_conditions(
                     Ok(date) => {
                         let ts = date
                             .and_hms_opt(23, 59, 59)
-                            .unwrap()
+                            .expect("23:59:59 is always valid")
                             .and_utc()
                             .timestamp() as f64;
                         modified <= ts

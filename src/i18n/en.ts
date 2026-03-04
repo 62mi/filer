@@ -525,48 +525,6 @@ export const en: Translations = {
     saved: "Image saved",
   },
 
-  workspace: {
-    title: "Workspaces",
-    save: "Save Workspace",
-    load: "Load Workspace",
-    delete: "Delete",
-    noWorkspaces: "No saved workspaces",
-    namePrompt: "Enter workspace name",
-    namePlaceholder: "e.g. Work",
-    tabs: "tabs",
-    updatedAt: "Updated",
-    confirmDelete: "Delete this workspace?",
-    saved: "Workspace saved",
-    loaded: "Workspace loaded",
-    deleted: "Workspace deleted",
-    saveCommand: "Save Workspace",
-    loadCommand: "Load Workspace",
-  },
-
-  organizationScore: {
-    title: "Organization Score",
-  },
-
-  duplicateDetector: {
-    title: "Duplicate File Detector",
-    scanning: "Scanning...",
-    noDuplicates: "No duplicate files found",
-    filesScanned: "files scanned",
-    groupsFound: "duplicate group(s)",
-    reclaimable: "reclaimable",
-    selectAllDuplicates: "Select all duplicates",
-    deselectAll: "Deselect all",
-    rescan: "Re-scan",
-    filesInGroup: "identical files",
-    each: "each",
-    original: "Original",
-    filesSelected: "file(s) selected",
-    selectFilesToDelete: "Select files to delete",
-    deleteSelected: "Delete selected",
-    deleting: "Deleting...",
-    commandLabel: "Find Duplicate Files",
-  },
-
   format: {
     bytes: "bytes",
   },

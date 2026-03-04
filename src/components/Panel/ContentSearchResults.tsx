@@ -29,11 +29,14 @@ function HighlightText({ text, query }: { text: string; query: string }) {
     <>
       {parts.map((part, i) =>
         part.highlight ? (
-          <mark key={i} className="bg-yellow-200 text-inherit rounded-sm px-0.5">
+          <mark
+            key={`h-${i}-${part.text}`}
+            className="bg-yellow-200 text-inherit rounded-sm px-0.5"
+          >
             {part.text}
           </mark>
         ) : (
-          <span key={i}>{part.text}</span>
+          <span key={`t-${i}-${part.text}`}>{part.text}</span>
         ),
       )}
     </>
@@ -72,7 +75,9 @@ export function ContentSearchResults({ results, query }: ContentSearchResultsPro
       const lastSep = normalized.lastIndexOf("\\");
       if (lastSep <= 0) return;
       const parentDir =
-        lastSep === 2 && normalized[1] === ":" ? normalized.substring(0, 3) : normalized.substring(0, lastSep);
+        lastSep === 2 && normalized[1] === ":"
+          ? normalized.substring(0, 3)
+          : normalized.substring(0, lastSep);
       loadDirectory(parentDir);
     },
     [loadDirectory],
@@ -117,7 +122,10 @@ export function ContentSearchResults({ results, query }: ContentSearchResultsPro
                   <div className="flex flex-col w-full px-3 py-1">
                     {/* コンテキスト（前） */}
                     {match.context_before.map((line, i) => (
-                      <div key={`before-${i}`} className="flex items-start text-xs text-[#aaa] font-mono leading-5">
+                      <div
+                        key={`before-${match.line_number - match.context_before.length + i}`}
+                        className="flex items-start text-xs text-[#aaa] font-mono leading-5"
+                      >
                         <span className="w-10 shrink-0 text-right pr-2 select-none text-[#ccc]">
                           {match.line_number - match.context_before.length + i}
                         </span>
@@ -137,7 +145,10 @@ export function ContentSearchResults({ results, query }: ContentSearchResultsPro
 
                     {/* コンテキスト（後） */}
                     {match.context_after.map((line, i) => (
-                      <div key={`after-${i}`} className="flex items-start text-xs text-[#aaa] font-mono leading-5">
+                      <div
+                        key={`after-${match.line_number + 1 + i}`}
+                        className="flex items-start text-xs text-[#aaa] font-mono leading-5"
+                      >
                         <span className="w-10 shrink-0 text-right pr-2 select-none text-[#ccc]">
                           {match.line_number + 1 + i}
                         </span>

@@ -147,9 +147,7 @@ export function SmartFolderEditor() {
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
           {/* 名前 */}
           <div>
-            <label className="block text-xs font-medium text-[#666] mb-1">
-              {t.common.name}
-            </label>
+            <label className="block text-xs font-medium text-[#666] mb-1">{t.common.name}</label>
             <input
               type="text"
               className="w-full px-2.5 py-1.5 text-sm border border-[#ddd] rounded focus:outline-none focus:border-[var(--accent)]"
@@ -163,9 +161,7 @@ export function SmartFolderEditor() {
           {/* 検索パス */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-[#666]">
-                {t.smartFolder.searchPaths}
-              </label>
+              <label className="text-xs font-medium text-[#666]">{t.smartFolder.searchPaths}</label>
               <button
                 className="flex items-center gap-1 px-2 py-0.5 text-xs text-[var(--accent)] hover:bg-[var(--chrome-hover)] rounded transition-colors"
                 onClick={addSearchPath}
@@ -204,9 +200,7 @@ export function SmartFolderEditor() {
           {/* 条件 */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-[#666]">
-                {t.smartFolder.conditions}
-              </label>
+              <label className="text-xs font-medium text-[#666]">{t.smartFolder.conditions}</label>
               <button
                 className="flex items-center gap-1 px-2 py-0.5 text-xs text-[var(--accent)] hover:bg-[var(--chrome-hover)] rounded transition-colors"
                 onClick={addCondition}
@@ -222,7 +216,10 @@ export function SmartFolderEditor() {
             ) : (
               <div className="space-y-2">
                 {conditions.map((cond, i) => (
-                  <div key={i} className="flex items-center gap-2 group">
+                  <div
+                    key={`${cond.type}-${cond.value}-${i}`}
+                    className="flex items-center gap-2 group"
+                  >
                     <select
                       className="px-2 py-1.5 text-xs border border-[#ddd] rounded bg-white focus:outline-none focus:border-[var(--accent)] min-w-[120px]"
                       value={cond.type}
@@ -251,9 +248,7 @@ export function SmartFolderEditor() {
                 ))}
               </div>
             )}
-            <p className="text-[10px] text-[#999] mt-1.5">
-              {t.smartFolder.conditionsHint}
-            </p>
+            <p className="text-[10px] text-[#999] mt-1.5">{t.smartFolder.conditionsHint}</p>
           </div>
         </div>
 

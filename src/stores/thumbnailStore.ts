@@ -875,9 +875,7 @@ export function extractPsdPaths(
 }
 
 /** エントリ配列からフォルダパスだけ抽出するヘルパー */
-export function extractFolderPaths(
-  entries: { is_dir: boolean; path: string }[],
-): string[] {
+export function extractFolderPaths(entries: { is_dir: boolean; path: string }[]): string[] {
   return entries.filter((e) => e.is_dir).map((e) => e.path);
 }
 

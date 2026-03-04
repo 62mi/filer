@@ -4,7 +4,6 @@ pub mod history;
 pub mod rules;
 pub mod smart_folder;
 pub mod usage;
-pub mod workspace;
 
 use rusqlite::Connection;
 use std::path::PathBuf;
@@ -90,13 +89,6 @@ impl Database {
                 path          TEXT PRIMARY KEY,
                 size          INTEGER NOT NULL,
                 calculated_at INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS workspaces (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                name       TEXT NOT NULL UNIQUE,
-                data       TEXT NOT NULL,
-                updated_at TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS smart_folders (

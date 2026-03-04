@@ -16,6 +16,7 @@ import { useTranslation } from "../../i18n";
 import { useBookmarkStore } from "../../stores/bookmarkStore";
 import { useIconStore } from "../../stores/iconStore";
 import { useExplorerStore } from "../../stores/panelStore";
+import { toast } from "../../stores/toastStore";
 import type { DriveInfo, RecentFile } from "../../types";
 import { cn } from "../../utils/cn";
 import { formatDate, formatFileSize } from "../../utils/format";
@@ -124,7 +125,11 @@ export function HomeView() {
     if (file.is_dir) {
       loadDirectory(file.path);
     } else {
-      invoke("open_in_default_app", { path: file.path }).catch(() => {});
+      invoke("open_in_default_app", { path: file.path }).catch((err: unknown) => {
+        toast.error(
+          `ファイルを開けませんでした: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
     }
   };
 

@@ -57,16 +57,12 @@ export function useRubberBand(containerRef: React.RefObject<HTMLDivElement | nul
       const containerRect = container.getBoundingClientRect();
 
       // ビューポート座標でのドラッグ開始位置をコンテナスクロール座標に変換
-      const startContainerX =
-        state.startX - containerRect.left + state.scrollLeft;
-      const startContainerY =
-        state.startY - containerRect.top + state.scrollTop;
+      const startContainerX = state.startX - containerRect.left + state.scrollLeft;
+      const startContainerY = state.startY - containerRect.top + state.scrollTop;
 
       // 現在のマウス位置をコンテナスクロール座標に変換
-      const currentContainerX =
-        currentX - containerRect.left + container.scrollLeft;
-      const currentContainerY =
-        currentY - containerRect.top + container.scrollTop;
+      const currentContainerX = currentX - containerRect.left + container.scrollLeft;
+      const currentContainerY = currentY - containerRect.top + container.scrollTop;
 
       // 選択矩形（コンテナスクロール座標系）
       const selLeft = Math.min(startContainerX, currentContainerX);
@@ -80,10 +76,7 @@ export function useRubberBand(containerRef: React.RefObject<HTMLDivElement | nul
         selLeft - container.scrollLeft + containerRect.left,
         containerRect.left,
       );
-      const viewTop = Math.max(
-        selTop - container.scrollTop + containerRect.top,
-        containerRect.top,
-      );
+      const viewTop = Math.max(selTop - container.scrollTop + containerRect.top, containerRect.top);
       const viewRight = Math.min(
         selRight - container.scrollLeft + containerRect.left,
         containerRect.right,
@@ -101,9 +94,7 @@ export function useRubberBand(containerRef: React.RefObject<HTMLDivElement | nul
       });
 
       // ファイル要素との交差判定
-      const fileElements = container.querySelectorAll<HTMLElement>(
-        "[data-file-index]",
-      );
+      const fileElements = container.querySelectorAll<HTMLElement>("[data-file-index]");
       const newSelection = new Set<number>(state.initialSelection);
 
       for (const el of fileElements) {
@@ -120,10 +111,7 @@ export function useRubberBand(containerRef: React.RefObject<HTMLDivElement | nul
 
         // 矩形交差判定
         const intersects =
-          selLeft < elRight &&
-          selRight > elLeft &&
-          selTop < elBottom &&
-          selBottom > elTop;
+          selLeft < elRight && selRight > elLeft && selTop < elBottom && selBottom > elTop;
 
         if (intersects) {
           newSelection.add(index);
@@ -137,9 +125,7 @@ export function useRubberBand(containerRef: React.RefObject<HTMLDivElement | nul
       if (!setsEqual(activeTab.selectedIndices, newSelection)) {
         useExplorerStore.setState((s) => ({
           tabs: s.tabs.map((t) =>
-            t.id === s.activeTabId
-              ? { ...t, selectedIndices: newSelection }
-              : t,
+            t.id === s.activeTabId ? { ...t, selectedIndices: newSelection } : t,
           ),
         }));
       }
