@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { BookmarkBar } from "./components/BookmarkBar";
 import { CommandPalette } from "./components/CommandPalette";
 import { CopyQueuePanel } from "./components/CopyQueue";
-import { DuplicateDetector } from "./components/DuplicateDetector";
 import { HomeView } from "./components/HomeView";
 import { NavigationBar } from "./components/NavigationBar";
 import { Panel } from "./components/Panel";
@@ -12,9 +11,9 @@ import { RuleManager } from "./components/RuleManager";
 import { RuleWizard } from "./components/RuleWizard";
 import { SettingsDialog } from "./components/SettingsDialog/SettingsDialog";
 import { Sidebar } from "./components/Sidebar";
+import { SmartFolderEditor } from "./components/SmartFolderEditor/SmartFolderEditor";
 import { StatusBar } from "./components/StatusBar";
 import { TabBar } from "./components/TabBar";
-import { SmartFolderEditor } from "./components/SmartFolderEditor/SmartFolderEditor";
 import { TemplateManager } from "./components/TemplateManager";
 import { useNativeDrop } from "./hooks/useNativeDrop";
 import { getTranslation } from "./i18n";
@@ -24,7 +23,6 @@ import { useExplorerStore } from "./stores/panelStore";
 import { useRuleSuggestionStore } from "./stores/ruleSuggestionStore";
 import { useThemeStore } from "./stores/themeStore";
 import { toast, useToastStore } from "./stores/toastStore";
-import { debouncedSaveSession, useWorkspaceStore } from "./stores/workspaceStore";
 
 function App() {
   const [sidebarWidth, setSidebarWidth] = useState(220);
@@ -40,27 +38,6 @@ function App() {
   // 起動時にテーマ初期化
   useEffect(() => {
     useThemeStore.getState().init();
-  }, []);
-
-  // 起動時にセッション復元
-  useEffect(() => {
-    useWorkspaceStore.getState().restoreSession();
-  }, []);
-
-  // タブ変更時にセッション自動保存（debounce）
-  useEffect(() => {
-    let prevTabPaths = "";
-    const unsub = useExplorerStore.subscribe((state) => {
-      // タブのパス一覧とアクティブタブのみ監視
-      const key = state.tabs.map((t) => t.path).join("|") + ":" + state.activeTabId;
-      if (key !== prevTabPaths) {
-        prevTabPaths = key;
-        if (useWorkspaceStore.getState().sessionRestored) {
-          debouncedSaveSession();
-        }
-      }
-    });
-    return unsub;
   }, []);
 
   // ネイティブドロップハンドラ（外部ファイルドロップ一元管理）
@@ -213,7 +190,10 @@ function App() {
       <TabBar />
 
       {/* Navigation bar */}
-      <NavigationBar previewOpen={previewOpen} onTogglePreview={() => setPreviewOpen(!previewOpen)} />
+      <NavigationBar
+        previewOpen={previewOpen}
+        onTogglePreview={() => setPreviewOpen(!previewOpen)}
+      />
 
       {/* Bookmark bar */}
       <BookmarkBar />
@@ -282,9 +262,6 @@ function App() {
 
       {/* Copy Queue Panel */}
       <CopyQueuePanel />
-
-      {/* Duplicate Detector Dialog */}
-      <DuplicateDetector />
 
       {/* Toast notifications */}
       {toasts.length > 0 && (

@@ -551,50 +551,6 @@ export const ja = {
   },
 
   // ── ワークスペース ──
-  workspace: {
-    title: "ワークスペース",
-    save: "ワークスペースを保存",
-    load: "ワークスペースを読み込み",
-    delete: "削除",
-    noWorkspaces: "保存されたワークスペースがありません",
-    namePrompt: "ワークスペース名を入力",
-    namePlaceholder: "例: 作業用",
-    tabs: "タブ",
-    updatedAt: "更新日時",
-    confirmDelete: "ワークスペースを削除しますか？",
-    saved: "ワークスペースを保存しました",
-    loaded: "ワークスペースを読み込みました",
-    deleted: "ワークスペースを削除しました",
-    saveCommand: "ワークスペースを保存",
-    loadCommand: "ワークスペースを読み込み",
-  },
-
-  // ── 整理スコア ──
-  organizationScore: {
-    title: "整理スコア",
-  },
-
-  // ── 重複ファイル検出 ──
-  duplicateDetector: {
-    title: "重複ファイル検出",
-    scanning: "スキャン中...",
-    noDuplicates: "重複ファイルは見つかりませんでした",
-    filesScanned: "件スキャン済み",
-    groupsFound: "グループの重複",
-    reclaimable: "削減可能",
-    selectAllDuplicates: "重複を全選択",
-    deselectAll: "すべて解除",
-    rescan: "再スキャン",
-    filesInGroup: "件の同一ファイル",
-    each: "/ ファイル",
-    original: "オリジナル",
-    filesSelected: "件選択中",
-    selectFilesToDelete: "削除するファイルを選択してください",
-    deleteSelected: "選択を削除",
-    deleting: "削除中...",
-    commandLabel: "重複ファイル検出",
-  },
-
   // ── フォーマット ──
   format: {
     bytes: "バイト",

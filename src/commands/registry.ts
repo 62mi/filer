@@ -1,12 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useAiStore } from "../stores/aiStore";
-import { useDuplicateDetectorStore } from "../stores/duplicateDetectorStore";
 import { useExplorerStore } from "../stores/panelStore";
 import { useRuleStore } from "../stores/ruleStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useTemplateStore } from "../stores/templateStore";
 import { toast } from "../stores/toastStore";
-import { useWorkspaceStore } from "../stores/workspaceStore";
 
 export interface Command {
   id: string;
@@ -114,47 +112,6 @@ export function getCommands(): Command[] {
         invoke("create_new_window").catch(() => {
           toast.error("新しいウィンドウの作成に失敗しました");
         });
-      },
-    },
-    {
-      id: "workspace-save",
-      label: "ワークスペースを保存",
-      action: () => {
-        const name = window.prompt("ワークスペース名を入力してください");
-        if (name?.trim()) {
-          useWorkspaceStore.getState().saveWorkspace(name.trim());
-        }
-      },
-    },
-    {
-      id: "workspace-load",
-      label: "ワークスペースを読み込み",
-      action: async () => {
-        await useWorkspaceStore.getState().listWorkspaces();
-        const { workspaces } = useWorkspaceStore.getState();
-        if (workspaces.length === 0) {
-          toast.info("保存されたワークスペースがありません");
-          return;
-        }
-        // コマンドパレットにワークスペース一覧を表示するため設定画面を開く
-        useSettingsStore.getState().openSettings("workspace");
-      },
-    },
-    {
-      id: "workspace-settings",
-      label: "ワークスペース管理",
-      action: () => {
-        useSettingsStore.getState().openSettings("workspace");
-      },
-    },
-    {
-      id: "duplicate-detector",
-      label: "重複ファイル検出",
-      action: () => {
-        const tab = useExplorerStore.getState().getActiveTab();
-        if (tab.path && tab.path !== "home:") {
-          useDuplicateDetectorStore.getState().open(tab.path);
-        }
       },
     },
   ];

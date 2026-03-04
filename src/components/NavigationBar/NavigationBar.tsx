@@ -17,8 +17,8 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "../../i18n";
 import { useBookmarkStore } from "../../stores/bookmarkStore";
 import { useExplorerStore } from "../../stores/panelStore";
-import { useSmartFolderStore } from "../../stores/smartFolderStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { useSmartFolderStore } from "../../stores/smartFolderStore";
 import { toast } from "../../stores/toastStore";
 import { cn } from "../../utils/cn";
 import { formatPath } from "../../utils/format";
@@ -282,7 +282,9 @@ export function NavigationBar({ previewOpen, onTogglePreview }: NavigationBarPro
             setSearchMode(newMode);
             setSearchValue("");
           }}
-          title={searchMode === "name" ? t.navigationBar.searchByContent : t.navigationBar.searchByName}
+          title={
+            searchMode === "name" ? t.navigationBar.searchByContent : t.navigationBar.searchByName
+          }
         >
           {searchMode === "name" ? (
             <Search className="w-3.5 h-3.5 text-[#999]" />
@@ -303,21 +305,24 @@ export function NavigationBar({ previewOpen, onTogglePreview }: NavigationBarPro
             setSearchValue(e.target.value);
             if (debounceRef.current) clearTimeout(debounceRef.current);
             const val = e.target.value;
-            debounceRef.current = setTimeout(() => {
-              if (val.trim()) {
-                if (searchMode === "name") {
-                  searchFn(val);
+            debounceRef.current = setTimeout(
+              () => {
+                if (val.trim()) {
+                  if (searchMode === "name") {
+                    searchFn(val);
+                  } else {
+                    searchContentFn(val);
+                  }
                 } else {
-                  searchContentFn(val);
+                  if (searchMode === "name") {
+                    clearSearch();
+                  } else {
+                    clearContentSearch();
+                  }
                 }
-              } else {
-                if (searchMode === "name") {
-                  clearSearch();
-                } else {
-                  clearContentSearch();
-                }
-              }
-            }, searchMode === "content" ? 500 : 300);
+              },
+              searchMode === "content" ? 500 : 300,
+            );
           }}
           onKeyDown={(e) => {
             e.stopPropagation();

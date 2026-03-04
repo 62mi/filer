@@ -76,22 +76,23 @@ export const FolderPeek = memo(function FolderPeek({
     const popupHeight = 230;
     const margin = 8;
 
-    let top = anchorRect.bottom + margin;
-    let left = anchorRect.left;
+    // 右側に表示（アンカー要素の右端に配置）
+    let left = anchorRect.right + margin;
+    let top = anchorRect.top;
 
-    // 右端からはみ出す場合
+    // 右端からはみ出す場合、左側に表示
     if (left + popupWidth > window.innerWidth - margin) {
-      left = window.innerWidth - popupWidth - margin;
+      left = anchorRect.left - popupWidth - margin;
     }
-    // 左端からはみ出す場合
+    // まだ左端からはみ出す場合
     if (left < margin) {
       left = margin;
     }
-    // 下端からはみ出す場合、上に表示
+    // 下端からはみ出す場合、上方向にずらす
     if (top + popupHeight > window.innerHeight - margin) {
-      top = anchorRect.top - popupHeight - margin;
+      top = window.innerHeight - popupHeight - margin;
     }
-    // まだ上端からはみ出す場合
+    // 上端からはみ出す場合
     if (top < margin) {
       top = margin;
     }

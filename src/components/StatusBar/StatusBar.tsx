@@ -1,4 +1,4 @@
-import { BarChart3, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
@@ -17,8 +17,6 @@ export function StatusBar() {
   const usageInfo = useAiStore((s) => s.usageInfo);
   const hasApiKey = useAiStore((s) => s.hasApiKey);
   const openSettings = useSettingsStore((s) => s.openSettings);
-  const organizationScore = useExplorerStore((s) => s.organizationScore);
-
   const entries = tab.entries;
   const dirSizes = useDirSizeStore((s) => s.sizes);
   const filteredEntries = useMemo(
@@ -87,23 +85,6 @@ export function StatusBar() {
       )}
 
       <div className="flex-1" />
-
-      {/* 整理スコアバッジ */}
-      {organizationScore !== null && (
-        <span
-          className={`inline-flex items-center gap-1 px-1.5 py-0.5 mr-2 rounded text-xs font-medium ${
-            organizationScore >= 80
-              ? "bg-green-100 text-green-700"
-              : organizationScore >= 60
-                ? "bg-amber-100 text-amber-700"
-                : "bg-red-100 text-red-700"
-          }`}
-          title={`${t.organizationScore.title}: ${organizationScore}/100`}
-        >
-          <BarChart3 className="w-3 h-3" />
-          {organizationScore}
-        </span>
-      )}
 
       {/* コピーキュー進捗インジケータ */}
       <CopyQueueMiniIndicator />
