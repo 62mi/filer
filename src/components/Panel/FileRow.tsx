@@ -29,6 +29,8 @@ interface FileRowProps {
   selectedCount: number;
   onStartRename: (index: number) => void;
   maxFileSize: number;
+  onFolderHover?: (path: string, rect: DOMRect) => void;
+  onFolderLeave?: () => void;
 }
 
 export function FileRow({
@@ -52,6 +54,8 @@ export function FileRow({
   selectedCount,
   onStartRename,
   maxFileSize,
+  onFolderHover,
+  onFolderLeave,
 }: FileRowProps) {
   const [renameValue, setRenameValue] = useState(entry.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -116,6 +120,7 @@ export function FileRow({
       data-mid-click-path={entry.is_dir ? entry.path : undefined}
       data-drop-zone="file-row"
       data-file-path={entry.path}
+      data-file-index={index}
       data-is-dir={entry.is_dir ? "true" : "false"}
       style={{ height: rowHeight - 4, fontSize, minWidth: getTotalColumnWidth(columnWidths) }}
       onMouseDown={(e) => {
@@ -173,6 +178,17 @@ export function FileRow({
           slowClickTimerRef.current = null;
         }
         onContextMenu(e, index);
+      }}
+      onMouseEnter={(e) => {
+        if (entry.is_dir && onFolderHover) {
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          onFolderHover(entry.path, rect);
+        }
+      }}
+      onMouseLeave={() => {
+        if (entry.is_dir && onFolderLeave) {
+          onFolderLeave();
+        }
       }}
     >
       <span className="relative mr-2 shrink-0">

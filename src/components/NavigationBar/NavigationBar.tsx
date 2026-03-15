@@ -5,6 +5,9 @@ import {
   ArrowUp,
   Eye,
   EyeOff,
+  FileText,
+  PanelRightClose,
+  PanelRightOpen,
   RotateCw,
   Search,
   Star,
@@ -15,9 +18,15 @@ import { useTranslation } from "../../i18n";
 import { useBookmarkStore } from "../../stores/bookmarkStore";
 import { useExplorerStore } from "../../stores/panelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { useSmartFolderStore } from "../../stores/smartFolderStore";
 import { toast } from "../../stores/toastStore";
 import { cn } from "../../utils/cn";
 import { formatPath } from "../../utils/format";
+
+interface NavigationBarProps {
+  previewOpen: boolean;
+  onTogglePreview: () => void;
+}
 
 const TERMINAL_COMMANDS = new Set(["cmd", "powershell", "pwsh", "wt"]);
 
@@ -47,7 +56,7 @@ function NavButton({
   );
 }
 
-export function NavigationBar() {
+export function NavigationBar({ previewOpen, onTogglePreview }: NavigationBarProps) {
   const t = useTranslation();
   const tab = useExplorerStore((s) => s.tabs.find((t) => t.id === s.activeTabId) || s.tabs[0]);
   const showHidden = useExplorerStore((s) => s.showHidden);
@@ -58,6 +67,12 @@ export function NavigationBar() {
   const toggleHidden = useExplorerStore((s) => s.toggleHidden);
   const searchFn = useExplorerStore((s) => s.search);
   const clearSearch = useExplorerStore((s) => s.clearSearch);
+  const searchMode = useExplorerStore(
+    (s) => s.tabs.find((t) => t.id === s.activeTabId)?.searchMode || "name",
+  );
+  const setSearchMode = useExplorerStore((s) => s.setSearchMode);
+  const searchContentFn = useExplorerStore((s) => s.searchContent);
+  const clearContentSearch = useExplorerStore((s) => s.clearContentSearch);
   const pathStyle = useSettingsStore((s) => s.pathStyle);
   const bookmarks = useBookmarkStore((s) => s.bookmarks);
   const addBookmark = useBookmarkStore((s) => s.addBookmark);
@@ -107,6 +122,12 @@ export function NavigationBar() {
   };
 
   const isHome = tab.path === "home:";
+  const isSmartFolder = tab.path.startsWith("smart-folder:");
+  const smartFolderName = useSmartFolderStore((s) => {
+    if (!isSmartFolder) return "";
+    const id = Number(tab.path.replace("smart-folder:", ""));
+    return s.smartFolders.find((sf) => sf.id === id)?.name ?? t.sidebar.smartFolders;
+  });
   const segments = tab.path.split(/[\\/]/).filter(Boolean);
 
   return (
@@ -122,7 +143,7 @@ export function NavigationBar() {
       >
         <ArrowRight className="w-4 h-4" />
       </NavButton>
-      <NavButton onClick={navigateUp} title="Up (Alt+Up)" disabled={isHome}>
+      <NavButton onClick={navigateUp} title="Up (Alt+Up)" disabled={isHome || isSmartFolder}>
         <ArrowUp className="w-4 h-4" />
       </NavButton>
       <NavButton
@@ -180,6 +201,11 @@ export function NavigationBar() {
             <div className="flex items-center flex-1 min-w-0 overflow-hidden">
               {isHome ? (
                 <span className="text-[#666]">{t.sidebar.home}</span>
+              ) : isSmartFolder ? (
+                <span className="flex items-center gap-1.5 text-[#666]">
+                  <Search className="w-3.5 h-3.5 text-[var(--accent)]" />
+                  {smartFolderName}
+                </span>
               ) : (
                 segments.map((segment, i) => {
                   const segmentPath = segments.slice(0, i + 1).join("\\");
@@ -234,41 +260,93 @@ export function NavigationBar() {
         {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4 text-[#999]" />}
       </NavButton>
 
+      {/* Preview panel toggle */}
+      <NavButton onClick={onTogglePreview} title={t.statusBar.togglePreview}>
+        {previewOpen ? (
+          <PanelRightClose className="w-4 h-4" />
+        ) : (
+          <PanelRightOpen className="w-4 h-4 text-[#999]" />
+        )}
+      </NavButton>
+
       {/* Search bar */}
-      <div className="flex items-center h-9 w-52 px-2 bg-[#f0f0f0] rounded text-sm focus-within:bg-white focus-within:border focus-within:border-[var(--accent)] transition-all duration-150">
-        <Search className="w-3.5 h-3.5 mr-2 shrink-0 text-[#999]" />
+      <div className="flex items-center h-9 w-60 bg-[#f0f0f0] rounded text-sm focus-within:bg-white focus-within:border focus-within:border-[var(--accent)] transition-all duration-150">
+        {/* モード切替ボタン */}
+        <button
+          className={cn(
+            "flex items-center justify-center h-full px-2 rounded-l transition-colors shrink-0",
+            "hover:bg-[#e0e0e0]",
+          )}
+          onClick={() => {
+            const newMode = searchMode === "name" ? "content" : "name";
+            setSearchMode(newMode);
+            setSearchValue("");
+          }}
+          title={
+            searchMode === "name" ? t.navigationBar.searchByContent : t.navigationBar.searchByName
+          }
+        >
+          {searchMode === "name" ? (
+            <Search className="w-3.5 h-3.5 text-[#999]" />
+          ) : (
+            <FileText className="w-3.5 h-3.5 text-[var(--accent)]" />
+          )}
+        </button>
         <input
           ref={searchRef}
           className="flex-1 bg-transparent outline-none text-[#1a1a1a] placeholder-[#999] min-w-0"
-          placeholder={`Search ${tab.path.split(/[\\/]/).filter(Boolean).pop() || ""}`}
+          placeholder={
+            searchMode === "name"
+              ? `Search ${tab.path.split(/[\\/]/).filter(Boolean).pop() || ""}`
+              : t.navigationBar.searchByContent
+          }
           value={searchValue}
           onChange={(e) => {
             setSearchValue(e.target.value);
             if (debounceRef.current) clearTimeout(debounceRef.current);
             const val = e.target.value;
-            debounceRef.current = setTimeout(() => {
-              if (val.trim()) {
-                searchFn(val);
-              } else {
-                clearSearch();
-              }
-            }, 300);
+            debounceRef.current = setTimeout(
+              () => {
+                if (val.trim()) {
+                  if (searchMode === "name") {
+                    searchFn(val);
+                  } else {
+                    searchContentFn(val);
+                  }
+                } else {
+                  if (searchMode === "name") {
+                    clearSearch();
+                  } else {
+                    clearContentSearch();
+                  }
+                }
+              },
+              searchMode === "content" ? 500 : 300,
+            );
           }}
           onKeyDown={(e) => {
             e.stopPropagation();
             if (e.key === "Escape") {
               setSearchValue("");
-              clearSearch();
+              if (searchMode === "name") {
+                clearSearch();
+              } else {
+                clearContentSearch();
+              }
               searchRef.current?.blur();
             }
           }}
         />
         {searchValue && (
           <button
-            className="text-[#999] hover:text-[#666] ml-1"
+            className="text-[#999] hover:text-[#666] mx-1"
             onClick={() => {
               setSearchValue("");
-              clearSearch();
+              if (searchMode === "name") {
+                clearSearch();
+              } else {
+                clearContentSearch();
+              }
             }}
           >
             <X className="w-3.5 h-3.5" />

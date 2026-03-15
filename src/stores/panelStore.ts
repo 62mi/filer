@@ -197,6 +197,16 @@ interface ClipboardData {
   operation: "copy" | "cut";
 }
 
+/** ファイル内容検索の結果1件 */
+export interface ContentSearchMatch {
+  path: string;
+  file_name: string;
+  line_number: number;
+  line_content: string;
+  context_before: string[];
+  context_after: string[];
+}
+
 /** ディレクトリ移動時に保存する表示状態 */
 interface DisplayState {
   cursorIndex: number;
@@ -221,6 +231,9 @@ interface TabState {
   searchQuery: string;
   searchResults: FileEntry[] | null;
   searching: boolean;
+  searchMode: "name" | "content";
+  contentSearchResults: ContentSearchMatch[] | null;
+  contentSearching: boolean;
   viewMode: "details" | "icons";
   filter: FilterState;
   displayStateCache: Map<string, DisplayState>;
@@ -244,6 +257,9 @@ function createTabState(path: string): TabState {
     searchQuery: "",
     searchResults: null,
     searching: false,
+    searchMode: "name",
+    contentSearchResults: null,
+    contentSearching: false,
     viewMode: "details",
     filter: { ...DEFAULT_FILTER },
     displayStateCache: new Map(),
@@ -313,6 +329,9 @@ interface ExplorerStore {
   // Search
   search: (query: string) => Promise<void>;
   clearSearch: () => void;
+  setSearchMode: (mode: "name" | "content") => void;
+  searchContent: (query: string) => Promise<void>;
+  clearContentSearch: () => void;
 
   // External clipboard sync
   syncExternalClipboard: (paths: string[], operation: string) => void;
@@ -442,8 +461,61 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           searchResults: null,
           searchQuery: "",
           searching: false,
+          contentSearchResults: null,
+          contentSearching: false,
         })),
       }));
+      return;
+    }
+
+    // スマートフォルダ: execute_smart_folder で検索結果を表示
+    const smartMatch = path.match(/^smart-folder:(\d+)$/);
+    if (smartMatch) {
+      const smartId = Number(smartMatch[1]);
+      const tab = get().getActiveTab();
+      set((s) => ({
+        tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+          loading: true,
+          error: null,
+          searchResults: null,
+          searchQuery: "",
+          searching: false,
+        })),
+      }));
+      try {
+        const entries: FileEntry[] = await invoke("execute_smart_folder", { id: smartId });
+        const { showHidden } = get();
+        const filtered = showHidden ? entries : entries.filter((e) => !e.is_hidden);
+        let history = tab.history;
+        let historyIndex = tab.historyIndex;
+        if (addToHistory) {
+          history = [...tab.history.slice(0, tab.historyIndex + 1), path];
+          historyIndex = history.length - 1;
+        }
+        set((s) => ({
+          tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+            path,
+            entries: filtered,
+            selectedIndices: new Set<number>(),
+            cursorIndex: 0,
+            loading: false,
+            error: null,
+            history,
+            historyIndex,
+            renamingIndex: null,
+            searchResults: null,
+            searchQuery: "",
+            searching: false,
+          })),
+        }));
+      } catch (e: unknown) {
+        set((s) => ({
+          tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+            loading: false,
+            error: e instanceof Error ? e.message : String(e),
+          })),
+        }));
+      }
       return;
     }
 
@@ -474,6 +546,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           searchResults: null,
           searchQuery: "",
           searching: false,
+          contentSearchResults: null,
+          contentSearching: false,
         })),
       }));
     }
@@ -508,7 +582,15 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           history,
           historyIndex,
           renamingIndex: null,
-          ...(smooth ? {} : { searchResults: null, searchQuery: "", searching: false }),
+          ...(smooth
+            ? {}
+            : {
+                searchResults: null,
+                searchQuery: "",
+                searching: false,
+                contentSearchResults: null,
+                contentSearching: false,
+              }),
         })),
       }));
 
@@ -521,7 +603,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           tabs: updateActiveTab(s.tabs, activeTabId, () => ({
             pendingRenamePath: null,
             ...(renameIdx >= 0
-              ? { renamingIndex: renameIdx, cursorIndex: renameIdx, selectedIndices: new Set([renameIdx]) }
+              ? {
+                  renamingIndex: renameIdx,
+                  cursorIndex: renameIdx,
+                  selectedIndices: new Set([renameIdx]),
+                }
               : {}),
           })),
         }));
@@ -1050,6 +1136,73 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         searchResults: null,
         searchQuery: "",
         searching: false,
+        contentSearchResults: null,
+        contentSearching: false,
+      })),
+    }));
+  },
+
+  setSearchMode: (mode) => {
+    set((s) => ({
+      tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
+        searchMode: mode,
+        // モード切替時に検索結果をクリア
+        searchResults: null,
+        searchQuery: "",
+        searching: false,
+        contentSearchResults: null,
+        contentSearching: false,
+      })),
+    }));
+  },
+
+  searchContent: async (query) => {
+    const { activeTabId } = get();
+    const tab = get().getActiveTab();
+    if (!query.trim()) {
+      set((s) => ({
+        tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+          contentSearchResults: null,
+          searchQuery: "",
+          contentSearching: false,
+        })),
+      }));
+      return;
+    }
+    set((s) => ({
+      tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+        contentSearching: true,
+        searchQuery: query,
+      })),
+    }));
+    try {
+      const results: ContentSearchMatch[] = await invoke("search_file_contents", {
+        path: tab.path,
+        query,
+        maxResults: 100,
+      });
+      set((s) => ({
+        tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+          contentSearchResults: results,
+          contentSearching: false,
+        })),
+      }));
+    } catch (e: unknown) {
+      set((s) => ({
+        tabs: updateActiveTab(s.tabs, activeTabId, () => ({
+          contentSearching: false,
+          error: e instanceof Error ? e.message : String(e),
+        })),
+      }));
+    }
+  },
+
+  clearContentSearch: () => {
+    set((s) => ({
+      tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
+        contentSearchResults: null,
+        searchQuery: "",
+        contentSearching: false,
       })),
     }));
   },

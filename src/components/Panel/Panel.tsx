@@ -1,7 +1,7 @@
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { resolveResource } from "@tauri-apps/api/path";
-import { Loader } from "lucide-react";
+import { ArrowUp, Loader } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   clearHighlight,
@@ -9,6 +9,7 @@ import {
   handleNativeDrop,
   setHighlight,
 } from "../../hooks/useNativeDrop";
+import { useRubberBand } from "../../hooks/useRubberBand";
 import { getTranslation, useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
@@ -22,7 +23,8 @@ import { useSuggestionStore } from "../../stores/suggestionStore";
 import { useThumbnailStore } from "../../stores/thumbnailStore";
 import { toast } from "../../stores/toastStore";
 import { useUndoStore } from "../../stores/undoStore";
-import type { FileEntry } from "../../types";
+import type { FileEntry, SortKey } from "../../types";
+import { cn } from "../../utils/cn";
 import { generateDragIcon } from "../../utils/dragIcon";
 import { getFileType } from "../../utils/fileType";
 import { formatDate, formatFileSize } from "../../utils/format";
@@ -33,7 +35,9 @@ import { PropertiesDialog } from "../PropertiesDialog";
 import { QuickLook } from "../QuickLook";
 import { PatternSuggestionBanner, RuleSuggestionBanner } from "../RuleSuggestion";
 import { ColumnHeader } from "./ColumnHeader";
+import { ContentSearchResults } from "./ContentSearchResults";
 import { FileRow } from "./FileRow";
+import { FolderPeek } from "./FolderPeek";
 import { GridView } from "./GridView";
 import { Toolbar } from "./Toolbar";
 
@@ -73,9 +77,30 @@ export function Panel() {
   const pasteFromStack = useExplorerStore((s) => s.pasteFromStack);
 
   const listRef = useRef<HTMLDivElement>(null);
+  const {
+    rect: rubberBandRect,
+    handleMouseDown: handleRubberBandMouseDown,
+    justFinished: rubberBandJustFinishedRef,
+  } = useRubberBand(listRef);
   const prevPathRef = useRef(tab.path);
   const prevLoadingRef = useRef(tab.loading);
   const suggestionTimerRef = useRef<number | null>(null);
+
+  // フォルダチラ見せ (FolderPeek) 状態
+  const [folderPeekPath, setFolderPeekPath] = useState<string | null>(null);
+  const [folderPeekRect, setFolderPeekRect] = useState<DOMRect | null>(null);
+  const folderPeekTimerRef = useRef<number | null>(null);
+
+  // パス変更時にフォルダピークを閉じる
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tab.pathの変更を検知して閉じる意図的な依存
+  useEffect(() => {
+    setFolderPeekPath(null);
+    setFolderPeekRect(null);
+    if (folderPeekTimerRef.current) {
+      clearTimeout(folderPeekTimerRef.current);
+      folderPeekTimerRef.current = null;
+    }
+  }, [tab.path]);
 
   const aiDialogOpen = useAiStore((s) => s.dialogOpen);
   const aiDialogTabId = useAiStore((s) => s.dialogTabId);
@@ -273,6 +298,14 @@ export function Panel() {
 
   const handleNavigate = useCallback(
     (entry: FileEntry) => {
+      // フォルダピークを即座に閉じる
+      if (folderPeekTimerRef.current) {
+        clearTimeout(folderPeekTimerRef.current);
+        folderPeekTimerRef.current = null;
+      }
+      setFolderPeekPath(null);
+      setFolderPeekRect(null);
+
       if (entry.is_dir) {
         loadDirectory(entry.path);
       } else {
@@ -306,6 +339,37 @@ export function Panel() {
     },
     [onProperties],
   );
+
+  // フォルダホバー: debounce付きでFolderPeekポップアップを表示
+  const handleFolderHover = useCallback(
+    (path: string, rect: DOMRect) => {
+      // ドラッグ中は表示しない
+      if (document.body.classList.contains("file-dragging")) return;
+      // 既に同じフォルダが表示中ならスキップ
+      if (folderPeekPath === path) return;
+      // タイマーリセット
+      if (folderPeekTimerRef.current) {
+        clearTimeout(folderPeekTimerRef.current);
+      }
+      folderPeekTimerRef.current = window.setTimeout(() => {
+        folderPeekTimerRef.current = null;
+        // ドラッグ中でないことを再確認
+        if (document.body.classList.contains("file-dragging")) return;
+        setFolderPeekPath(path);
+        setFolderPeekRect(rect);
+      }, 500);
+    },
+    [folderPeekPath],
+  );
+
+  const handleFolderLeave = useCallback(() => {
+    if (folderPeekTimerRef.current) {
+      clearTimeout(folderPeekTimerRef.current);
+      folderPeekTimerRef.current = null;
+    }
+    setFolderPeekPath(null);
+    setFolderPeekRect(null);
+  }, []);
 
   // ハイブリッドドラッグ: カスタム内部ドラッグ + ウィンドウ外でネイティブOS D&D
   const dragStartRef = useRef<{ x: number; y: number; index: number } | null>(null);
@@ -446,12 +510,25 @@ export function Panel() {
       // 外部ドラッグ用アイコンをバックグラウンド生成
       externalDragIconRef.current = null;
       const firstEntry = dragEntries[0];
-      const PREVIEW_IMG_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"]);
+      const PREVIEW_IMG_EXTS = new Set([
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "webp",
+        "bmp",
+        "svg",
+        "avif",
+        "ico",
+      ]);
       const thumbStore = useThumbnailStore.getState();
       const iconStore = useIconStore.getState();
       const cachedThumb = thumbStore.getThumbnail(firstEntry.path, 128);
-      const previewSrc = cachedThumb || (!firstEntry.is_dir && PREVIEW_IMG_EXTS.has(firstEntry.extension)
-        ? convertFileSrc(firstEntry.path) : null);
+      const previewSrc =
+        cachedThumb ||
+        (!firstEntry.is_dir && PREVIEW_IMG_EXTS.has(firstEntry.extension)
+          ? convertFileSrc(firstEntry.path)
+          : null);
       const iconKey = firstEntry.is_dir ? "__directory__" : firstEntry.extension;
       const iconSrc = iconStore.largeIcons[iconKey] || iconStore.icons[iconKey] || null;
       generateDragIcon({
@@ -957,7 +1034,10 @@ export function Panel() {
         className="flex-1 overflow-y-auto overflow-x-auto"
         data-drop-zone="panel-bg"
         data-panel-path={tab.path}
+        onMouseDown={handleRubberBandMouseDown}
         onClick={(e) => {
+          // ラバーバンド操作後のclickは選択解除しない
+          if (rubberBandJustFinishedRef.current) return;
           // ファイル行以外（空白エリア・グリッドgap等）をクリックしたら選択・カーソル解除
           if (!(e.target as HTMLElement).closest?.("[data-file-path]")) {
             clearSelection();
@@ -975,10 +1055,41 @@ export function Panel() {
             onAutoFit={handleAutoFit}
           />
         )}
-        {(tab.loading || tab.searching) && (
+        {/* Grid sort bar (icons mode only) */}
+        {viewMode === "icons" && (
+          <div className="flex items-center h-7 px-3 border-b border-[#e5e5e5] bg-[#fafafa] text-xs shrink-0 gap-0.5">
+            {(["name", "modified", "extension", "size"] as SortKey[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => setSort(key)}
+                className={cn(
+                  "flex items-center px-2 py-0.5 rounded transition-colors",
+                  tab.sortKey === key
+                    ? "text-[var(--accent)] font-medium"
+                    : "text-[#999] hover:text-[#666] hover:bg-[#eee]",
+                )}
+              >
+                {t.columnHeader[key === "extension" ? "type" : key]}
+                {tab.sortKey === key && (
+                  <ArrowUp
+                    className={cn(
+                      "w-3 h-3 ml-0.5 transition-transform duration-200",
+                      tab.sortOrder === "desc" && "rotate-180",
+                    )}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+        {(tab.loading || tab.searching || tab.contentSearching) && (
           <div className="flex items-center justify-center h-full text-[#999] gap-2">
             <Loader className="w-4 h-4 animate-spin" />
-            {tab.searching ? t.panel.searching : t.panel.loading}
+            {tab.contentSearching
+              ? t.navigationBar.contentSearching
+              : tab.searching
+                ? t.panel.searching
+                : t.panel.loading}
           </div>
         )}
         {tab.error && (
@@ -986,14 +1097,33 @@ export function Panel() {
             {tab.error}
           </div>
         )}
-        {!tab.loading && !tab.searching && !tab.error && displayEntries.length === 0 && (
-          <div className="flex items-center justify-center h-full text-[#999] animate-fade-in">
-            {tab.searchResults !== null ? t.panel.noResults : t.panel.emptyFolder}
-          </div>
-        )}
+        {/* 内容検索結果表示 */}
+        {!tab.loading &&
+          !tab.contentSearching &&
+          !tab.error &&
+          tab.contentSearchResults !== null &&
+          (tab.contentSearchResults.length > 0 ? (
+            <ContentSearchResults results={tab.contentSearchResults} query={tab.searchQuery} />
+          ) : (
+            <div className="flex items-center justify-center h-full text-[#999] animate-fade-in">
+              {t.navigationBar.contentSearchNoResults}
+            </div>
+          ))}
         {!tab.loading &&
           !tab.searching &&
+          !tab.contentSearching &&
           !tab.error &&
+          tab.contentSearchResults === null &&
+          displayEntries.length === 0 && (
+            <div className="flex items-center justify-center h-full text-[#999] animate-fade-in">
+              {tab.searchResults !== null ? t.panel.noResults : t.panel.emptyFolder}
+            </div>
+          )}
+        {!tab.loading &&
+          !tab.searching &&
+          !tab.contentSearching &&
+          !tab.error &&
+          tab.contentSearchResults === null &&
           (viewMode === "details" ? (
             displayEntries.map((entry, index) => (
               <FileRow
@@ -1018,6 +1148,8 @@ export function Panel() {
                 selectedCount={tab.selectedIndices.size}
                 onStartRename={startRename}
                 maxFileSize={maxFileSize}
+                onFolderHover={handleFolderHover}
+                onFolderLeave={handleFolderLeave}
               />
             ))
           ) : (
@@ -1039,6 +1171,8 @@ export function Panel() {
               onFileMouseDown={handleFileMouseDown}
               onClearSelection={clearSelection}
               onStartRename={startRename}
+              onFolderHover={handleFolderHover}
+              onFolderLeave={handleFolderLeave}
             />
           ))}
       </div>
@@ -1066,8 +1200,31 @@ export function Panel() {
         />
       )}
 
+      {/* フォルダ中身チラ見せポップアップ */}
+      <FolderPeek
+        folderPath={folderPeekPath}
+        anchorRect={folderPeekRect}
+        onClose={handleFolderLeave}
+      />
+
       {/* 移動先サジェストポップアップ */}
       <DragSuggestion onSelectDestination={handleSuggestionSelect} />
+
+      {/* ラバーバンド選択矩形 */}
+      {rubberBandRect && rubberBandRect.width > 0 && rubberBandRect.height > 0 && (
+        <div
+          className="fixed pointer-events-none z-[100]"
+          style={{
+            left: rubberBandRect.left,
+            top: rubberBandRect.top,
+            width: rubberBandRect.width,
+            height: rubberBandRect.height,
+            backgroundColor: "rgba(var(--accent-rgb), 0.12)",
+            border: "1px solid rgba(var(--accent-rgb), 0.5)",
+            borderRadius: 2,
+          }}
+        />
+      )}
 
       {/* カスタムドラッグゴースト（Explorer風） */}
       {dragGhostPaths &&
@@ -1150,9 +1307,7 @@ export function Panel() {
                         const store = useIconStore.getState();
                         const iconUrl = store.largeIcons[iconKey] || store.icons[iconKey];
                         if (iconUrl)
-                          return (
-                            <img src={iconUrl} alt="" className="w-8 h-8" draggable={false} />
-                          );
+                          return <img src={iconUrl} alt="" className="w-8 h-8" draggable={false} />;
                         return (
                           <span className="text-2xl leading-none">
                             {isDir ? "\uD83D\uDCC1" : "\uD83D\uDCC4"}

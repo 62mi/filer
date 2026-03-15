@@ -59,6 +59,37 @@ export const ja = {
     sortByModified: "更新日時",
     sortByType: "種類",
     sortBySize: "サイズ",
+    customActions: "カスタムアクション",
+    noCustomActions: "カスタムアクションなし",
+    manageCustomActions: "カスタムアクション管理...",
+  },
+
+  // ── カスタムアクション ──
+  customAction: {
+    title: "カスタムアクション",
+    description: "右クリックメニューに独自のコマンドを追加できます",
+    name: "アクション名",
+    command: "コマンド",
+    commandPlaceholder: "例: code {path}",
+    commandHelp: "プレースホルダー: {path} {dir} {name} {ext}",
+    icon: "アイコン",
+    iconPlaceholder: "lucide-reactアイコン名（例: Terminal）",
+    showFor: "表示対象",
+    showForFile: "ファイルのみ",
+    showForDirectory: "フォルダのみ",
+    showForBoth: "両方",
+    extensions: "対象拡張子",
+    extensionsPlaceholder: "カンマ区切り（例: jpg,png,gif）空欄=全て",
+    addAction: "アクションを追加",
+    editAction: "アクションを編集",
+    noActions: "カスタムアクションはまだ登録されていません",
+    saved: "カスタムアクションを保存しました",
+    deleted: "カスタムアクションを削除しました",
+    loadFailed: "カスタムアクションの読み込みに失敗",
+    saveFailed: "カスタムアクションの保存に失敗",
+    deleteFailed: "カスタムアクションの削除に失敗",
+    executeFailed: "カスタムアクションの実行に失敗",
+    confirmDelete: "このカスタムアクションを削除しますか？",
   },
 
   // ── ツールバー ──
@@ -226,6 +257,9 @@ export const ja = {
     googleDriveNotDetected: "Google Drive 未検出",
     googleDriveAccounts: "件のアカウント",
     openInBrowser: "ブラウザで開く",
+    mediaPreview: "メディアプレビュー",
+    mediaAutoPlay: "音声・動画を自動再生",
+    mediaAutoPlayDescription: "プレビュー表示時に自動で再生を開始します",
   },
 
   // ── AI自動整理 ──
@@ -458,6 +492,13 @@ export const ja = {
   // ── ナビゲーションバー ──
   navigationBar: {
     terminalFailed: "ターミナルの起動に失敗しました",
+    searchByName: "ファイル名で検索",
+    searchByContent: "ファイル内容で検索",
+    contentSearching: "内容を検索中...",
+    contentSearchResults: "件の内容一致",
+    contentSearchNoResults: "内容が一致するファイルが見つかりませんでした",
+    contentSearchFailed: "内容検索に失敗しました",
+    lineNumber: "行",
   },
 
   // ── サイドバー ──
@@ -465,12 +506,38 @@ export const ja = {
     home: "ホーム",
     quickAccess: "クイック アクセス",
     thisPC: "PC",
+    smartFolders: "スマートフォルダ",
     stack: "スタック",
     clearStack: "スタッククリア",
     dragFilesHere: "ここにファイルをドラッグ",
     remove: "削除",
     clearAll: "すべてクリア",
     trash: "ゴミ箱",
+  },
+
+  // ── スマートフォルダ ──
+  smartFolder: {
+    create: "スマートフォルダを作成",
+    edit: "スマートフォルダを編集",
+    empty: "スマートフォルダなし",
+    namePlaceholder: "例: 大きな画像ファイル",
+    searchPaths: "検索対象フォルダ",
+    selectSearchPath: "検索対象フォルダを選択",
+    noSearchPaths: "検索対象フォルダを追加してください",
+    conditions: "検索条件",
+    noConditions: "条件なし（すべてのファイルが対象）",
+    conditionsHint: "すべての条件に合致するファイルが表示されます（AND条件）",
+    conditionTypes: {
+      extension: "拡張子",
+      name_contains: "名前に含む",
+      name_glob: "名前パターン",
+      size_min: "最小サイズ (bytes)",
+      size_max: "最大サイズ (bytes)",
+      modified_after: "更新日（以降）",
+      modified_before: "更新日（以前）",
+    } as Record<string, string>,
+    placeholderNameContains: "検索キーワード",
+    placeholderSize: "バイト数",
   },
 
   // ── 画像操作 ──
@@ -486,6 +553,7 @@ export const ja = {
     saved: "画像を保存しました",
   },
 
+  // ── ワークスペース ──
   // ── フォーマット ──
   format: {
     bytes: "バイト",

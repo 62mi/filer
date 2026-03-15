@@ -1,4 +1,6 @@
+import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import { toast } from "./toastStore";
 
 export interface Bookmark {
   id: string;
@@ -316,9 +318,20 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
       }
 
       set({ bookmarks, folders, loaded: true });
-      if (needsSave) get().saveBookmarks();
+      if (needsSave) {
+        get().saveBookmarks();
+      } else {
+        // ジャンプリストだけ同期（saveBookmarks内でも呼ばれるが、needsSave=falseの場合用）
+        const rootBm: [string, string][] = bookmarks
+          .filter((b) => !b.folderId)
+          .sort((a, b) => a.order - b.order)
+          .map((b) => [b.name, b.path]);
+        invoke("update_jump_list", { bookmarks: rootBm }).catch(() => {});
+      }
     } catch (err) {
-      console.warn("ブックマークの読み込みに失敗しました:", err);
+      toast.error(
+        `ブックマークの読み込みに失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      );
       set({ loaded: true });
     }
   },
@@ -329,7 +342,15 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
       localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
       localStorage.setItem(FOLDER_STORAGE_KEY, JSON.stringify(folders));
     } catch (err) {
-      console.warn("ブックマークの保存に失敗しました:", err);
+      toast.error(
+        `ブックマークの保存に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
+    // ジャンプリストを更新（ルートレベルのブックマークのみ）
+    const rootBookmarks: [string, string][] = bookmarks
+      .filter((b) => !b.folderId)
+      .sort((a, b) => a.order - b.order)
+      .map((b) => [b.name, b.path]);
+    invoke("update_jump_list", { bookmarks: rootBookmarks }).catch(() => {});
   },
 }));

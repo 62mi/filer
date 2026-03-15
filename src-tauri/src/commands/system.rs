@@ -277,3 +277,16 @@ pub fn open_recycle_bin() -> Result<(), String> {
         Err("Recycle Bin is only supported on Windows".to_string())
     }
 }
+
+/// ブックマーク一覧でジャンプリストを更新する
+#[tauri::command]
+pub fn update_jump_list(bookmarks: Vec<(String, String)>) {
+    #[cfg(windows)]
+    {
+        crate::jumplist::update_jump_list_with_bookmarks(&bookmarks);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = bookmarks;
+    }
+}

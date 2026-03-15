@@ -11,6 +11,7 @@ import { RuleManager } from "./components/RuleManager";
 import { RuleWizard } from "./components/RuleWizard";
 import { SettingsDialog } from "./components/SettingsDialog/SettingsDialog";
 import { Sidebar } from "./components/Sidebar";
+import { SmartFolderEditor } from "./components/SmartFolderEditor/SmartFolderEditor";
 import { StatusBar } from "./components/StatusBar";
 import { TabBar } from "./components/TabBar";
 import { TemplateManager } from "./components/TemplateManager";
@@ -93,6 +94,19 @@ function App() {
           .syncExternalClipboard(event.payload.paths, event.payload.operation);
       },
     );
+    return () => {
+      unlisten.then((f) => f()).catch(() => {});
+    };
+  }, []);
+
+  // ジャンプリストの --open <path> イベントをリッスン
+  useEffect(() => {
+    const unlisten = listen<string>("open-path", (event) => {
+      const path = event.payload;
+      if (path) {
+        useExplorerStore.getState().addTab(path);
+      }
+    });
     return () => {
       unlisten.then((f) => f()).catch(() => {});
     };
@@ -189,7 +203,10 @@ function App() {
       <TabBar />
 
       {/* Navigation bar */}
-      <NavigationBar />
+      <NavigationBar
+        previewOpen={previewOpen}
+        onTogglePreview={() => setPreviewOpen(!previewOpen)}
+      />
 
       {/* Bookmark bar */}
       <BookmarkBar />
@@ -236,7 +253,7 @@ function App() {
       </div>
 
       {/* Status bar */}
-      <StatusBar onTogglePreview={() => setPreviewOpen(!previewOpen)} previewOpen={previewOpen} />
+      <StatusBar />
 
       {/* Rule Manager Dialog */}
       <RuleManager />
@@ -252,6 +269,9 @@ function App() {
 
       {/* Template Manager Dialog */}
       <TemplateManager />
+
+      {/* Smart Folder Editor */}
+      <SmartFolderEditor />
 
       {/* Copy Queue Panel */}
       <CopyQueuePanel />

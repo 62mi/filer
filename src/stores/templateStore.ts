@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { toast } from "./toastStore";
 
 export interface TemplateNode {
   name: string;
@@ -144,7 +145,9 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
       const merged = [...BUILTIN_TEMPLATES.filter((bt) => !savedIds.has(bt.id)), ...saved];
       set({ templates: merged, loaded: true });
     } catch (err) {
-      console.warn("テンプレートの読み込みに失敗しました:", err);
+      toast.error(
+        `テンプレートの読み込みに失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      );
       set({ templates: [...BUILTIN_TEMPLATES], loaded: true });
     }
   },
@@ -154,7 +157,9 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
     } catch (err) {
-      console.warn("テンプレートの保存に失敗しました:", err);
+      toast.error(
+        `テンプレートの保存に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   },
 }));

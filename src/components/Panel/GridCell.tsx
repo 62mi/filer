@@ -29,6 +29,8 @@ export interface GridCellProps {
   onClearSelection: () => void;
   selectedCount: number;
   onStartRename: (index: number) => void;
+  onFolderHover?: (path: string, rect: DOMRect) => void;
+  onFolderLeave?: () => void;
 }
 
 export const GridCell = memo(function GridCell({
@@ -51,6 +53,8 @@ export const GridCell = memo(function GridCell({
   onClearSelection,
   selectedCount,
   onStartRename,
+  onFolderHover,
+  onFolderLeave,
 }: GridCellProps) {
   const [renameValue, setRenameValue] = useState(entry.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,30 +75,37 @@ export const GridCell = memo(function GridCell({
   const isPsd = !entry.is_dir && PSD_EXTS.has(entry.extension);
   const isGoogleDocs = !entry.is_dir && GOOGLE_DOCS_EXTENSIONS.has(entry.extension);
   const hasThumbnailMedia = isImage || isVideo || isPdf || isPsd || isGoogleDocs;
+  const isFolder = entry.is_dir;
+  const hasThumbnailTarget = hasThumbnailMedia || isFolder;
   const THUMB_SIZE = 128;
-  const thumbKey = hasThumbnailMedia ? `${entry.path}\0${THUMB_SIZE}` : "";
+  const thumbKey = hasThumbnailTarget ? `${entry.path}\0${THUMB_SIZE}` : "";
   const fetchThumbnails = useThumbnailStore((s) => s.fetchThumbnails);
   const fetchVideoThumbnail = useThumbnailStore((s) => s.fetchVideoThumbnail);
   const fetchPdfThumbnail = useThumbnailStore((s) => s.fetchPdfThumbnail);
   const fetchPsdThumbnail = useThumbnailStore((s) => s.fetchPsdThumbnail);
   const fetchGoogleDocsThumbnails = useThumbnailStore((s) => s.fetchGoogleDocsThumbnails);
+  const fetchFolderThumbnail = useThumbnailStore((s) => s.fetchFolderThumbnail);
   const markFailed = useThumbnailStore((s) => s.markFailed);
   const hasThumbnail = useThumbnailStore((s) =>
-    hasThumbnailMedia ? !!s.thumbnails[thumbKey] : false,
+    hasThumbnailTarget ? !!s.thumbnails[thumbKey] : false,
   );
-  const isPending = useThumbnailStore((s) => (hasThumbnailMedia ? s.pending.has(thumbKey) : false));
-  const isFailed = useThumbnailStore((s) => (hasThumbnailMedia ? s.failed.has(thumbKey) : false));
+  const isPending = useThumbnailStore((s) =>
+    hasThumbnailTarget ? s.pending.has(thumbKey) : false,
+  );
+  const isFailed = useThumbnailStore((s) => (hasThumbnailTarget ? s.failed.has(thumbKey) : false));
 
   // IntersectionObserver: ビューポートに入ったらサムネイル取得
   useEffect(() => {
-    if (!hasThumbnailMedia || hasThumbnail || isPending || isFailed) return;
+    if (!hasThumbnailTarget || hasThumbnail || isPending || isFailed) return;
     const el = cellRef.current;
     if (!el) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) {
-          if (isImage) {
+          if (isFolder) {
+            fetchFolderThumbnail(entry.path, THUMB_SIZE);
+          } else if (isImage) {
             fetchThumbnails([entry.path], THUMB_SIZE);
           } else if (isGoogleDocs) {
             fetchGoogleDocsThumbnails([entry.path], THUMB_SIZE);
@@ -113,7 +124,8 @@ export const GridCell = memo(function GridCell({
     observer.observe(el);
     return () => observer.disconnect();
   }, [
-    hasThumbnailMedia,
+    hasThumbnailTarget,
+    isFolder,
     isImage,
     isGoogleDocs,
     isPdf,
@@ -127,6 +139,7 @@ export const GridCell = memo(function GridCell({
     fetchPdfThumbnail,
     fetchPsdThumbnail,
     fetchGoogleDocsThumbnails,
+    fetchFolderThumbnail,
   ]);
 
   useEffect(() => {
@@ -160,7 +173,7 @@ export const GridCell = memo(function GridCell({
   };
 
   const thumbnail = useThumbnailStore((s) =>
-    hasThumbnailMedia ? s.thumbnails[thumbKey] : undefined,
+    hasThumbnailTarget ? s.thumbnails[thumbKey] : undefined,
   );
   const largeIcon = useIconStore(
     (s) => s.largeIcons[entry.is_dir ? "__directory__" : entry.extension],
@@ -185,6 +198,7 @@ export const GridCell = memo(function GridCell({
       data-mid-click-path={entry.is_dir ? entry.path : undefined}
       data-drop-zone="file-row"
       data-file-path={entry.path}
+      data-file-index={index}
       data-is-dir={entry.is_dir ? "true" : "false"}
       style={{ width: cellWidth, height: cellHeight }}
       onMouseDown={(e) => {
@@ -239,6 +253,17 @@ export const GridCell = memo(function GridCell({
         }
         onContextMenu(e, index);
       }}
+      onMouseEnter={(e) => {
+        if (entry.is_dir && onFolderHover) {
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          onFolderHover(entry.path, rect);
+        }
+      }}
+      onMouseLeave={() => {
+        if (entry.is_dir && onFolderLeave) {
+          onFolderLeave();
+        }
+      }}
     >
       {/* Selection checkmark */}
       {isSelected && (
@@ -251,22 +276,60 @@ export const GridCell = memo(function GridCell({
         className="relative flex items-center justify-center shrink-0"
         style={{ width: gridIconSize, height: gridIconSize }}
       >
-        {hasThumbnailMedia && thumbnail ? (
+        {hasThumbnailTarget && thumbnail ? (
           <>
+            {/* フォルダ: 背面にずらしたカードで「複数ファイル感」を演出 */}
+            {isFolder && (
+              <>
+                <div
+                  className="absolute rounded-sm bg-[#e8e8e8] border border-[#d0d0d0]"
+                  style={{
+                    width: gridIconSize * 0.7,
+                    height: gridIconSize * 0.7,
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%) rotate(6deg) translate(4px, -2px)",
+                  }}
+                />
+                <div
+                  className="absolute rounded-sm bg-[#f0f0f0] border border-[#d8d8d8]"
+                  style={{
+                    width: gridIconSize * 0.7,
+                    height: gridIconSize * 0.7,
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%) rotate(-4deg) translate(-3px, -1px)",
+                  }}
+                />
+              </>
+            )}
             <img
               src={thumbnail}
               alt=""
-              className="rounded-sm animate-fade-in"
+              className="rounded-sm animate-fade-in relative"
               style={{
-                maxWidth: gridIconSize,
-                maxHeight: gridIconSize,
+                maxWidth: isFolder ? gridIconSize * 0.72 : gridIconSize,
+                maxHeight: isFolder ? gridIconSize * 0.72 : gridIconSize,
                 objectFit: "contain",
                 filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.2))",
               }}
               draggable={false}
               onError={isGoogleDocs ? () => markFailed(entry.path, THUMB_SIZE) : undefined}
             />
-            {smallIcon && !isImage && (
+            {isFolder && largeIcon ? (
+              <img
+                src={largeIcon}
+                alt=""
+                className="absolute bottom-0 right-0"
+                style={{ width: 32, height: 32, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}
+                draggable={false}
+              />
+            ) : isFolder ? (
+              <Folder
+                className="absolute bottom-0 right-0 text-amber-500"
+                style={{ width: 32, height: 32, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}
+              />
+            ) : smallIcon && !isImage ? (
               <img
                 src={smallIcon}
                 alt=""
@@ -274,10 +337,13 @@ export const GridCell = memo(function GridCell({
                 style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}
                 draggable={false}
               />
-            )}
+            ) : null}
           </>
-        ) : hasThumbnailMedia && isPending ? (
-          <Loader className="text-[#aaa] animate-spin" style={{ width: iconDisplaySize * 0.35, height: iconDisplaySize * 0.35 }} />
+        ) : hasThumbnailTarget && isPending && !isFolder ? (
+          <Loader
+            className="text-[#aaa] animate-spin"
+            style={{ width: iconDisplaySize * 0.35, height: iconDisplaySize * 0.35 }}
+          />
         ) : largeIcon ? (
           <img
             src={largeIcon}

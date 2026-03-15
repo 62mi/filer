@@ -3,13 +3,30 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Instant, UNIX_EPOCH};
 use tauri::{Emitter, Manager};
 use walkdir::WalkDir;
 
 const DEFAULT_SEARCH_MAX_RESULTS: usize = 200;
 const DEFAULT_SEARCH_MAX_DEPTH: usize = 5;
 const DEFAULT_READ_MAX_BYTES: usize = 50_000;
+
+// 内容検索用定数
+const DEFAULT_CONTENT_SEARCH_MAX_RESULTS: usize = 100;
+const DEFAULT_CONTENT_SEARCH_MAX_DEPTH: usize = 5;
+/// 内容検索対象の最大ファイルサイズ (10MB)
+const CONTENT_SEARCH_MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
+/// コンテキスト行数（前後）
+const CONTENT_SEARCH_CONTEXT_LINES: usize = 2;
+
+/// 内容検索の対象拡張子
+const CONTENT_SEARCH_EXTENSIONS: &[&str] = &[
+    "txt", "json", "csv", "md", "ts", "tsx", "js", "jsx", "rs", "py",
+    "html", "css", "xml", "toml", "yaml", "yml", "cfg", "ini", "log",
+    "sh", "bat", "ps1", "c", "cpp", "h", "hpp", "java", "go", "rb",
+    "php", "sql", "vue", "svelte", "scss", "less", "env", "gitignore",
+    "editorconfig", "prettierrc", "eslintrc",
+];
 
 /// 宛先に同名ファイル/フォルダが存在する場合、「name (N).ext」形式のユニークなパスを生成
 /// is_dir=true の場合は拡張子を分離せず名前全体をステムとして扱う
@@ -949,4 +966,139 @@ pub fn save_temp_drag_icon(data: Vec<u8>) -> Result<String, String> {
     fs::write(&path, &data).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().into_owned())
 }
+
+/// 内容検索の結果1件
+#[derive(Debug, Serialize, Clone)]
+pub struct ContentSearchMatch {
+    pub path: String,
+    pub file_name: String,
+    pub line_number: usize,
+    pub line_content: String,
+    pub context_before: Vec<String>,
+    pub context_after: Vec<String>,
+}
+
+/// バイナリファイルかどうかを先頭バイトで判定
+fn is_binary_file(data: &[u8]) -> bool {
+    let check_len = data.len().min(512);
+    data[..check_len].contains(&0)
+}
+
+/// ファイル内容をgrep的に検索する
+/// query: 検索文字列（大文字小文字を区別しない）
+/// path: 検索開始ディレクトリ
+/// max_results: 最大結果数
+/// max_depth: 最大深度
+/// context_lines: コンテキスト行数（前後）
+#[tauri::command]
+pub async fn search_file_contents(
+    path: String,
+    query: String,
+    max_results: Option<usize>,
+    max_depth: Option<usize>,
+    context_lines: Option<usize>,
+) -> Result<Vec<ContentSearchMatch>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let max = max_results.unwrap_or(DEFAULT_CONTENT_SEARCH_MAX_RESULTS);
+        let depth = max_depth.unwrap_or(DEFAULT_CONTENT_SEARCH_MAX_DEPTH);
+        let ctx = context_lines.unwrap_or(CONTENT_SEARCH_CONTEXT_LINES);
+        let query_lower = query.to_lowercase();
+        let mut results = Vec::new();
+
+        let ext_set: std::collections::HashSet<&str> =
+            CONTENT_SEARCH_EXTENSIONS.iter().copied().collect();
+
+        for entry in WalkDir::new(&path)
+            .max_depth(depth)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if results.len() >= max {
+                break;
+            }
+
+            // ファイルのみ対象
+            let file_path = entry.path();
+            let metadata = match entry.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if metadata.is_dir() {
+                continue;
+            }
+
+            // サイズ上限チェック
+            if metadata.len() > CONTENT_SEARCH_MAX_FILE_SIZE {
+                continue;
+            }
+
+            // 拡張子フィルター
+            let ext = file_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            if !ext_set.contains(ext.as_str()) {
+                continue;
+            }
+
+            // ファイル読み込み
+            let data = match fs::read(file_path) {
+                Ok(d) => d,
+                Err(_) => continue,
+            };
+
+            // バイナリチェック
+            if is_binary_file(&data) {
+                continue;
+            }
+
+            // UTF-8変換
+            let content = String::from_utf8_lossy(&data);
+            let lines: Vec<&str> = content.lines().collect();
+
+            // 行ごとに検索
+            for (i, line) in lines.iter().enumerate() {
+                if results.len() >= max {
+                    break;
+                }
+                if !line.to_lowercase().contains(&query_lower) {
+                    continue;
+                }
+
+                // コンテキスト行を収集
+                let ctx_start = i.saturating_sub(ctx);
+                let ctx_end = (i + ctx + 1).min(lines.len());
+
+                let context_before: Vec<String> = lines[ctx_start..i]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect();
+                let context_after: Vec<String> = lines[(i + 1)..ctx_end]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect();
+
+                let file_name = file_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+
+                results.push(ContentSearchMatch {
+                    path: file_path.to_string_lossy().to_string(),
+                    file_name,
+                    line_number: i + 1, // 1-indexed
+                    line_content: line.to_string(),
+                    context_before,
+                    context_after,
+                });
+            }
+        }
+
+        Ok(results)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 

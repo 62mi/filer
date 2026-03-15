@@ -37,8 +37,10 @@ interface ThumbnailStore {
   fetchThumbnails: (paths: string[], size: number) => Promise<void>;
   fetchVideoThumbnail: (path: string, size: number) => Promise<void>;
   fetchGoogleDocsThumbnails: (paths: string[], size: number) => Promise<void>;
+  fetchFolderThumbnail: (path: string, size: number) => Promise<void>;
   prefetchInBackground: (paths: string[], size: number) => void;
   prefetchVideosInBackground: (paths: string[], size: number) => void;
+  prefetchFoldersInBackground: (paths: string[], size: number) => void;
   fetchPdfThumbnail: (path: string, size: number) => Promise<void>;
   fetchPsdThumbnail: (path: string, size: number) => Promise<void>;
   prefetchPdfInBackground: (paths: string[], size: number) => void;
@@ -49,6 +51,7 @@ interface ThumbnailStore {
   cancelPdfPrefetch: () => void;
   cancelPsdPrefetch: () => void;
   cancelGoogleDocsPrefetch: () => void;
+  cancelFolderPrefetch: () => void;
   getThumbnail: (path: string, size: number) => string | undefined;
   hasThumbnail: (path: string, size: number) => boolean;
   isPending: (path: string, size: number) => boolean;
@@ -64,6 +67,7 @@ let videoPrefetchAbort: AbortController | null = null;
 let pdfPrefetchAbort: AbortController | null = null;
 let psdPrefetchAbort: AbortController | null = null;
 let gdocsPrefetchAbort: AbortController | null = null;
+let folderPrefetchAbort: AbortController | null = null;
 
 // pdfjs-dist の遅延ロード
 let pdfjsPromise: Promise<typeof import("pdfjs-dist")> | null = null;
@@ -347,6 +351,122 @@ export const useThumbnailStore = create<ThumbnailStore>((set, get) => ({
       gdocsPrefetchAbort.abort();
       gdocsPrefetchAbort = null;
     }
+  },
+
+  cancelFolderPrefetch: () => {
+    if (folderPrefetchAbort) {
+      folderPrefetchAbort.abort();
+      folderPrefetchAbort = null;
+    }
+  },
+
+  // フォルダサムネイル取得（1フォルダずつ、Rust側で画像探索）
+  fetchFolderThumbnail: async (path: string, size: number) => {
+    const k = cacheKey(path, size);
+    const { thumbnails, pending, failed } = get();
+    if (thumbnails[k] || pending.has(k) || failed.has(k)) return;
+
+    set((s) => {
+      const next = new Set(s.pending);
+      next.add(k);
+      return { pending: next };
+    });
+
+    try {
+      const dataUrl = await invoke<string>("generate_folder_thumbnail", { path, size });
+      if (dataUrl) {
+        set((s) => {
+          const next = new Set(s.pending);
+          next.delete(k);
+          return { thumbnails: { ...s.thumbnails, [k]: dataUrl }, pending: next };
+        });
+      } else {
+        // 画像なし → failed にマークして再試行しない
+        set((s) => {
+          const next = new Set(s.pending);
+          next.delete(k);
+          const nextFailed = new Set(s.failed);
+          nextFailed.add(k);
+          return { pending: next, failed: nextFailed };
+        });
+      }
+    } catch {
+      set((s) => {
+        const next = new Set(s.pending);
+        next.delete(k);
+        const nextFailed = new Set(s.failed);
+        nextFailed.add(k);
+        return { pending: next, failed: nextFailed };
+      });
+    }
+  },
+
+  // フォルダサムネイルのバックグラウンドプリフェッチ（1フォルダずつ処理）
+  prefetchFoldersInBackground: (paths: string[], size: number) => {
+    if (folderPrefetchAbort) folderPrefetchAbort.abort();
+    const controller = new AbortController();
+    folderPrefetchAbort = controller;
+
+    const { thumbnails, pending, failed } = get();
+    const needed = paths.filter((p) => {
+      const k = cacheKey(p, size);
+      return !thumbnails[k] && !pending.has(k) && !failed.has(k);
+    });
+    if (needed.length === 0) return;
+
+    (async () => {
+      // 画像サムネイルの読み込みを優先させるため待つ
+      await new Promise((r) => setTimeout(r, 800));
+      if (controller.signal.aborted) return;
+
+      for (const path of needed) {
+        if (controller.signal.aborted) return;
+
+        const k = cacheKey(path, size);
+        const current = get();
+        if (current.thumbnails[k] || current.pending.has(k) || current.failed.has(k)) continue;
+
+        set((s) => {
+          const next = new Set(s.pending);
+          next.add(k);
+          return { pending: next };
+        });
+
+        try {
+          const dataUrl = await invoke<string>("generate_folder_thumbnail", { path, size });
+          if (controller.signal.aborted) return;
+          if (dataUrl) {
+            set((s) => {
+              const next = new Set(s.pending);
+              next.delete(k);
+              return { thumbnails: { ...s.thumbnails, [k]: dataUrl }, pending: next };
+            });
+          } else {
+            set((s) => {
+              const next = new Set(s.pending);
+              next.delete(k);
+              const nextFailed = new Set(s.failed);
+              nextFailed.add(k);
+              return { pending: next, failed: nextFailed };
+            });
+          }
+        } catch {
+          if (controller.signal.aborted) return;
+          set((s) => {
+            const next = new Set(s.pending);
+            next.delete(k);
+            const nextFailed = new Set(s.failed);
+            nextFailed.add(k);
+            return { pending: next, failed: nextFailed };
+          });
+        }
+
+        // フォルダ走査はIO負荷があるので間隔を空ける
+        if (!controller.signal.aborted) {
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      }
+    })();
   },
 
   removeThumbnail: (path, size) => {
@@ -752,6 +872,11 @@ export function extractPsdPaths(
   entries: { is_dir: boolean; extension: string; path: string }[],
 ): string[] {
   return entries.filter((e) => !e.is_dir && PSD_EXTS.has(e.extension)).map((e) => e.path);
+}
+
+/** エントリ配列からフォルダパスだけ抽出するヘルパー */
+export function extractFolderPaths(entries: { is_dir: boolean; path: string }[]): string[] {
+  return entries.filter((e) => e.is_dir).map((e) => e.path);
 }
 
 export { VIDEO_EXTS, PDF_EXTS, PSD_EXTS };

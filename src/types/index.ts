@@ -39,3 +39,26 @@ export interface FilterState {
   sizeRange: SizeRange | null;
   modifiedRange: ModifiedRange | null;
 }
+
+// スマートフォルダ
+export type SmartFolderConditionType =
+  | "extension"
+  | "name_contains"
+  | "name_glob"
+  | "size_min"
+  | "size_max"
+  | "modified_after"
+  | "modified_before";
+
+export interface SmartFolderCondition {
+  type: SmartFolderConditionType;
+  value: string;
+}
+
+export interface SmartFolder {
+  id: number;
+  name: string;
+  conditions: SmartFolderCondition[];
+  search_paths: string[];
+  created_at: string;
+}

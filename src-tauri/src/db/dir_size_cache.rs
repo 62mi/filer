@@ -25,7 +25,8 @@ impl Database {
         Ok(())
     }
 
-    /// 古いキャッシュエントリを削除
+    /// 古いキャッシュエントリを削除（定期メンテナンス用）
+    #[allow(dead_code)]
     pub fn cleanup_dir_size_cache(&self, max_age_secs: i64) -> Result<(), String> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let cutoff = chrono::Utc::now().timestamp() - max_age_secs;

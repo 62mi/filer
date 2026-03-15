@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { useImageControls } from "../../hooks/useImageControls";
+import { useMediaPlayback } from "../../hooks/useMediaPlayback";
 import { usePreview } from "../../hooks/usePreview";
 import { useTranslation } from "../../i18n";
 import type { FileEntry } from "../../types";
@@ -44,6 +45,7 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
   const t = useTranslation();
   const preview = usePreview(entry, { maxTextBytes: 50000 });
   const controls = useImageControls(entry?.path ?? null);
+  const { mediaRef, mediaAutoPlay, handleVolumeChange } = useMediaPlayback();
   const [imgVersion, setImgVersion] = useState(0);
 
   if (!entry) return null;
@@ -268,7 +270,14 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
         return (
           <div className="flex flex-col items-center">
             {preview.mediaUrl ? (
-              <video src={preview.mediaUrl} controls className="max-w-full max-h-[400px] rounded">
+              <video
+                ref={mediaRef}
+                src={preview.mediaUrl}
+                controls
+                autoPlay={mediaAutoPlay}
+                onVolumeChange={handleVolumeChange}
+                className="max-w-full max-h-[400px] rounded"
+              >
                 <track kind="captions" />
               </video>
             ) : (
@@ -289,7 +298,16 @@ export function PreviewPanel({ entry, onClose }: PreviewPanelProps) {
             <Music className="w-10 h-10 text-[#bbb]" />
             <div className="text-xs font-medium text-[#1a1a1a] text-center break-all">{e.name}</div>
             {preview.mediaUrl && (
-              <audio src={preview.mediaUrl} controls className="w-full">
+              <audio
+                ref={mediaRef}
+                src={preview.mediaUrl}
+                controls
+                autoPlay={mediaAutoPlay}
+                onVolumeChange={handleVolumeChange}
+                tabIndex={-1}
+                onFocus={(e) => e.currentTarget.blur()}
+                className="w-full"
+              >
                 <track kind="captions" />
               </audio>
             )}

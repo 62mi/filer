@@ -1,6 +1,8 @@
+pub mod custom_action;
 pub mod dir_size_cache;
 pub mod history;
 pub mod rules;
+pub mod smart_folder;
 pub mod usage;
 
 use rusqlite::Connection;
@@ -87,6 +89,24 @@ impl Database {
                 path          TEXT PRIMARY KEY,
                 size          INTEGER NOT NULL,
                 calculated_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS smart_folders (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                name         TEXT NOT NULL,
+                conditions   TEXT NOT NULL,
+                search_paths TEXT NOT NULL,
+                created_at   TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS custom_actions (
+                id          TEXT PRIMARY KEY,
+                name        TEXT NOT NULL,
+                command     TEXT NOT NULL,
+                icon        TEXT,
+                show_for    TEXT NOT NULL DEFAULT 'both',
+                extensions  TEXT NOT NULL DEFAULT '',
+                sort_order  INTEGER NOT NULL DEFAULT 0
             );",
         )
         .map_err(|e| format!("Failed to init tables: {}", e))?;
