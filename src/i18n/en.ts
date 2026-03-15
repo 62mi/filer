@@ -248,6 +248,9 @@ export const en: Translations = {
     googleDriveNotDetected: "Google Drive not detected",
     googleDriveAccounts: "account(s)",
     openInBrowser: "Open in browser",
+    mediaPreview: "Media Preview",
+    mediaAutoPlay: "Auto-play audio & video",
+    mediaAutoPlayDescription: "Automatically start playback when previewing",
   },
 
   aiOrganizer: {

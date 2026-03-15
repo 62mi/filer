@@ -257,6 +257,9 @@ export const ja = {
     googleDriveNotDetected: "Google Drive 未検出",
     googleDriveAccounts: "件のアカウント",
     openInBrowser: "ブラウザで開く",
+    mediaPreview: "メディアプレビュー",
+    mediaAutoPlay: "音声・動画を自動再生",
+    mediaAutoPlayDescription: "プレビュー表示時に自動で再生を開始します",
   },
 
   // ── AI自動整理 ──

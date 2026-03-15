@@ -19,7 +19,7 @@ use db::smart_folder::*;
 use db::Database;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 /// Windows MessageBox でエラーを表示する
 #[cfg(windows)]
@@ -56,6 +56,34 @@ fn show_main_window(app: &tauri::AppHandle) {
     }
 }
 
+/// --open "path" 引数からパスを抽出する
+fn extract_open_path(args: &[String]) -> Option<String> {
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--open" {
+            return iter.next().cloned();
+        }
+        // --open "C:\path" が1つの引数として渡される場合
+        if let Some(path) = arg.strip_prefix("--open=") {
+            return Some(path.trim_matches('"').to_string());
+        }
+    }
+    None
+}
+
+/// 指定パスで新しいウィンドウを開き、フロントエンドにパスを通知する
+fn open_path_in_window(app: &tauri::AppHandle, path: &str) {
+    if let Ok(_) = commands::window::create_new_window_internal(app) {
+        let path = path.to_string();
+        let app = app.clone();
+        // 新しいウィンドウの初期化を待ってからイベントを送信
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            app.emit("open-path", &path).ok();
+        });
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let database = match Database::new() {
@@ -75,6 +103,9 @@ pub fn run() {
             if args.iter().any(|a| a == "--new-window") {
                 // --new-window → 新しいウィンドウを作成
                 commands::window::create_new_window_internal(app).ok();
+            } else if let Some(path) = extract_open_path(&args) {
+                // --open <path> → 指定パスで新しいウィンドウを開く
+                open_path_in_window(app, &path);
             } else {
                 // 通常の2回目起動 → 既存ウィンドウを表示・フォーカス
                 show_main_window(app);
@@ -283,6 +314,7 @@ pub fn run() {
             save_custom_action,
             delete_custom_action,
             execute_custom_action,
+            update_jump_list,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useImageControls } from "../../hooks/useImageControls";
+import { useMediaPlayback } from "../../hooks/useMediaPlayback";
 import { usePreview } from "../../hooks/usePreview";
 import { useTranslation } from "../../i18n";
 import type { FileEntry } from "../../types";
@@ -50,6 +51,7 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
   const t = useTranslation();
   const preview = usePreview(entry, { maxTextBytes: 100000 });
   const controls = useImageControls(entry.path);
+  const { mediaRef, mediaAutoPlay, handleVolumeChange } = useMediaPlayback();
   const [closing, setClosing] = useState(false);
   const [imgVersion, setImgVersion] = useState(0);
   const [contentKey, setContentKey] = useState(0);
@@ -307,7 +309,14 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
 
       case "video":
         return preview.mediaUrl ? (
-          <video src={preview.mediaUrl} controls className="max-w-full max-h-[70vh] rounded-md">
+          <video
+            ref={mediaRef}
+            src={preview.mediaUrl}
+            controls
+            autoPlay={mediaAutoPlay}
+            onVolumeChange={handleVolumeChange}
+            className="max-w-full max-h-[70vh] rounded-md"
+          >
             <track kind="captions" />
           </video>
         ) : null;
@@ -319,9 +328,11 @@ export function QuickLook({ entry, onClose, onPrev, onNext }: QuickLookProps) {
             <div className="text-base font-medium text-[#1a1a1a]">{entry.name}</div>
             {preview.mediaUrl && (
               <audio
+                ref={mediaRef}
                 src={preview.mediaUrl}
                 controls
-                autoPlay
+                autoPlay={mediaAutoPlay}
+                onVolumeChange={handleVolumeChange}
                 tabIndex={-1}
                 onFocus={(e) => e.currentTarget.blur()}
                 className="w-full"
