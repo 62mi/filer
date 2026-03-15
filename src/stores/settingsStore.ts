@@ -45,6 +45,10 @@ interface SettingsState {
   // Startup
   autoStart: boolean;
 
+  // Media preview
+  mediaAutoPlay: boolean;
+  mediaVolume: number;
+
   // Settings dialog
   isOpen: boolean;
   initialTab: string | null;
@@ -77,6 +81,8 @@ interface SettingsData {
   language: Language;
   pathStyle: PathStyle;
   autoStart: boolean;
+  mediaAutoPlay: boolean;
+  mediaVolume: number;
 }
 
 const DEFAULT_COLUMN_WIDTHS: ColumnWidths = {
@@ -104,6 +110,8 @@ const DEFAULTS: SettingsData = {
   language: "ja",
   pathStyle: "windows" as PathStyle,
   autoStart: false,
+  mediaAutoPlay: true,
+  mediaVolume: 1.0,
 };
 
 function loadSettings(): Partial<SettingsData> {
@@ -137,6 +145,8 @@ function saveSettings(state: SettingsState) {
     language: state.language,
     pathStyle: state.pathStyle,
     autoStart: state.autoStart,
+    mediaAutoPlay: state.mediaAutoPlay,
+    mediaVolume: state.mediaVolume,
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -165,6 +175,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   language: saved.language ?? DEFAULTS.language,
   pathStyle: saved.pathStyle ?? DEFAULTS.pathStyle,
   autoStart: saved.autoStart ?? DEFAULTS.autoStart,
+  mediaAutoPlay: saved.mediaAutoPlay ?? DEFAULTS.mediaAutoPlay,
+  mediaVolume: saved.mediaVolume ?? DEFAULTS.mediaVolume,
 
   isOpen: false,
   initialTab: null,

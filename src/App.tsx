@@ -99,6 +99,19 @@ function App() {
     };
   }, []);
 
+  // ジャンプリストの --open <path> イベントをリッスン
+  useEffect(() => {
+    const unlisten = listen<string>("open-path", (event) => {
+      const path = event.payload;
+      if (path) {
+        useExplorerStore.getState().addTab(path);
+      }
+    });
+    return () => {
+      unlisten.then((f) => f()).catch(() => {});
+    };
+  }, []);
+
   // ルール自動実行の通知をリッスン
   useEffect(() => {
     const unlistenExec = listen<{

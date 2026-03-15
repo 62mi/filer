@@ -265,6 +265,12 @@ export function SettingsDialog() {
               </div>
               <div className="border-t border-[#f0f0f0] pt-3">
                 <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
+                  {t.settingsDialog.mediaPreview}
+                </div>
+                <MediaPreviewToggle />
+              </div>
+              <div className="border-t border-[#f0f0f0] pt-3">
+                <div className="text-[10px] text-[#999] uppercase tracking-wider mb-2">
                   {t.settingsDialog.externalTools}
                 </div>
                 <FfmpegStatus />
@@ -753,6 +759,29 @@ function AutoStartToggle() {
         <span className="text-xs text-[#555]">{t.settingsDialog.autoStartLabel}</span>
       </label>
       <p className="text-[10px] text-[#bbb] mt-1 ml-5.5">{t.settingsDialog.autoStartDescription}</p>
+    </div>
+  );
+}
+
+function MediaPreviewToggle() {
+  const t = useTranslation();
+  const mediaAutoPlay = useSettingsStore((s) => s.mediaAutoPlay);
+  const setSetting = useSettingsStore((s) => s.setSetting);
+
+  return (
+    <div>
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={mediaAutoPlay}
+          onChange={(e) => setSetting("mediaAutoPlay", e.target.checked)}
+          className="w-3.5 h-3.5 accent-[var(--accent)]"
+        />
+        <span className="text-xs text-[#555]">{t.settingsDialog.mediaAutoPlay}</span>
+      </label>
+      <p className="text-[10px] text-[#bbb] mt-1 ml-5.5">
+        {t.settingsDialog.mediaAutoPlayDescription}
+      </p>
     </div>
   );
 }
