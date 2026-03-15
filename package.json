@@ -1,9 +1,8 @@
 {
   "name": "filer",
-  "private": true,
-  "version": "1.5.0",
+  "version": "1.6.0",
   "author": "Tomako",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
