@@ -83,7 +83,7 @@ export function Panel() {
     justFinished: rubberBandJustFinishedRef,
   } = useRubberBand(listRef);
   const prevPathRef = useRef(tab.path);
-  const prevLoadingRef = useRef(tab.loading);
+
   const suggestionTimerRef = useRef<number | null>(null);
 
   // フォルダチラ見せ (FolderPeek) 状態
@@ -236,20 +236,16 @@ export function Panel() {
 
   // Scroll to keep cursor visible (パス変更・ロード完了時はカーソルを中心にスクロール)
   useEffect(() => {
-    const wasLoading = prevLoadingRef.current;
-    prevLoadingRef.current = tab.loading;
-
     // loading中はスクロールしない
     if (tab.loading || !listRef.current) return;
 
     const container = listRef.current;
-    const justFinishedLoading = wasLoading;
     const isPathChange = prevPathRef.current !== tab.path;
     prevPathRef.current = tab.path;
 
-    // パス変更 or ロード完了 → カーソルを中心にスクロール
-    // (navigateBackで2回loadDirectoryが呼ばれる問題を回避: 最後のロード完了時にスクロール)
-    const shouldCenter = isPathChange || justFinishedLoading;
+    // パス変更時のみカーソルを中心にスクロール
+    // 同一パスの再読み込み（ファイル操作後）はスクロール位置を保持し、カーソルが見えるように調整のみ
+    const shouldCenter = isPathChange;
 
     const doScroll = () => {
       const settings = useSettingsStore.getState();
@@ -482,7 +478,10 @@ export function Panel() {
 
       const state = useExplorerStore.getState();
       const activeTab = state.tabs.find((t) => t.id === state.activeTabId) || state.tabs[0];
-      const entries = activeTab.searchResults ?? activeTab.entries;
+      const baseEntries = activeTab.searchResults ?? activeTab.entries;
+      const entries = activeTab.searchResults
+        ? baseEntries
+        : applyFilters(baseEntries, activeTab.filter, useDirSizeStore.getState().sizes);
       const index = start.index;
 
       const indices =

@@ -564,12 +564,21 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         historyIndex = history.length - 1;
       }
 
+      // 同一パスの再読み込み（ファイル操作後）ではカーソルと選択を保持
+      const isSamePathReload = tab.path === path && !addToHistory;
+
       // キャッシュから表示状態を復元（戻る/進む・クリック操作共通）
       const cached = tab.displayStateCache.get(path);
-      const restoredCursor = cached ? Math.min(cached.cursorIndex, sorted.length - 1) : 0;
-      const restoredSelection = cached
-        ? new Set(cached.selectedIndices.filter((i) => i < sorted.length))
-        : new Set<number>();
+      const restoredCursor = isSamePathReload
+        ? Math.min(tab.cursorIndex, sorted.length - 1)
+        : cached
+          ? Math.min(cached.cursorIndex, sorted.length - 1)
+          : 0;
+      const restoredSelection = isSamePathReload
+        ? new Set(Array.from(tab.selectedIndices).filter((i) => i < sorted.length))
+        : cached
+          ? new Set(cached.selectedIndices.filter((i) => i < sorted.length))
+          : new Set<number>();
 
       set((s) => ({
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({
