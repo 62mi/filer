@@ -155,7 +155,7 @@ export function applyFilters(
 
 export const DEFAULT_FILTER: FilterState = { types: [], sizeRange: null, modifiedRange: null };
 
-function sortEntries(entries: FileEntry[], key: SortKey, order: SortOrder): FileEntry[] {
+export function sortEntries(entries: FileEntry[], key: SortKey, order: SortOrder): FileEntry[] {
   const dirSizes = useDirSizeStore.getState().sizes;
   return [...entries].sort((a, b) => {
     if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;

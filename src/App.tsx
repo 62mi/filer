@@ -15,6 +15,7 @@ import { SmartFolderEditor } from "./components/SmartFolderEditor/SmartFolderEdi
 import { StatusBar } from "./components/StatusBar";
 import { TabBar } from "./components/TabBar";
 import { TemplateManager } from "./components/TemplateManager";
+import { useFsWatcher } from "./hooks/useFsWatcher";
 import { useNativeDrop } from "./hooks/useNativeDrop";
 import { getTranslation } from "./i18n";
 import { useAiStore } from "./stores/aiStore";
@@ -42,6 +43,9 @@ function App() {
 
   // ネイティブドロップハンドラ（外部ファイルドロップ一元管理）
   useNativeDrop();
+
+  // ファイルシステム変更のリアルタイム監視
+  useFsWatcher();
 
   // 中クリック（ホイールクリック）: オートスクロール無効化 + 新しいタブで開く
   // data-mid-click-path 属性を持つ要素上で中クリック → そのパスで新タブ作成

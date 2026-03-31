@@ -1,6 +1,7 @@
 mod clipboard_watcher;
 mod commands;
 mod db;
+mod dir_watcher;
 #[cfg(windows)]
 mod jumplist;
 mod watcher;
@@ -17,6 +18,7 @@ use db::history::*;
 use db::rules::*;
 use db::smart_folder::*;
 use db::Database;
+use dir_watcher::*;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Manager};
@@ -135,6 +137,10 @@ pub fn run() {
             let watcher_manager = watcher::WatcherManager::new(handle.clone());
             watcher_manager.start()?;
             app.manage(watcher_manager);
+
+            // ディレクトリ変更監視（開いているタブのリアルタイム更新）
+            let dir_watcher = dir_watcher::DirWatcherManager::new(handle.clone());
+            app.manage(dir_watcher);
 
             // クリップボード監視を開始
             #[cfg(windows)]
@@ -315,6 +321,8 @@ pub fn run() {
             delete_custom_action,
             execute_custom_action,
             update_jump_list,
+            watch_directory,
+            unwatch_directory,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
