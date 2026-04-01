@@ -1,0 +1,83 @@
+name: Weekly Issue Workflow
+
+on:
+  schedule:
+    # 毎週月曜 09:00 JST (日曜 24:00 UTC)
+    - cron: "0 0 * * 1"
+  workflow_dispatch: # 手動トリガーも可能
+
+jobs:
+  process-issues:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get open issues
+        id: issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              sort: 'created',
+              direction: 'asc',
+              per_page: 5,
+            });
+
+            // PRを除外し、純粋なIssueのみ取得
+            const realIssues = issues.filter(i => !i.pull_request);
+
+            if (realIssues.length === 0) {
+              core.setOutput('has_issues', 'false');
+              core.setOutput('issue_list', '');
+              return;
+            }
+
+            const summary = realIssues.map(i =>
+              `- #${i.number}: ${i.title} (labels: ${i.labels.map(l => l.name).join(', ') || 'none'})`
+            ).join('\n');
+
+            core.setOutput('has_issues', 'true');
+            core.setOutput('issue_list', summary);
+            core.setOutput('issue_numbers', realIssues.map(i => i.number).join(','));
+
+      - name: Run Claude Code on issues
+        if: steps.issues.outputs.has_issues == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            あなたはTomaFilerプロジェクトの開発アシスタントです。
+            以下のオープンIssueを確認し、対応してください。
+
+            ## 現在のオープンIssue一覧
+            ${{ steps.issues.outputs.issue_list }}
+
+            ## 対応方針
+            1. 各Issueの内容を確認し、優先度と難易度を判断する
+            2. 対応可能なIssueから順に実装する
+            3. 各Issueに対して:
+               - 専用ブランチを作成する (例: feat/#123-feature-name)
+               - CLAUDE.mdのコーディング規約に従って実装する
+               - テスト (pnpm test) とリント (pnpm check) を実行して問題がないことを確認する
+               - コミットメッセージにIssue番号を含める (例: "fix #123: 説明")
+               - PRを作成する
+            4. 対応できないIssueにはコメントで状況を報告する
+
+            ## 注意事項
+            - masterへの直接コミットは禁止
+            - セキュリティ: APIキーやシークレットをコードに含めない
+            - パフォーマンス最優先の設計方針を守る
+            - 1回の実行で最大3件まで対応する
+
+      - name: No issues found
+        if: steps.issues.outputs.has_issues == 'false'
+        run: echo "対応が必要なオープンIssueはありません。"
