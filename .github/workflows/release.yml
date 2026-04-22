@@ -10,6 +10,12 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+      id-token: write
+
+    outputs:
+      version: ${{ steps.vars.outputs.version }}
+      unsigned-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+      release-notes: ${{ steps.changelog.outputs.notes }}
 
     steps:
       - uses: actions/checkout@v4
@@ -33,32 +39,112 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
+      - name: Extract variables
+        id: vars
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Extract release notes from CHANGELOG.md
         id: changelog
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          # [x.y.z] セクションの本文を抽出（次の ## まで）
+          VERSION="${{ steps.vars.outputs.version }}"
           NOTES=$(awk "/^## \\[${VERSION}\\]/{found=1; next} /^## \\[/{if(found) exit} found{print}" CHANGELOG.md)
           if [ -z "$NOTES" ]; then
             NOTES="リリースノートは CHANGELOG.md を参照してください。"
           fi
-          # multiline output
           {
             echo "notes<<EOF"
             echo "$NOTES"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Tauri app (unsigned)
+        run: pnpm tauri build
+
+      - name: Collect unsigned artifacts
+        shell: bash
+        run: |
+          VERSION="${{ steps.vars.outputs.version }}"
+          mkdir -p unsigned
+          cp "src-tauri/target/release/bundle/nsis/TomaFiler_${VERSION}_x64-setup.exe" "unsigned/"
+          cp "src-tauri/target/release/bundle/msi/TomaFiler_${VERSION}_x64_en-US.msi" "unsigned/"
+          ls -la unsigned/
+
+      - name: Upload unsigned artifacts
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Filer ${{ github.ref_name }}"
-          releaseBody: |
-            ${{ steps.changelog.outputs.notes }}
+          name: tomafiler-unsigned
+          path: unsigned/*
+          if-no-files-found: error
+          retention-days: 7
+
+  sign:
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      id-token: write
+      contents: read
+    # SignPath 未設定の場合はスキップして unsigned のまま release に進む
+    if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+
+    outputs:
+      signed: 'true'
+
+    steps:
+      - name: Submit signing request to SignPath
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
+          project-slug: '${{ vars.SIGNPATH_PROJECT_SLUG }}'
+          signing-policy-slug: '${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}'
+          github-artifact-id: '${{ needs.build.outputs.unsigned-artifact-id }}'
+          wait-for-completion: true
+          output-artifact-directory: 'signed'
+
+      - name: Upload signed artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tomafiler-signed
+          path: signed/*
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    needs: [build, sign]
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download signed artifacts (when SignPath is configured)
+        if: needs.sign.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: tomafiler-signed
+          path: release-assets
+
+      - name: Download unsigned artifacts (fallback)
+        if: needs.sign.result != 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: tomafiler-unsigned
+          path: release-assets
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Filer ${{ github.ref_name }}"
+          body: |
+            ${{ needs.build.outputs.release-notes }}
 
             ---
 
@@ -68,7 +154,8 @@ jobs:
 
             ### 動作環境
             - Windows 10/11 (64bit)
-          releaseDraft: false
+          files: release-assets/*
+          draft: false
           prerelease: false
 
       - name: Upload to Cloudflare R2
@@ -78,9 +165,9 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ needs.build.outputs.version }}"
           ENDPOINT="https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
-          aws s3 cp "src-tauri/target/release/bundle/nsis/TomaFiler_${VERSION}_x64-setup.exe" \
+          aws s3 cp "release-assets/TomaFiler_${VERSION}_x64-setup.exe" \
             "s3://filer/TomaFiler_${VERSION}_x64-setup.exe" --endpoint-url "$ENDPOINT"
-          aws s3 cp "src-tauri/target/release/bundle/msi/TomaFiler_${VERSION}_x64_en-US.msi" \
+          aws s3 cp "release-assets/TomaFiler_${VERSION}_x64_en-US.msi" \
             "s3://filer/TomaFiler_${VERSION}_x64_en-US.msi" --endpoint-url "$ENDPOINT"
