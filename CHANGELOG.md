@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### Added
+- Microsoft Store 経由の無料コード署名ワークフロー — `scripts/create-signing-cert.ps1` で自己署名 .pfx を生成、`scripts/sign-msix.ps1` で MSIX に署名。手順は `docs/microsoft-store-signing.md` を参照
+
+### Security
+- `*.pfx`, `*.p12`, `*.cer` を `.gitignore` に追加 — コード署名証明書の誤コミットを防止
+
 ## [1.6.0] - 2026-03-15
 
 ### Added

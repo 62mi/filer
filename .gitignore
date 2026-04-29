@@ -31,3 +31,8 @@ NUL
 
 # Dev assets
 image/
+
+# Code signing certificates (Microsoft Store distribution)
+*.pfx
+*.p12
+*.cer
