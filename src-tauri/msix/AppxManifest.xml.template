@@ -52,12 +52,7 @@
         Description="美しくて、ファイル整理が気持ちいいタブ型ファイラー"
         Square150x150Logo="images\Square150x150Logo.png"
         Square44x44Logo="images\Square44x44Logo.png"
-        BackgroundColor="transparent">
-        <uap:DefaultTile
-          Square71x71Logo="images\Square71x71Logo.png"
-          Square310x310Logo="images\Square310x310Logo.png" />
-        <uap:SplashScreen Image="images\Square150x150Logo.png" />
-      </uap:VisualElements>
+        BackgroundColor="transparent" />
 
       <Extensions>
         <uap5:Extension

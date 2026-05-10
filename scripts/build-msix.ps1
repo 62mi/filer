@@ -133,9 +133,7 @@ Get-ChildItem $releaseDir -Filter "*.dll" -ErrorAction SilentlyContinue | ForEac
 # アイコン
 $icons = @(
     "Square44x44Logo.png",
-    "Square71x71Logo.png",
     "Square150x150Logo.png",
-    "Square310x310Logo.png",
     "StoreLogo.png"
 )
 foreach ($icon in $icons) {
