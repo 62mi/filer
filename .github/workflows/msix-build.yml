@@ -6,15 +6,6 @@ name: MSIX Build (manual)
 
 on:
   workflow_dispatch:
-  # 検証用: feat/msstore-msix ブランチへの push でも起動
-  # マージ後はこのトリガーは不要になるため削除予定
-  push:
-    branches:
-      - feat/msstore-msix
-    paths:
-      - 'src-tauri/msix/**'
-      - 'scripts/build-msix.ps1'
-      - '.github/workflows/msix-build.yml'
 
 jobs:
   build-msix:
