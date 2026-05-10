@@ -1,0 +1,13 @@
+# デフォルトはテキスト自動判定 + LF 改行
+* text=auto eol=lf
+
+# PowerShell スクリプトは Windows でしか動かない前提で CRLF + ファイル自体は BOM 付き UTF-8 を維持
+# (Windows PowerShell 5.1 のパーサーが Shift-JIS と誤認識して日本語文字列が破損するのを防ぐため、
+#  ファイルは BOM 付き UTF-8 で保存する。コミット時は git がバイト透過で扱う)
+*.ps1   text eol=crlf
+*.psm1  text eol=crlf
+*.psd1  text eol=crlf
+
+# Windows 用バッチファイルは CRLF
+*.bat   text eol=crlf
+*.cmd   text eol=crlf

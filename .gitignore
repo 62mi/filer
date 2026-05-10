@@ -31,3 +31,6 @@ NUL
 
 # Dev assets
 image/
+
+# CI からダウンロードした成果物 (.msix 等)
+artifacts/

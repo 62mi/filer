@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  TomaFiler AppxManifest テンプレート
+
+  このファイルは scripts/build-msix.ps1 によりプレースホルダが置換されて
+  MSIX パッケージに同梱されます。直接編集する場合は __MSIX_*__ プレースホルダを
+  維持してください。
+
+  プレースホルダ:
+    __MSIX_IDENTITY_NAME__        Partner Center の Package/Identity/Name
+    __MSIX_IDENTITY_PUBLISHER__   Partner Center の Package/Identity/Publisher (CN=...)
+    __MSIX_VERSION__              4桁バージョン (例: 1.6.0.0) — tauri.conf.json から自動算出
+    __MSIX_PUBLISHER_DISPLAY__    Partner Center の PublisherDisplayName
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap5 rescap">
+
+  <Identity
+    Name="__MSIX_IDENTITY_NAME__"
+    Publisher="__MSIX_IDENTITY_PUBLISHER__"
+    Version="__MSIX_VERSION__"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>TomaFiler</DisplayName>
+    <PublisherDisplayName>__MSIX_PUBLISHER_DISPLAY__</PublisherDisplayName>
+    <Logo>images\StoreLogo.png</Logo>
+    <Description>美しくて、ファイル整理が気持ちいいタブ型ファイラー</Description>
+  </Properties>
+
+  <Resources>
+    <Resource Language="ja-JP" />
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+  <Applications>
+    <Application Id="TomaFiler" Executable="TomaFiler.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="TomaFiler"
+        Description="美しくて、ファイル整理が気持ちいいタブ型ファイラー"
+        Square150x150Logo="images\Square150x150Logo.png"
+        Square44x44Logo="images\Square44x44Logo.png"
+        BackgroundColor="transparent" />
+
+      <Extensions>
+        <uap5:Extension
+          Category="windows.startupTask"
+          Executable="TomaFiler.exe"
+          EntryPoint="Windows.FullTrustApplication">
+          <uap5:StartupTask
+            TaskId="TomaFilerStartup"
+            Enabled="false"
+            DisplayName="TomaFiler" />
+        </uap5:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>

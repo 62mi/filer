@@ -82,6 +82,56 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  build-msix:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    # MSIX Identity 値が repo Variables に未設定なら skip
+    if: ${{ vars.MSIX_IDENTITY_NAME != '' }}
+
+    outputs:
+      msix-artifact-id: ${{ steps.upload-msix.outputs.artifact-id }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: msix
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build MSIX
+        shell: pwsh
+        env:
+          MSIX_IDENTITY_NAME: ${{ vars.MSIX_IDENTITY_NAME }}
+          MSIX_IDENTITY_PUBLISHER: ${{ vars.MSIX_IDENTITY_PUBLISHER }}
+          MSIX_PUBLISHER_DISPLAY: ${{ vars.MSIX_PUBLISHER_DISPLAY }}
+        run: ./scripts/build-msix.ps1
+
+      - name: Upload MSIX artifact
+        id: upload-msix
+        uses: actions/upload-artifact@v4
+        with:
+          name: tomafiler-msix
+          path: src-tauri/target/msix/*.msix
+          if-no-files-found: error
+          retention-days: 30
+
   sign:
     needs: build
     runs-on: windows-latest
