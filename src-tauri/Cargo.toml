@@ -36,6 +36,7 @@ keyring = { version = "3", features = ["windows-native"] }
 tauri-plugin-drag = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
+portable-pty = "0.9"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"

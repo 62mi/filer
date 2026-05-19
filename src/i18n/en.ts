@@ -142,12 +142,7 @@ export const en: Translations = {
 
   terminal: {
     title: "Terminal",
-    placeholder: "Type a command (Enter to run)",
-    clearHint: "Clear log",
     closeHint: "Close",
-    runningHint: "Running...",
-    emptyHint: "Run PowerShell commands in the current folder. ↑/↓ to navigate history.",
-    exitCodeLabel: "Exit code",
   },
 
   columnHeader: {

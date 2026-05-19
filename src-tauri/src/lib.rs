@@ -13,7 +13,7 @@ use commands::fs::*;
 use commands::icons::*;
 use commands::media::*;
 use commands::system::*;
-use commands::terminal::*;
+use commands::terminal::{pty_close, pty_open, pty_resize, pty_write, PtyManager};
 use db::custom_action::*;
 use db::history::*;
 use db::rules::*;
@@ -131,6 +131,7 @@ pub fn run() {
             cache: std::sync::Mutex::new(std::collections::HashMap::new()),
         })
         .manage(CopyQueueManager::new())
+        .manage(PtyManager::new())
         .manage(commands::tab_drag::TabDragState::new())
         .setup(|app| {
             let handle = app.handle().clone();
@@ -254,7 +255,10 @@ pub fn run() {
             open_in_default_app,
             open_with_dialog,
             open_terminal,
-            run_terminal_command,
+            pty_open,
+            pty_write,
+            pty_resize,
+            pty_close,
             search_files,
             read_text_file,
             read_cloud_doc_id,

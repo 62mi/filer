@@ -1,55 +1,53 @@
-import { Loader2, Trash2, X } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { FitAddon } from "@xterm/addon-fit";
+import { Terminal } from "@xterm/xterm";
+import "@xterm/xterm/css/xterm.css";
+import { X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "../../i18n";
 import { useTerminalStore } from "../../stores/terminalStore";
+
+interface PtyDataPayload {
+  session_id: string;
+  data: string;
+}
+
+interface PtyExitPayload {
+  session_id: string;
+  exit_code: number | null;
+}
+
+// base64 → Uint8Array（PTY バイト列の復元用）
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const len = bin.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
 
 export function TerminalPanel() {
   const t = useTranslation();
   const isOpen = useTerminalStore((s) => s.isOpen);
   const height = useTerminalStore((s) => s.height);
-  const cwd = useTerminalStore((s) => s.cwd);
+  const initialCwd = useTerminalStore((s) => s.initialCwd);
   const shell = useTerminalStore((s) => s.shell);
-  const entries = useTerminalStore((s) => s.entries);
-  const running = useTerminalStore((s) => s.running);
 
   const close = useTerminalStore((s) => s.close);
   const setHeight = useTerminalStore((s) => s.setHeight);
   const setShell = useTerminalStore((s) => s.setShell);
-  const clear = useTerminalStore((s) => s.clear);
-  const runCommand = useTerminalStore((s) => s.runCommand);
-  const navigateHistory = useTerminalStore((s) => s.navigateHistory);
-  const resetHistoryCursor = useTerminalStore((s) => s.resetHistoryCursor);
+  const setSessionId = useTerminalStore((s) => s.setSessionId);
 
-  const prompt = shell === "cmd" ? ">" : "PS >";
-
-  const [draft, setDraft] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const logRef = useRef<HTMLDivElement>(null);
 
-  // パネルを開いたら入力にフォーカス
-  useEffect(() => {
-    if (isOpen) {
-      // 開いた直後はDOMマウントが先なので次フレームでフォーカス
-      const id = requestAnimationFrame(() => inputRef.current?.focus());
-      return () => cancelAnimationFrame(id);
-    }
-  }, [isOpen]);
-
-  // 新しい出力が追加されたら一番下にスクロール
-  useLayoutEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight;
-    }
-  }, [entries]);
-
-  // リサイズハンドル
+  // リサイズハンドルのドラッグ
   useEffect(() => {
     if (!dragging) return;
     const onMove = (e: MouseEvent) => {
-      // 画面下端からの距離 = 期待するパネル高さ
-      const newHeight = window.innerHeight - e.clientY;
-      setHeight(newHeight);
+      setHeight(window.innerHeight - e.clientY);
     };
     const onUp = () => setDragging(false);
     document.addEventListener("mousemove", onMove);
@@ -60,42 +58,141 @@ export function TerminalPanel() {
     };
   }, [dragging, setHeight]);
 
+  // xterm + PTY セッションの初期化／クリーンアップ
+  // isOpen / shell が変わるたびに再構築する
+  useEffect(() => {
+    if (!isOpen) return;
+    const containerEl = containerRef.current;
+    if (!containerEl) return;
+    if (!initialCwd) return;
+
+    const term = new Terminal({
+      cursorBlink: true,
+      fontFamily:
+        '"Cascadia Mono", "Cascadia Code", "Consolas", "Yu Gothic UI", "Meiryo", monospace',
+      fontSize: 13,
+      lineHeight: 1.2,
+      theme: {
+        background: "#1a1a1a",
+        foreground: "#e5e5e5",
+        cursor: "#e5e5e5",
+        selectionBackground: "#5c8bff66",
+      },
+      allowProposedApi: true,
+      scrollback: 5000,
+    });
+    const fit = new FitAddon();
+    term.loadAddon(fit);
+    term.open(containerEl);
+    // 次フレームで fit すると DOM サイズ計測が安定する
+    requestAnimationFrame(() => {
+      try {
+        fit.fit();
+      } catch {
+        // ignore
+      }
+    });
+    term.focus();
+
+    let disposed = false;
+    let dataUnlisten: UnlistenFn | null = null;
+    let exitUnlisten: UnlistenFn | null = null;
+
+    // 入力をPTYへ流す
+    const inputDisposable = term.onData((data) => {
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+      invoke("pty_write", { sessionId: sid, data }).catch(() => {
+        // best-effort
+      });
+    });
+
+    // 出力イベント購読 → xterm へ書き込み
+    listen<PtyDataPayload>("pty-data", (event) => {
+      if (event.payload.session_id !== sessionIdRef.current) return;
+      const bytes = base64ToBytes(event.payload.data);
+      term.write(bytes);
+    })
+      .then((un) => {
+        if (disposed) un();
+        else dataUnlisten = un;
+      })
+      .catch(() => {});
+
+    listen<PtyExitPayload>("pty-exit", (event) => {
+      if (event.payload.session_id !== sessionIdRef.current) return;
+      term.writeln("");
+      term.writeln(`\x1b[90m[Process exited: ${event.payload.exit_code ?? "?"}]\x1b[0m`);
+      sessionIdRef.current = null;
+      setSessionId(null);
+    })
+      .then((un) => {
+        if (disposed) un();
+        else exitUnlisten = un;
+      })
+      .catch(() => {});
+
+    // セッション起動
+    (async () => {
+      try {
+        const sid = await invoke<string>("pty_open", {
+          cwd: initialCwd,
+          shell,
+          cols: term.cols,
+          rows: term.rows,
+        });
+        if (disposed) {
+          // 起動完了前にアンマウントされた場合は即閉じる
+          invoke("pty_close", { sessionId: sid }).catch(() => {});
+          return;
+        }
+        sessionIdRef.current = sid;
+        setSessionId(sid);
+      } catch (err) {
+        term.writeln(
+          `\r\n\x1b[31m[Failed to start ${shell}: ${
+            err instanceof Error ? err.message : String(err)
+          }]\x1b[0m`,
+        );
+      }
+    })();
+
+    // コンテナのサイズ変動を検知して fit + PTY リサイズ
+    const ro = new ResizeObserver(() => {
+      if (disposed) return;
+      try {
+        fit.fit();
+      } catch {
+        return;
+      }
+      const sid = sessionIdRef.current;
+      if (sid) {
+        invoke("pty_resize", {
+          sessionId: sid,
+          cols: term.cols,
+          rows: term.rows,
+        }).catch(() => {});
+      }
+    });
+    ro.observe(containerEl);
+
+    return () => {
+      disposed = true;
+      ro.disconnect();
+      inputDisposable.dispose();
+      dataUnlisten?.();
+      exitUnlisten?.();
+      const sid = sessionIdRef.current;
+      sessionIdRef.current = null;
+      setSessionId(null);
+      if (sid) {
+        invoke("pty_close", { sessionId: sid }).catch(() => {});
+      }
+      term.dispose();
+    };
+  }, [isOpen, shell, initialCwd, setSessionId]);
+
   if (!isOpen) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cmd = draft.trim();
-    if (!cmd || running) return;
-    setDraft("");
-    resetHistoryCursor();
-
-    // ローカルで `clear` / `cls` をログクリアに割り当て（POSIX/Windows両方の感覚に合わせる）
-    if (cmd === "clear" || cmd === "cls") {
-      clear();
-      return;
-    }
-    await runCommand(cmd);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Tab") {
-      // フォーカスがパネル外に逃げないように吸収（補完は未対応）
-      e.preventDefault();
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setDraft(navigateHistory(-1, draft));
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setDraft(navigateHistory(1, draft));
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      close();
-    } else if (e.key === "l" && (e.ctrlKey || e.metaKey)) {
-      // Ctrl+L: ログクリア（ターミナル慣習）
-      e.preventDefault();
-      clear();
-    }
-  };
 
   return (
     <div
@@ -119,51 +216,29 @@ export function TerminalPanel() {
 
         {/* シェル切替セレクター */}
         <div className="ml-2 flex items-center gap-0.5 bg-[#1a1a1a] rounded p-0.5">
-          <button
-            type="button"
-            className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
-              shell === "powershell"
-                ? "bg-[var(--accent)] text-white"
-                : "text-[#999] hover:text-[#ccc]"
-            }`}
-            onClick={() => setShell("powershell")}
-            disabled={running}
-            title="PowerShell"
-          >
-            PowerShell
-          </button>
-          <button
-            type="button"
-            className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
-              shell === "cmd" ? "bg-[var(--accent)] text-white" : "text-[#999] hover:text-[#ccc]"
-            }`}
-            onClick={() => setShell("cmd")}
-            disabled={running}
-            title="cmd.exe"
-          >
-            cmd
-          </button>
+          {(["powershell", "cmd", "pwsh"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                shell === s
+                  ? "bg-[var(--accent)] text-white"
+                  : "text-[#999] hover:text-[#ccc]"
+              }`}
+              onClick={() => setShell(s)}
+              title={s === "pwsh" ? "PowerShell 7+" : s === "cmd" ? "cmd.exe" : "Windows PowerShell"}
+            >
+              {s === "pwsh" ? "pwsh" : s === "cmd" ? "cmd" : "PowerShell"}
+            </button>
+          ))}
         </div>
 
         <span className="mx-2 text-[#555]">|</span>
-        <span className="truncate text-[#9aa] font-mono" title={cwd}>
-          {cwd || "—"}
+        <span className="truncate text-[#9aa] font-mono" title={initialCwd}>
+          {initialCwd || "—"}
         </span>
-        {running && (
-          <span className="ml-2 flex items-center gap-1 text-[var(--accent)]">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            <span>{t.terminal.runningHint}</span>
-          </span>
-        )}
+
         <div className="flex-1" />
-        <button
-          type="button"
-          className="p-1 rounded hover:bg-[#3a3a3a] text-[#999]"
-          onClick={clear}
-          title={t.terminal.clearHint}
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
         <button
           type="button"
           className="p-1 rounded hover:bg-[#3a3a3a] text-[#999]"
@@ -174,60 +249,8 @@ export function TerminalPanel() {
         </button>
       </div>
 
-      {/* 出力ログ */}
-      <div
-        ref={logRef}
-        className="flex-1 min-h-0 overflow-y-auto px-3 py-2 font-mono text-[12px] leading-[1.5] whitespace-pre-wrap break-words"
-      >
-        {entries.length === 0 ? (
-          <div className="text-[#777] italic">{t.terminal.emptyHint}</div>
-        ) : (
-          entries.map((entry) => (
-            <div key={entry.id} className="mb-2">
-              {/* プロンプト行 */}
-              <div className="flex items-start gap-2">
-                <span className="text-[#7aa] shrink-0" title={entry.cwd}>
-                  {entry.shell === "cmd" ? ">" : "PS >"}
-                </span>
-                <span className="text-[#e8e8e8] break-all">{entry.command}</span>
-              </div>
-              {/* 標準出力 */}
-              {entry.stdout && <div className="text-[#d4d4d4]">{entry.stdout}</div>}
-              {/* 標準エラー */}
-              {entry.stderr && <div className="text-[#ff8a8a]">{entry.stderr}</div>}
-              {/* 終了コード（0以外のときだけ目立たせる） */}
-              {!entry.running && entry.exitCode !== null && entry.exitCode !== 0 && (
-                <div className="text-[#ff8a8a] text-[11px] mt-0.5">
-                  [{t.terminal.exitCodeLabel}: {entry.exitCode}]
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* 入力フォーム */}
-      <form
-        onSubmit={handleSubmit}
-        className="shrink-0 flex items-center px-3 py-1.5 bg-[#141414] border-t border-[#333]"
-      >
-        <span className="text-[#7aa] font-mono text-[12px] mr-2 shrink-0">{prompt}</span>
-        <input
-          ref={inputRef}
-          type="text"
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            resetHistoryCursor();
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder={t.terminal.placeholder}
-          disabled={running}
-          spellCheck={false}
-          autoComplete="off"
-          className="flex-1 bg-transparent border-0 outline-none font-mono text-[12px] text-[#e5e5e5] placeholder:text-[#555] disabled:opacity-50"
-        />
-      </form>
+      {/* xterm.js を載せるコンテナ */}
+      <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden px-2 py-1" />
     </div>
   );
 }
