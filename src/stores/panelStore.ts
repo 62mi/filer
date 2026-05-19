@@ -289,6 +289,8 @@ interface ExplorerStore {
   // Directory navigation
   loadDirectory: (path: string, addToHistory?: boolean, smooth?: boolean) => Promise<void>;
   refreshDirectory: () => Promise<void>;
+  /** 特定タブID のフォルダをバックグラウンドリフレッシュ（リアルタイム更新用） */
+  refreshTabByPath: (folderPath: string) => Promise<void>;
   /** 現在のソートキー/順序でエントリを再ソート（dirSizes更新時などに使用） */
   resortEntries: () => void;
   navigateUp: () => Promise<void>;
@@ -629,6 +631,45 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   refreshDirectory: async () => {
     const tab = get().getActiveTab();
     await get().loadDirectory(tab.path, false);
+  },
+
+  refreshTabByPath: async (folderPath) => {
+    // 指定パスを表示している全タブをリフレッシュ（smooth=true でチカチカ防止）
+    const { tabs, showHidden } = get();
+    const targetTabs = tabs.filter((t) => t.path === folderPath);
+    if (targetTabs.length === 0) return;
+
+    let entries: FileEntry[];
+    try {
+      entries = await invoke<FileEntry[]>("list_directory", { path: folderPath });
+    } catch {
+      // フォルダが消えた等のエラーは無視（手動リフレッシュで対応）
+      return;
+    }
+    const filtered = showHidden ? entries : entries.filter((e) => !e.is_hidden);
+
+    set((s) => ({
+      tabs: s.tabs.map((t) => {
+        if (t.path !== folderPath) return t;
+        // リネーム中のインデックスが範囲外にならないよう調整
+        const sorted = sortEntries(filtered, t.sortKey, t.sortOrder);
+        const newRenamingIndex =
+          t.renamingIndex !== null && t.renamingIndex < sorted.length
+            ? t.renamingIndex
+            : null;
+        return {
+          ...t,
+          entries: sorted,
+          renamingIndex: newRenamingIndex,
+          // カーソルが範囲外になっていたら末尾に収める
+          cursorIndex: Math.min(t.cursorIndex, Math.max(0, sorted.length - 1)),
+          // 選択インデックスも範囲外を除去
+          selectedIndices: new Set(
+            Array.from(t.selectedIndices).filter((i) => i < sorted.length),
+          ),
+        };
+      }),
+    }));
   },
 
   resortEntries: () => {

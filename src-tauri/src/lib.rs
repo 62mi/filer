@@ -1,6 +1,7 @@
 mod clipboard_watcher;
 mod commands;
 mod db;
+mod folder_view_watcher;
 #[cfg(windows)]
 mod jumplist;
 mod watcher;
@@ -135,6 +136,10 @@ pub fn run() {
             let watcher_manager = watcher::WatcherManager::new(handle.clone());
             watcher_manager.start()?;
             app.manage(watcher_manager);
+
+            // フォルダビューのリアルタイム更新用ウォッチャーを初期化
+            let folder_view_watcher = folder_view_watcher::FolderViewWatcher::new(handle.clone());
+            app.manage(folder_view_watcher);
 
             // クリップボード監視を開始
             #[cfg(windows)]
@@ -315,6 +320,8 @@ pub fn run() {
             delete_custom_action,
             execute_custom_action,
             update_jump_list,
+            folder_view_watcher::watch_folder,
+            folder_view_watcher::unwatch_folder,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {

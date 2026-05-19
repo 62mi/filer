@@ -1,5 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { BookmarkBar } from "./components/BookmarkBar";
 import { CommandPalette } from "./components/CommandPalette";
 import { CopyQueuePanel } from "./components/CopyQueue";
@@ -106,6 +108,60 @@ function App() {
       if (path) {
         useExplorerStore.getState().addTab(path);
       }
+    });
+    return () => {
+      unlisten.then((f) => f()).catch(() => {});
+    };
+  }, []);
+
+  // ── リアルタイムフォルダ監視 ──
+  // 全タブが表示しているフォルダを Rust 側に watch させ、
+  // タブのパスが変わったら差分だけ watch/unwatch する。
+
+  // 前回のwatchedパス一覧を保持（差分更新用）
+  const watchedPathsRef = useRef<Set<string>>(new Set());
+
+  // タブが参照しているパスのリストを購読（useShallowでreference安定化）
+  const tabPaths = useExplorerStore(useShallow((s) => s.tabs.map((t) => t.path)));
+
+  useEffect(() => {
+    const newPaths = new Set(
+      tabPaths.filter(
+        (p) =>
+          p &&
+          !p.startsWith("home:") &&
+          !p.startsWith("smart-folder:"),
+      ),
+    );
+    const prevPaths = watchedPathsRef.current;
+
+    // 新たに追加されたパスを watch
+    for (const p of newPaths) {
+      if (!prevPaths.has(p)) {
+        invoke("watch_folder", { folderPath: p }).catch((err: unknown) => {
+          // エラーは静かに無視（権限のないフォルダ等）
+          console.warn(
+            `[FolderWatch] watch failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+      }
+    }
+
+    // 不要になったパスを unwatch
+    for (const p of prevPaths) {
+      if (!newPaths.has(p)) {
+        invoke("unwatch_folder", { folderPath: p }).catch(() => {});
+      }
+    }
+
+    watchedPathsRef.current = newPaths;
+  }, [tabPaths]);
+
+  // folder-changed イベントを受け取って該当タブをリフレッシュ
+  useEffect(() => {
+    const unlisten = listen<{ folder_path: string }>("folder-changed", (event) => {
+      const { folder_path } = event.payload;
+      useExplorerStore.getState().refreshTabByPath(folder_path);
     });
     return () => {
       unlisten.then((f) => f()).catch(() => {});
