@@ -1011,6 +1011,43 @@ export function Panel() {
     [tab.path, loadDirectory, schedulePatternRecheck],
   );
 
+  // 新規フォルダを作成してドラッグしたファイルをまとめて移動する
+  const handleCreateFolderAndMove = useCallback(
+    async (folderName: string) => {
+      const store = useSuggestionStore.getState();
+      const paths = store.draggedPaths;
+      if (paths.length === 0) return;
+
+      try {
+        const createdFolderPath: string = await invoke("create_folder_and_move", {
+          destDir: tab.path,
+          folderName,
+          sources: paths,
+        });
+
+        // Undo用エントリ: folderize相当として記録
+        useUndoStore.getState().pushAction({
+          type: "folderize",
+          entries: paths.map((p) => {
+            const fileName = p.substring(p.lastIndexOf("\\") + 1);
+            return { sourcePath: p, destPath: `${createdFolderPath}\\${fileName}` };
+          }),
+          createdFolder: createdFolderPath,
+        });
+
+        toast.success(t.dragCreateFolder.success.replace("{name}", folderName));
+        await loadDirectory(tab.path, false);
+      } catch (err: unknown) {
+        toast.error(
+          `${t.dragCreateFolder.error}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      } finally {
+        useSuggestionStore.getState().hide();
+      }
+    },
+    [tab.path, loadDirectory, t.dragCreateFolder.success, t.dragCreateFolder.error],
+  );
+
   // Determine which paths are "cut" for visual feedback
   const cutPaths = clipboard?.operation === "cut" ? new Set(clipboard.paths) : new Set<string>();
 
@@ -1208,7 +1245,10 @@ export function Panel() {
       />
 
       {/* 移動先サジェストポップアップ */}
-      <DragSuggestion onSelectDestination={handleSuggestionSelect} />
+      <DragSuggestion
+        onSelectDestination={handleSuggestionSelect}
+        onCreateFolderAndMove={handleCreateFolderAndMove}
+      />
 
       {/* ラバーバンド選択矩形 */}
       {rubberBandRect && rubberBandRect.width > 0 && rubberBandRect.height > 0 && (

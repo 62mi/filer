@@ -805,6 +805,75 @@ fn create_nodes_recursive(
     Ok(())
 }
 
+/// 新しいフォルダを作成してファイル群をまとめて移動する
+/// dest_dir: 作成先の親ディレクトリ
+/// folder_name: 作成するフォルダ名（ユーザー入力値 or デフォルト名）
+/// sources: 移動するファイルパスのリスト
+/// 戻り値: 作成されたフォルダのパス
+#[tauri::command]
+pub fn create_folder_and_move(
+    dest_dir: String,
+    folder_name: String,
+    sources: Vec<String>,
+) -> Result<String, String> {
+    // フォルダ名バリデーション（パストラバーサル防止）
+    validate_name(&folder_name)?;
+
+    let parent = Path::new(&dest_dir);
+
+    // 親ディレクトリの存在確認
+    if !parent.is_dir() {
+        return Err(format!("ディレクトリが見つかりません: {}", dest_dir));
+    }
+
+    // 重複しないフォルダパスを生成
+    let folder_path = generate_unique_path(parent, std::ffi::OsStr::new(&folder_name), true);
+
+    // パストラバーサル防止: folder の parent が canonical_parent と一致することを確認
+    // Windows の canonicalize() は \\?\ 接頭辞を返すため、両辺を canonicalize してから比較する
+    let canonical_parent = parent
+        .canonicalize()
+        .map_err(|e| format!("パスの正規化に失敗: {}", e))?;
+    if let Some(fp) = folder_path.parent() {
+        let fp_canonical = fp
+            .canonicalize()
+            .map_err(|e| format!("パスの正規化に失敗: {}", e))?;
+        if fp_canonical != canonical_parent {
+            return Err("無効なパスです".to_string());
+        }
+    }
+
+    // フォルダ作成
+    fs::create_dir_all(&folder_path)
+        .map_err(|e| format!("フォルダ作成に失敗: {}", e))?;
+
+    // ファイルを移動
+    for src_str in &sources {
+        let src = Path::new(src_str);
+        let file_name = src.file_name().ok_or("無効なファイル名です")?;
+        let dest = generate_unique_path(&folder_path, file_name, src.is_dir());
+        match fs::rename(src, &dest) {
+            Ok(()) => {}
+            Err(_) => {
+                // クロスドライブ等: コピー→削除
+                if src.is_dir() {
+                    copy_dir_recursive(src, &dest)
+                        .map_err(|e| format!("移動に失敗 {}: {}", src_str, e))?;
+                    fs::remove_dir_all(src)
+                        .map_err(|e| format!("元フォルダ削除に失敗 {}: {}", src_str, e))?;
+                } else {
+                    fs::copy(src, &dest)
+                        .map_err(|e| format!("移動に失敗 {}: {}", src_str, e))?;
+                    fs::remove_file(src)
+                        .map_err(|e| format!("元ファイル削除に失敗 {}: {}", src_str, e))?;
+                }
+            }
+        }
+    }
+
+    Ok(folder_path.to_string_lossy().to_string())
+}
+
 /// 画像を回転・反転して上書き保存する
 #[tauri::command]
 pub async fn transform_image(

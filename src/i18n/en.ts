@@ -516,6 +516,16 @@ export const en: Translations = {
     placeholderSize: "Bytes",
   },
 
+  dragCreateFolder: {
+    header: "Move into new folder",
+    placeholder: "Folder name",
+    defaultName: "New Folder",
+    create: "Create & Move",
+    cancel: "Cancel",
+    success: 'Created "{name}" and moved files',
+    error: "Failed to create folder",
+  },
+
   imageControls: {
     rotateCcw: "Rotate left",
     rotateCw: "Rotate right",
