@@ -540,6 +540,17 @@ export const ja = {
     placeholderSize: "バイト数",
   },
 
+  // ── ドラッグ新規フォルダ作成 ──
+  dragCreateFolder: {
+    header: "新しいフォルダに入れる",
+    placeholder: "フォルダ名",
+    defaultName: "新しいフォルダ",
+    create: "作成して移動",
+    cancel: "キャンセル",
+    success: "「{name}」を作成してファイルを移動しました",
+    error: "フォルダ作成に失敗しました",
+  },
+
   // ── 画像操作 ──
   imageControls: {
     rotateCcw: "左に回転",

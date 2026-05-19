@@ -1,9 +1,12 @@
-import { Bookmark, Clock, Folder, History } from "lucide-react";
+import { Bookmark, Clock, Folder, FolderPlus, History, X } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "../../i18n";
 import { type SuggestionItem, useSuggestionStore } from "../../stores/suggestionStore";
 
 interface DragSuggestionProps {
   onSelectDestination: (destPath: string) => void;
+  /** 「新規フォルダ作成して移動」アクション */
+  onCreateFolderAndMove: (folderName: string) => void;
 }
 
 function SourceBadge({ source }: { source: SuggestionItem["source"] }) {
@@ -19,13 +22,20 @@ function SourceBadge({ source }: { source: SuggestionItem["source"] }) {
   }
 }
 
-export function DragSuggestion({ onSelectDestination }: DragSuggestionProps) {
+export function DragSuggestion({ onSelectDestination, onCreateFolderAndMove }: DragSuggestionProps) {
+  const t = useTranslation();
   const visible = useSuggestionStore((s) => s.visible);
   const items = useSuggestionStore((s) => s.items);
   const selectedIndex = useSuggestionStore((s) => s.selectedIndex);
   const position = useSuggestionStore((s) => s.position);
+  const createFolderMode = useSuggestionStore((s) => s.createFolderMode);
+  const folderNameInput = useSuggestionStore((s) => s.folderNameInput);
   const setSelectedIndex = useSuggestionStore((s) => s.setSelectedIndex);
+  const openCreateFolderMode = useSuggestionStore((s) => s.openCreateFolderMode);
+  const closeCreateFolderMode = useSuggestionStore((s) => s.closeCreateFolderMode);
+  const setFolderNameInput = useSuggestionStore((s) => s.setFolderNameInput);
   const panelRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // ビューポート端の自動調整
   useEffect(() => {
@@ -38,9 +48,40 @@ export function DragSuggestion({ onSelectDestination }: DragSuggestionProps) {
     if (rect.bottom > window.innerHeight) {
       el.style.top = `${window.innerHeight - rect.height - 8}px`;
     }
-  }, [visible]);
+  }, [visible, createFolderMode]);
 
-  if (!visible || items.length === 0) return null;
+  // フォルダ作成モードに入ったら入力欄にフォーカス
+  useEffect(() => {
+    if (createFolderMode && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [createFolderMode]);
+
+  // items が空でも「新規フォルダに入れる」アクションのために表示する
+  if (!visible) return null;
+
+  const handleCreateFolderClick = () => {
+    setFolderNameInput(t.dragCreateFolder.defaultName);
+    openCreateFolderMode();
+  };
+
+  const handleCreateFolderSubmit = () => {
+    const name = folderNameInput.trim();
+    if (!name) return;
+    onCreateFolderAndMove(name);
+    closeCreateFolderMode();
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleCreateFolderSubmit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closeCreateFolderMode();
+    }
+  };
 
   return (
     <div
@@ -78,6 +119,71 @@ export function DragSuggestion({ onSelectDestination }: DragSuggestionProps) {
           <SourceBadge source={item.source} />
         </div>
       ))}
+
+      {/* 新規フォルダ作成セクション */}
+      <div className="border-t border-[#f0f0f0] mt-1 pt-1">
+        {!createFolderMode ? (
+          /* 「新規フォルダに入れる」: ドロップで作成 + F2リネームモード起動 */
+          <button
+            type="button"
+            data-drop-zone="create-folder"
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-left transition-colors duration-75 hover:bg-[#f0f0f0] text-[#0078d4]"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleCreateFolderClick();
+            }}
+          >
+            <FolderPlus className="w-4 h-4 shrink-0" />
+            <span className="text-sm font-medium">{t.dragCreateFolder.header}</span>
+          </button>
+        ) : (
+          /* フォルダ名入力フォーム */
+          <div className="px-3 py-2">
+            <div className="text-[10px] font-semibold text-[#999] uppercase tracking-wider mb-1.5">
+              {t.dragCreateFolder.header}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <input
+                ref={inputRef}
+                type="text"
+                value={folderNameInput}
+                onChange={(e) => setFolderNameInput(e.target.value)}
+                onKeyDown={handleInputKeyDown}
+                placeholder={t.dragCreateFolder.placeholder}
+                className="flex-1 min-w-0 text-sm border border-[#d0d0d0] rounded px-2 py-1 outline-none focus:border-[#0078d4] focus:ring-1 focus:ring-[#0078d4]"
+                onMouseDown={(e) => e.stopPropagation()}
+              />
+              {/* 作成ボタン */}
+              <button
+                type="button"
+                className="shrink-0 text-xs font-medium px-2 py-1 bg-[#0078d4] text-white rounded hover:bg-[#106ebe] transition-colors disabled:opacity-40"
+                disabled={!folderNameInput.trim()}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCreateFolderSubmit();
+                }}
+              >
+                {t.dragCreateFolder.create}
+              </button>
+              {/* キャンセルボタン */}
+              <button
+                type="button"
+                className="shrink-0 p-1 text-[#999] hover:text-[#333] transition-colors rounded"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  closeCreateFolderMode();
+                }}
+                title={t.dragCreateFolder.cancel}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* フッター */}
       <div className="px-3 py-1 text-[9px] text-[#bbb] border-t border-[#f0f0f0] text-center">

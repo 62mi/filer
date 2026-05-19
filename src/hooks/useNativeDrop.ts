@@ -36,6 +36,7 @@ const ZONE_STYLES: Record<string, { bg: string; shadow: string }> = {
   "bookmark-folder": { bg: "rgba(0,120,212,0.20)", shadow: "" },
   "sidebar-trash": { bg: "rgba(220,38,38,0.15)", shadow: "inset 0 0 0 1.5px #dc2626" },
   suggestion: { bg: "#cce8ff", shadow: "" },
+  "create-folder": { bg: "rgba(0,120,212,0.20)", shadow: "inset 0 0 0 1.5px #0078d4" },
 };
 
 /** ハイライト付与 / 解除（インラインスタイルで確実に適用） */
@@ -161,6 +162,12 @@ export async function handleNativeDrop(paths: string[], x: number, y: number) {
       break;
     }
 
+    case "create-folder": {
+      await handleCreateFolderDrop(paths);
+      useSuggestionStore.getState().hide();
+      break;
+    }
+
     default:
       // 不明なゾーン: パネル背景扱い
       await handlePanelBgDrop(paths);
@@ -226,6 +233,37 @@ async function handleTrashDrop(paths: string[]) {
 }
 
 /** パネル背景へのドロップ: 現在ディレクトリに移動 */
+/** 「新しいフォルダに入れる」へのドロップ: 新フォルダ作成 + ファイル移動 + F2リネームモード起動 */
+async function handleCreateFolderDrop(paths: string[]) {
+  const state = useExplorerStore.getState();
+  const tab = state.tabs.find((t) => t.id === state.activeTabId) || state.tabs[0];
+  const defaultName = "新しいフォルダ";
+  try {
+    const createdFolderPath: string = await invoke("create_folder_and_move", {
+      destDir: tab.path,
+      folderName: defaultName,
+      sources: paths,
+    });
+    useUndoStore.getState().pushAction({
+      type: "folderize",
+      entries: paths.map((p) => ({
+        sourcePath: p,
+        destPath: `${createdFolderPath}\\${getFileName(p)}`,
+      })),
+      createdFolder: createdFolderPath,
+    });
+    // 作成したフォルダを pendingRenamePath にセット → loadDirectory後に自動でF2モード起動
+    useExplorerStore.setState((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === state.activeTabId ? { ...t, pendingRenamePath: createdFolderPath } : t,
+      ),
+    }));
+    await state.loadDirectory(tab.path, false);
+  } catch (err: unknown) {
+    toast.error(`フォルダ作成に失敗: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 async function handlePanelBgDrop(paths: string[]) {
   const state = useExplorerStore.getState();
   const tab = state.tabs.find((t) => t.id === state.activeTabId) || state.tabs[0];

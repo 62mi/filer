@@ -309,6 +309,7 @@ pub fn run() {
             check_ffmpeg_available,
             get_google_docs_thumbnails,
             check_google_drive_status,
+            create_folder_and_move,
             save_temp_drag_icon,
             search_file_contents,
             save_smart_folder,

@@ -26,6 +26,10 @@ interface SuggestionStore {
   loading: boolean;
   draggedPaths: string[];
   position: { x: number; y: number };
+  /** 新規フォルダ作成モード: 入力UIを展開する */
+  createFolderMode: boolean;
+  /** フォルダ名入力値 */
+  folderNameInput: string;
 
   fetchSuggestions: (
     extensions: string[],
@@ -38,6 +42,9 @@ interface SuggestionStore {
   selectPrev: () => void;
   getSelected: () => SuggestionItem | null;
   setSelectedIndex: (index: number) => void;
+  openCreateFolderMode: () => void;
+  closeCreateFolderMode: () => void;
+  setFolderNameInput: (name: string) => void;
 }
 
 function shortenPath(fullPath: string): string {
@@ -58,6 +65,8 @@ export const useSuggestionStore = create<SuggestionStore>((set, get) => ({
   loading: false,
   draggedPaths: [],
   position: { x: 0, y: 0 },
+  createFolderMode: false,
+  folderNameInput: "",
 
   fetchSuggestions: async (extensions, sourceDir, draggedPaths) => {
     set({ loading: true, draggedPaths });
@@ -151,12 +160,19 @@ export const useSuggestionStore = create<SuggestionStore>((set, get) => ({
   },
 
   show: (x, y) => {
-    if (get().items.length > 0) {
-      set({ visible: true, position: { x, y } });
-    }
+    // items が空でも「新規フォルダに入れる」アクションのために常に表示する
+    set({ visible: true, position: { x, y } });
   },
 
-  hide: () => set({ visible: false, items: [], selectedIndex: 0, draggedPaths: [] }),
+  hide: () =>
+    set({
+      visible: false,
+      items: [],
+      selectedIndex: 0,
+      draggedPaths: [],
+      createFolderMode: false,
+      folderNameInput: "",
+    }),
 
   selectNext: () => {
     const { items, selectedIndex } = get();
@@ -178,4 +194,8 @@ export const useSuggestionStore = create<SuggestionStore>((set, get) => ({
   },
 
   setSelectedIndex: (index) => set({ selectedIndex: index }),
+
+  openCreateFolderMode: () => set({ createFolderMode: true }),
+  closeCreateFolderMode: () => set({ createFolderMode: false, folderNameInput: "" }),
+  setFolderNameInput: (name) => set({ folderNameInput: name }),
 }));
