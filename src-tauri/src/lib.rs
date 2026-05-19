@@ -13,6 +13,7 @@ use commands::fs::*;
 use commands::icons::*;
 use commands::media::*;
 use commands::system::*;
+use commands::terminal::*;
 use db::custom_action::*;
 use db::history::*;
 use db::rules::*;
@@ -253,6 +254,7 @@ pub fn run() {
             open_in_default_app,
             open_with_dialog,
             open_terminal,
+            run_terminal_command,
             search_files,
             read_text_file,
             read_cloud_doc_id,

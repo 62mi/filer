@@ -141,6 +141,18 @@ export const ja = {
     aiUsageTooltip: "AI使用量 (クリックで設定)",
     togglePreview: "プレビュー切替 (Alt+P)",
     copyInProgress: "件のコピー進行中",
+    toggleTerminal: "ターミナル切替 (Ctrl+`)",
+  },
+
+  // ── ターミナル ──
+  terminal: {
+    title: "ターミナル",
+    placeholder: "コマンドを入力 (Enter で実行)",
+    clearHint: "ログをクリア",
+    closeHint: "閉じる",
+    runningHint: "実行中...",
+    emptyHint: "現在のフォルダで PowerShell コマンドを実行します。↑↓で履歴。",
+    exitCodeLabel: "終了コード",
   },
 
   // ── 列ヘッダー ──

@@ -6,4 +6,5 @@ pub mod icons;
 pub mod media;
 pub mod system;
 pub mod tab_drag;
+pub mod terminal;
 pub mod window;

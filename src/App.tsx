@@ -17,12 +17,14 @@ import { SmartFolderEditor } from "./components/SmartFolderEditor/SmartFolderEdi
 import { StatusBar } from "./components/StatusBar";
 import { TabBar } from "./components/TabBar";
 import { TemplateManager } from "./components/TemplateManager";
+import { TerminalPanel } from "./components/Terminal";
 import { useNativeDrop } from "./hooks/useNativeDrop";
 import { getTranslation } from "./i18n";
 import { useAiStore } from "./stores/aiStore";
 import { useCopyQueueStore } from "./stores/copyQueueStore";
 import { useExplorerStore } from "./stores/panelStore";
 import { useRuleSuggestionStore } from "./stores/ruleSuggestionStore";
+import { useTerminalStore } from "./stores/terminalStore";
 import { useThemeStore } from "./stores/themeStore";
 import { toast, useToastStore } from "./stores/toastStore";
 
@@ -44,6 +46,20 @@ function App() {
 
   // ネイティブドロップハンドラ（外部ファイルドロップ一元管理）
   useNativeDrop();
+
+  // ターミナル トグル: Ctrl+` （Backquote）。現在タブのパスで開く
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.code === "Backquote") {
+        e.preventDefault();
+        const current = useExplorerStore.getState();
+        const activeTab = current.tabs.find((tt) => tt.id === current.activeTabId) ?? current.tabs[0];
+        useTerminalStore.getState().toggle(activeTab?.path);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   // 中クリック（ホイールクリック）: オートスクロール無効化 + 新しいタブで開く
   // data-mid-click-path 属性を持つ要素上で中クリック → そのパスで新タブ作成
@@ -307,6 +323,9 @@ function App() {
           </>
         )}
       </div>
+
+      {/* Terminal panel (status bar の上に配置) */}
+      <TerminalPanel />
 
       {/* Status bar */}
       <StatusBar />
