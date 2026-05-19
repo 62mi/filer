@@ -170,6 +170,39 @@ export async function handleNativeDrop(paths: string[], x: number, y: number) {
 
 /** ゴミ箱ドロップ: ファイルをゴミ箱に送る */
 async function handleTrashDrop(paths: string[]) {
+  const state = useExplorerStore.getState();
+  const tab = state.tabs.find((t) => t.id === state.activeTabId) || state.tabs[0];
+  const displayEntries = tab.searchResults ?? tab.entries;
+
+  // 削除後にフォーカスするファイルを事前に決定する（隣接ファイルを選択）
+  const pathSet = new Set(paths.map((p) => p.toLowerCase()));
+  const deletedIndices: number[] = [];
+  for (let i = 0; i < displayEntries.length; i++) {
+    if (pathSet.has(displayEntries[i].path.toLowerCase())) {
+      deletedIndices.push(i);
+    }
+  }
+  const deletedIdxSet = new Set(deletedIndices);
+  const maxDeletedIdx = deletedIndices.length > 0 ? Math.max(...deletedIndices) : -1;
+  let nextFocusPath: string | undefined;
+  if (maxDeletedIdx >= 0) {
+    for (let i = maxDeletedIdx + 1; i < displayEntries.length; i++) {
+      if (!deletedIdxSet.has(i)) {
+        nextFocusPath = displayEntries[i].path;
+        break;
+      }
+    }
+    if (!nextFocusPath) {
+      const minDeletedIdx = Math.min(...deletedIndices);
+      for (let i = minDeletedIdx - 1; i >= 0; i--) {
+        if (!deletedIdxSet.has(i)) {
+          nextFocusPath = displayEntries[i].path;
+          break;
+        }
+      }
+    }
+  }
+
   try {
     const result = await invoke<{ succeeded: string[]; failed: [string, string][] }>(
       "delete_files",
@@ -184,7 +217,9 @@ async function handleTrashDrop(paths: string[]) {
     if (result.failed.length > 0) {
       toast.error(`${result.failed.length}件の削除に失敗: ${result.failed[0][1]}`);
     }
-    useExplorerStore.getState().refreshDirectory();
+    // 削除後は隣接ファイルをフォーカス
+    const tabPath = (useExplorerStore.getState().tabs.find((t) => t.id === useExplorerStore.getState().activeTabId) || useExplorerStore.getState().tabs[0]).path;
+    await useExplorerStore.getState().loadDirectory(tabPath, false, false, nextFocusPath);
   } catch (err: unknown) {
     toast.error(`ゴミ箱への移動に失敗: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -279,7 +314,10 @@ async function handleFolderize(dragPaths: string[], targetPath: string) {
       createdFolder: folderPath,
     });
 
-    useExplorerStore.getState().refreshDirectory();
+    // グループ化後: 作成されたフォルダをフォーカス
+    const state = useExplorerStore.getState();
+    const tab = state.tabs.find((t) => t.id === state.activeTabId) || state.tabs[0];
+    await state.loadDirectory(tab.path, false, false, folderPath);
   } catch (err: unknown) {
     toast.error(`グループ化に失敗: ${err instanceof Error ? err.message : String(err)}`);
   }
