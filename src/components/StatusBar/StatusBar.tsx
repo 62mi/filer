@@ -1,10 +1,11 @@
-import { Sparkles } from "lucide-react";
+import { Sparkles, Terminal } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "../../i18n";
 import { useAiStore } from "../../stores/aiStore";
 import { useDirSizeStore } from "../../stores/dirSizeStore";
 import { applyFilters, useExplorerStore } from "../../stores/panelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { useTerminalStore } from "../../stores/terminalStore";
 
 import { formatFileSize } from "../../utils/format";
 import { CopyQueueMiniIndicator } from "../CopyQueue";
@@ -17,6 +18,7 @@ export function StatusBar() {
   const usageInfo = useAiStore((s) => s.usageInfo);
   const hasApiKey = useAiStore((s) => s.hasApiKey);
   const openSettings = useSettingsStore((s) => s.openSettings);
+  const terminalOpen = useTerminalStore((s) => s.isOpen);
   const entries = tab.entries;
   const dirSizes = useDirSizeStore((s) => s.sizes);
   const filteredEntries = useMemo(
@@ -85,6 +87,18 @@ export function StatusBar() {
       )}
 
       <div className="flex-1" />
+
+      {/* ターミナルトグル */}
+      <button
+        type="button"
+        className={`flex items-center px-1.5 py-0.5 mr-2 rounded hover:bg-[var(--chrome-hover)] transition-colors ${
+          terminalOpen ? "text-[var(--accent)]" : "text-[var(--chrome-text-dim)]"
+        }`}
+        onClick={() => useTerminalStore.getState().toggle(tab.path)}
+        title={t.statusBar.toggleTerminal}
+      >
+        <Terminal className="w-3.5 h-3.5" />
+      </button>
 
       {/* コピーキュー進捗インジケータ */}
       <CopyQueueMiniIndicator />

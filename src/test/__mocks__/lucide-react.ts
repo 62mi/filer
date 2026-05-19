@@ -81,6 +81,7 @@ export const Save = icon("Save");
 export const Search = icon("Search");
 export const Send = icon("Send");
 export const Settings = icon("Settings");
+export const Terminal = icon("Terminal");
 export const Sparkles = icon("Sparkles");
 export const Star = icon("Star");
 export const ToggleLeft = icon("ToggleLeft");
