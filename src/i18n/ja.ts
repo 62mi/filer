@@ -147,12 +147,7 @@ export const ja = {
   // ── ターミナル ──
   terminal: {
     title: "ターミナル",
-    placeholder: "コマンドを入力 (Enter で実行)",
-    clearHint: "ログをクリア",
     closeHint: "閉じる",
-    runningHint: "実行中...",
-    emptyHint: "現在のフォルダで PowerShell コマンドを実行します。↑↓で履歴。",
-    exitCodeLabel: "終了コード",
   },
 
   // ── 列ヘッダー ──
