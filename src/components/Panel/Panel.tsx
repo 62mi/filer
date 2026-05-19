@@ -480,7 +480,12 @@ export function Panel() {
 
       const state = useExplorerStore.getState();
       const activeTab = state.tabs.find((t) => t.id === state.activeTabId) || state.tabs[0];
-      const entries = activeTab.searchResults ?? activeTab.entries;
+      // フィルタ状態でも正しいエントリを参照するため、displayEntries と同じ計算を行う。
+      // searchResults があればそのまま使い、なければ applyFilters を適用する。
+      // （activeTab.entries のみだとフィルタ外のファイルを誤って参照してしまう）
+      const entries = activeTab.searchResults
+        ? activeTab.searchResults
+        : applyFilters(activeTab.entries, activeTab.filter, useDirSizeStore.getState().sizes);
       const index = start.index;
 
       const indices =
@@ -644,7 +649,10 @@ export function Panel() {
 
       const state = useExplorerStore.getState();
       const activeTab = state.tabs.find((t) => t.id === state.activeTabId) || state.tabs[0];
-      const entries = activeTab.searchResults ?? activeTab.entries;
+      // フィルタ状態でも正しいエントリを参照するため applyFilters を使う
+      const entries = activeTab.searchResults
+        ? activeTab.searchResults
+        : applyFilters(activeTab.entries, activeTab.filter, useDirSizeStore.getState().sizes);
 
       // Grid mode: calculate columns from container width
       const getGridCols = () => {

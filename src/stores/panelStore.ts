@@ -706,7 +706,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
 
   setCursor: (index) => {
     const tab = get().getActiveTab();
-    const displayEntries = tab.searchResults ?? tab.entries;
+    // フィルタ状態でも正しい表示エントリ数でクランプするため applyFilters を使う
+    const displayEntries = tab.searchResults
+      ? tab.searchResults
+      : applyFilters(tab.entries, tab.filter, useDirSizeStore.getState().sizes);
     const len = displayEntries.length;
     set((s) => ({
       tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({
@@ -749,7 +752,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
 
   selectAll: () => {
     const tab = get().getActiveTab();
-    const displayEntries = tab.searchResults ?? tab.entries;
+    // フィルタ状態でも表示されているエントリのみを選択するため applyFilters を使う
+    const displayEntries = tab.searchResults
+      ? tab.searchResults
+      : applyFilters(tab.entries, tab.filter, useDirSizeStore.getState().sizes);
     const newSet = new Set<number>();
     for (let i = 0; i < displayEntries.length; i++) newSet.add(i);
     set((s) => ({
@@ -789,7 +795,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   // File operations
   clipboardCopy: () => {
     const tab = get().getActiveTab();
-    const displayEntries = tab.searchResults ?? tab.entries;
+    // フィルタ状態では applyFilters 済みエントリを参照する
+    const displayEntries = tab.searchResults
+      ? tab.searchResults
+      : applyFilters(tab.entries, tab.filter, useDirSizeStore.getState().sizes);
     const indices =
       tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
@@ -805,7 +814,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
 
   clipboardCut: () => {
     const tab = get().getActiveTab();
-    const displayEntries = tab.searchResults ?? tab.entries;
+    // フィルタ状態では applyFilters 済みエントリを参照する
+    const displayEntries = tab.searchResults
+      ? tab.searchResults
+      : applyFilters(tab.entries, tab.filter, useDirSizeStore.getState().sizes);
     const indices =
       tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
@@ -888,7 +900,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
 
   deleteSelected: async () => {
     const tab = get().getActiveTab();
-    const displayEntries = tab.searchResults ?? tab.entries;
+    // フィルタ状態では applyFilters 済みエントリを参照する
+    const displayEntries = tab.searchResults
+      ? tab.searchResults
+      : applyFilters(tab.entries, tab.filter, useDirSizeStore.getState().sizes);
     const indices =
       tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
@@ -1065,7 +1080,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }
 
     // 次/前のファイルへ移動してリネーム開始
-    const displayEntries = tab.searchResults ?? tab.entries;
+    // フィルタ状態では applyFilters 済みエントリ数で境界チェックする
+    const displayEntries = tab.searchResults
+      ? tab.searchResults
+      : applyFilters(tab.entries, tab.filter, useDirSizeStore.getState().sizes);
     const nextIndex = tab.renamingIndex + direction;
     if (nextIndex >= 0 && nextIndex < displayEntries.length) {
       // ディレクトリを再読み込みしてからリネーム開始
