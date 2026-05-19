@@ -287,7 +287,12 @@ interface ExplorerStore {
   getActiveTab: () => TabState;
 
   // Directory navigation
-  loadDirectory: (path: string, addToHistory?: boolean, smooth?: boolean) => Promise<void>;
+  loadDirectory: (
+    path: string,
+    addToHistory?: boolean,
+    smooth?: boolean,
+    focusPath?: string,
+  ) => Promise<void>;
   refreshDirectory: () => Promise<void>;
   /** 現在のソートキー/順序でエントリを再ソート（dirSizes更新時などに使用） */
   resortEntries: () => void;
@@ -435,7 +440,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
 
   // Directory
   // smooth=true: 既存entriesを保持したままバックグラウンド更新（Undo/Redo時のチカチカ防止）
-  loadDirectory: async (path, addToHistory = true, smooth = false) => {
+  // focusPath: 再読み込み後にカーソル・選択をこのパスに合わせる（ファイル操作後のフォーカス維持）
+  loadDirectory: async (path, addToHistory = true, smooth = false, focusPath) => {
     const { activeTabId } = get();
 
     // ホーム画面: バックエンド呼び出し不要
@@ -564,12 +570,33 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         historyIndex = history.length - 1;
       }
 
+      // focusPath が指定されている場合: そのファイルのインデックスを探してカーソル・選択を合わせる
+      // ファイル操作（リネーム・コピー・移動・削除）後に選択状態を維持するための仕組み
+      let focusCursor: number | null = null;
+      let focusSelection: Set<number> | null = null;
+      if (focusPath) {
+        const focusIdx = sorted.findIndex((e) => e.path === focusPath);
+        if (focusIdx >= 0) {
+          focusCursor = focusIdx;
+          focusSelection = new Set([focusIdx]);
+        }
+      }
+
       // キャッシュから表示状態を復元（戻る/進む・クリック操作共通）
-      const cached = tab.displayStateCache.get(path);
-      const restoredCursor = cached ? Math.min(cached.cursorIndex, sorted.length - 1) : 0;
-      const restoredSelection = cached
-        ? new Set(cached.selectedIndices.filter((i) => i < sorted.length))
-        : new Set<number>();
+      // focusPath が指定されている場合はキャッシュより優先する
+      const cached = focusPath ? null : tab.displayStateCache.get(path);
+      const restoredCursor =
+        focusCursor !== null
+          ? focusCursor
+          : cached
+            ? Math.min(cached.cursorIndex, sorted.length - 1)
+            : 0;
+      const restoredSelection =
+        focusSelection !== null
+          ? focusSelection
+          : cached
+            ? new Set(cached.selectedIndices.filter((i) => i < sorted.length))
+            : new Set<number>();
 
       set((s) => ({
         tabs: updateActiveTab(s.tabs, activeTabId, () => ({
@@ -815,6 +842,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     if (!clipData || clipData.paths.length === 0) return false;
 
     try {
+      let focusPathAfterPaste: string | undefined;
       if (clipData.operation === "copy") {
         await useCopyQueueStore.getState().enqueue(clipData.paths, tab.path, "copy");
         // コピーキューは非同期でリネームされる可能性があるため、undo記録は省略
@@ -830,6 +858,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         }));
         useUndoStore.getState().pushAction({ type: "move", entries });
         set({ clipboard: null });
+        // 移動後: 最初のファイルをフォーカス
+        if (actualPaths.length > 0) {
+          focusPathAfterPaste = actualPaths[0];
+        }
       }
       // 移動履歴記録
       const exts = clipData.paths
@@ -842,7 +874,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         operation: clipData.operation === "copy" ? "copy" : "move",
         fileCount: clipData.paths.length,
       }).catch((_err) => {});
-      await get().loadDirectory(tab.path, false);
+      await get().loadDirectory(tab.path, false, false, focusPathAfterPaste);
       return true;
     } catch (e: unknown) {
       set((s) => ({
@@ -861,6 +893,31 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       tab.selectedIndices.size > 0 ? Array.from(tab.selectedIndices) : [tab.cursorIndex];
     const paths = indices.map((i) => displayEntries[i]?.path).filter(Boolean);
     if (paths.length === 0) return;
+
+    // 削除後にフォーカスするファイルを事前に決定する
+    // 削除インデックスの最大値の「次のファイル」、なければ「前のファイル」を探す
+    const deletedIndicesSet = new Set(indices);
+    const sortedIndices = [...indices].sort((a, b) => a - b);
+    const maxDeletedIdx = sortedIndices[sortedIndices.length - 1];
+    let nextFocusPath: string | undefined;
+    // 削除されないファイルの中で、最大削除インデックスの「次」を探す
+    for (let i = maxDeletedIdx + 1; i < displayEntries.length; i++) {
+      if (!deletedIndicesSet.has(i)) {
+        nextFocusPath = displayEntries[i].path;
+        break;
+      }
+    }
+    // 次がなければ「前」を探す
+    if (!nextFocusPath) {
+      const minDeletedIdx = sortedIndices[0];
+      for (let i = minDeletedIdx - 1; i >= 0; i--) {
+        if (!deletedIndicesSet.has(i)) {
+          nextFocusPath = displayEntries[i].path;
+          break;
+        }
+      }
+    }
+
     try {
       const result = await invoke<{ succeeded: string[]; failed: [string, string][] }>(
         "delete_files",
@@ -878,7 +935,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         const names = result.failed.map(([p]) => p.substring(p.lastIndexOf("\\") + 1)).join(", ");
         toast.error(`削除に失敗: ${names}`);
       }
-      await get().loadDirectory(tab.path, false);
+      // 削除後は隣接ファイルをフォーカス（スクロール位置を保持しつつ近くのファイルを選択）
+      await get().loadDirectory(tab.path, false, false, nextFocusPath);
     } catch (e: unknown) {
       toast.error(`削除エラー: ${e instanceof Error ? e.message : String(e)}`);
       await get().loadDirectory(tab.path, false);
@@ -969,7 +1027,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           renamingIndex: null,
         })),
       }));
-      await get().loadDirectory(tab.path, false);
+      // リネーム後の新しいパスをフォーカスして選択状態を維持する
+      await get().loadDirectory(tab.path, false, false, newPath);
     } catch (e: unknown) {
       set((s) => ({
         tabs: updateActiveTab(s.tabs, s.activeTabId, () => ({

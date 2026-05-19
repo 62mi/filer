@@ -234,22 +234,20 @@ export function Panel() {
     fetchIcons(Array.from(exts));
   }, [displayEntries, tab.loading, fetchIcons]);
 
-  // Scroll to keep cursor visible (パス変更・ロード完了時はカーソルを中心にスクロール)
+  // Scroll to keep cursor visible (パス変更時はカーソルを中心にスクロール、それ以外は最小スクロール)
   useEffect(() => {
-    const wasLoading = prevLoadingRef.current;
     prevLoadingRef.current = tab.loading;
 
     // loading中はスクロールしない
     if (tab.loading || !listRef.current) return;
 
     const container = listRef.current;
-    const justFinishedLoading = wasLoading;
     const isPathChange = prevPathRef.current !== tab.path;
     prevPathRef.current = tab.path;
 
-    // パス変更 or ロード完了 → カーソルを中心にスクロール
-    // (navigateBackで2回loadDirectoryが呼ばれる問題を回避: 最後のロード完了時にスクロール)
-    const shouldCenter = isPathChange || justFinishedLoading;
+    // パス変更時のみカーソルを中心にスクロール
+    // ファイル操作後の再読み込み（同一パス）ではカーソルが見える範囲に最小スクロールするだけにする
+    const shouldCenter = isPathChange;
 
     const doScroll = () => {
       const settings = useSettingsStore.getState();
